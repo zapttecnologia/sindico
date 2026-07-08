@@ -214,6 +214,16 @@ export default function Morador({ onToast }) {
                 placeholder="Descreva com detalhes: local, horario, o que aconteceu..."
                 value={descricao} onChange={e => setDescricao(e.target.value)} />
             </div>
+
+            {/* Aviso de anexo — disponível após envio */}
+            <div style={{ padding:'12px 14px', background:'#e8eeff', borderRadius:'var(--r-md)',
+              fontSize:13, color:'#2843ad', marginBottom:16, display:'flex', alignItems:'center', gap:8 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21.44 11.05L12.25 20.24a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+              </svg>
+              Apos enviar voce podera anexar fotos e arquivos (max. 10MB cada).
+            </div>
+
             <button className="btn btn-primary btn-block" style={{ fontSize:15, padding:'13px' }}
               onClick={enviarChamado} disabled={loading || !descricao.trim()}>
               {loading ? 'Enviando...' : 'Enviar solicitacao'}
@@ -221,7 +231,7 @@ export default function Morador({ onToast }) {
           </div>
         ) : (
           <div>
-            {/* Confirmação + Anexos */}
+            {/* Confirmação */}
             <div className="card" style={{ textAlign:'center', marginBottom:16 }}>
               <div style={{ fontSize:36, marginBottom:8 }}>✅</div>
               <h3 style={{ fontFamily:'var(--font-display)', color:'var(--navy)', margin:'0 0 6px' }}>Solicitacao enviada!</h3>
@@ -235,9 +245,14 @@ export default function Morador({ onToast }) {
               </p>
             </div>
 
-            {/* Anexar arquivos */}
+            {/* Anexar arquivos APÓS criação */}
             <div className="card">
-              <h3 className="section-title">Adicionar fotos ou arquivos (opcional)</h3>
+              <h3 className="section-title" style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" strokeWidth="2">
+                  <path d="M21.44 11.05L12.25 20.24a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                </svg>
+                Adicionar fotos ou arquivos
+              </h3>
               <AnexosPanel solicitacaoId={ticketCriado.id} onToast={onToast} />
               <div style={{ marginTop:16, display:'flex', gap:8 }}>
                 <button className="btn btn-primary" onClick={() => { setTicketCriado(null); setScreen('home') }}>

@@ -556,6 +556,39 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
         {/* ── CONDOMÍNIOS + USUÁRIOS (aninhados) ── */}
         {!loading && aba==='condominios' && (
           <div>
+            {/* Equipe da empresa (sem condomínio vinculado) */}
+            {(() => {
+              const equipe = usuarios.filter(u => ['admin','equipe'].includes(u.papel) && !u.condominio_id)
+              if (!equipe.length) return null
+              return (
+                <div style={{ background:'#1a1f2e', border:`1px solid ${C.border}`, borderRadius:12, padding:'14px 16px', marginBottom:12 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.violet, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
+                    👥 Equipe da empresa
+                  </div>
+                  {equipe.map(u => (
+                    <div key={u.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:`1px solid ${C.border2}` }}>
+                      <div style={{ width:32, height:32, borderRadius:'50%', background:'#1a3451',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:12, fontWeight:700, color:C.blue, flexShrink:0 }}>
+                        {(u.nome||'?')[0].toUpperCase()}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{u.nome||'—'}</div>
+                        <div style={{ fontSize:11, color:C.muted }}>
+                          {u.codigo_acesso ? `Código: ${u.codigo_acesso}` : ''}
+                          {u.email ? ` · ${u.email}` : ''}
+                        </div>
+                      </div>
+                      <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:5,
+                        background:'#21262d', color: u.papel==='admin' ? C.amber : C.green, textTransform:'uppercase' }}>
+                        {u.papel==='admin' ? 'Admin' : 'Síndico'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+
             {condominios.map(c => (
               <CondominioCard
                 key={c.id}

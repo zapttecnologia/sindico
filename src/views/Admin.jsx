@@ -116,6 +116,30 @@ export default function Admin({ onToast }) {
     onToast('Condominio atualizado.'); setModalCondo(null); carregarCondos()
   }
 
+  const uploadPDF = async (file, condoId, tipo) => {
+    if (file.size > 20 * 1024 * 1024) { onToast('Arquivo muito grande. Máximo 20MB.'); return null }
+    if (file.type !== 'application/pdf') { onToast('Apenas arquivos PDF são aceitos.'); return null }
+    const path = `${condoId}/${tipo}-${Date.now()}.pdf`
+    const { error } = await supabase.storage.from('docs-condominios').upload(path, file, { upsert:true })
+    if (error) { onToast('Erro no upload: '+error.message); return null }
+    const { data } = supabase.storage.from('docs-condominios').getPublicUrl(path)
+    return data.publicUrl
+  }
+
+  const handleUploadPDF = async (e, condoId, tipo) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    onToast('Enviando PDF...')
+    const url = await uploadPDF(file, condoId, tipo)
+    if (!url) return
+    const campo = tipo === 'regulamento' ? 'regulamento_pdf_url' : 'convencao_pdf_url'
+    await supabase.from('condominios').update({ [campo]: url }).eq('id', condoId)
+    onToast('PDF salvo com sucesso!')
+    setModalCondo(m => m ? ({ ...m, [campo]: url }) : m)
+    carregarCondos()
+    e.target.value = ''
+  }
+
   const excluirCondo = async (id) => {
     if (!window.confirm('Excluir este condominio?')) return
     const { error } = await supabase.from('condominios').delete().eq('id', id)
@@ -391,7 +415,6 @@ export default function Admin({ onToast }) {
               [['Seguradora','seguro_seguradora'],['Apolice','seguro_apolice']],
               [['Vencimento seguro','seguro_vencimento','date'],['Inicio gestao','gestao_inicio','date']],
               [['Observacoes','obs']],
-            [['URL Regulamento Interno (PDF)','regulamento_pdf_url'],['URL Convencao (PDF)','convencao_pdf_url']],
             ].map((row,ri) => (
               <div key={ri} style={{ display:'grid', gridTemplateColumns:`repeat(${row.length},1fr)`, gap:10, marginBottom:10 }}>
                 {row.map(([label,key,type='text']) => (
@@ -403,6 +426,53 @@ export default function Admin({ onToast }) {
                 ))}
               </div>
             ))}
+            {/* Upload PDFs */}
+            <div style={{ margin:'16px 0', paddingTop:16, borderTop:'1px solid var(--gray-100)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
+                Documentos do Condominio
+              </div>
+              <div className="row2">
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--gray-600)', display:'block', marginBottom:6 }}>Regulamento Interno (PDF)</label>
+                  {modalCondo?.regulamento_pdf_url && (
+                    <a href={modalCondo.regulamento_pdf_url} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize:12, color:'var(--emerald)', display:'block', marginBottom:6 }}>
+                      ✅ PDF atual — clique para ver
+                    </a>
+                  )}
+                  <label style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 12px',
+                    background:'var(--mint)', border:'1px solid var(--emerald)', borderRadius:'var(--r-md)',
+                    fontSize:12, fontWeight:600, color:'var(--emerald)', cursor:'pointer' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    {modalCondo?.regulamento_pdf_url ? 'Substituir PDF' : 'Enviar PDF'}
+                    <input type="file" accept="application/pdf" style={{ display:'none' }}
+                      onChange={e => handleUploadPDF(e, modalCondo?.id, 'regulamento')} />
+                  </label>
+                </div>
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--gray-600)', display:'block', marginBottom:6 }}>Convencao do Condominio (PDF)</label>
+                  {modalCondo?.convencao_pdf_url && (
+                    <a href={modalCondo.convencao_pdf_url} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize:12, color:'var(--emerald)', display:'block', marginBottom:6 }}>
+                      ✅ PDF atual — clique para ver
+                    </a>
+                  )}
+                  <label style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 12px',
+                    background:'var(--mint)', border:'1px solid var(--emerald)', borderRadius:'var(--r-md)',
+                    fontSize:12, fontWeight:600, color:'var(--emerald)', cursor:'pointer' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    {modalCondo?.convencao_pdf_url ? 'Substituir PDF' : 'Enviar PDF'}
+                    <input type="file" accept="application/pdf" style={{ display:'none' }}
+                      onChange={e => handleUploadPDF(e, modalCondo?.id, 'convencao')} />
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <button className="btn btn-primary btn-block" onClick={salvarCondoCompleto}>Salvar todos os dados</button>
           </div>
         </div>
