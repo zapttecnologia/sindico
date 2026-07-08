@@ -56,10 +56,12 @@ export default function Login() {
 
       <div style={{ position:'relative', zIndex:1, width:'100%', maxWidth:420, display:'flex', flexDirection:'column', alignItems:'center' }}>
         <div style={{ textAlign:'center', marginBottom:36 }}>
+          {/* Logo com fundo branco */}
           <div style={{ display:'inline-flex', alignItems:'center', justifyContent:'center',
-            width:76, height:76, background:'rgba(255,255,255,.15)',
-            borderRadius:20, marginBottom:18, backdropFilter:'blur(4px)' }}>
-            <ZaptCondoLogo size={52} white />
+            width:86, height:86, background:'#ffffff',
+            borderRadius:22, marginBottom:18,
+            boxShadow:'0 8px 32px rgba(0,0,0,.25)' }}>
+            <ZaptCondoLogo size={58} white={false} />
           </div>
           <h1 style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:800,
             color:'#fff', margin:'0 0 10px', letterSpacing:'-.3px', lineHeight:1.2 }}>
