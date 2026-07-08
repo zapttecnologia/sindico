@@ -34,7 +34,8 @@ export default function Admin({ onToast }) {
   const [filtroCondo, setFiltroCondo] = useState('todos')
   const [novoCondo, setNovoCondo] = useState('')
   const [modalConta, setModalConta] = useState(null)
-  const [blocosCarregados, setBlocosCarregados] = useState(true) // false = tabela não existe
+  const [modalCondo, setModalCondo] = useState(null) // edição completa do condomínio
+  const [blocosCarregados, setBlocosCarregados] = useState(true)
 
   // Form cadastro — ordem: papel → condo → bloco → apto → código auto
   const VAZIO = { nome:'', email:'', codigo:'', senha:SENHA_PADRAO, telefone:'', papel:'morador', condo:'', bloco:'', apto:'' }
@@ -46,7 +47,7 @@ export default function Admin({ onToast }) {
   const [novoBloco, setNovoBloco] = useState({}) // { [condoId]: {nome:'', total:''} }
 
   const carregarCondos = useCallback(async () => {
-    const { data } = await supabase.from('condominios').select('id,nome').order('nome')
+    const { data } = await supabase.from('condominios').select('*').order('nome')
     if (data) setCondominios(data)
   }, [])
 
@@ -101,6 +102,39 @@ export default function Admin({ onToast }) {
     const { error } = await supabase.from('condominios').update({ nome }).eq('id', id)
     if (error) { onToast('Erro ao salvar: '+error.message); return }
     onToast('Nome atualizado.'); carregarCondos()
+  }
+
+  const salvarCondoCompleto = async () => {
+    if (!modalCondo) return
+    const { error } = await supabase.from('condominios').update({
+      nome:              modalCondo.nome,
+      cnpj:              modalCondo.cnpj || null,
+      total_unidades:    modalCondo.total_unidades ? Number(modalCondo.total_unidades) : null,
+      ano_construcao:    modalCondo.ano_construcao ? Number(modalCondo.ano_construcao) : null,
+      endereco_rua:      modalCondo.endereco_rua || null,
+      endereco_numero:   modalCondo.endereco_numero || null,
+      endereco_complemento: modalCondo.endereco_complemento || null,
+      endereco_bairro:   modalCondo.endereco_bairro || null,
+      endereco_cidade:   modalCondo.endereco_cidade || null,
+      endereco_uf:       modalCondo.endereco_uf || null,
+      endereco_cep:      modalCondo.endereco_cep || null,
+      sindico_nome:      modalCondo.sindico_nome || null,
+      sindico_telefone:  modalCondo.sindico_telefone || null,
+      sindico_email:     modalCondo.sindico_email || null,
+      mandato_inicio:    modalCondo.mandato_inicio || null,
+      mandato_fim:       modalCondo.mandato_fim || null,
+      administradora_nome:    modalCondo.administradora_nome || null,
+      administradora_contato: modalCondo.administradora_contato || null,
+      portaria_nome:     modalCondo.portaria_nome || null,
+      portaria_telefone: modalCondo.portaria_telefone || null,
+      seguro_seguradora: modalCondo.seguro_seguradora || null,
+      seguro_apolice:    modalCondo.seguro_apolice || null,
+      seguro_vencimento: modalCondo.seguro_vencimento || null,
+      gestao_inicio:     modalCondo.gestao_inicio || null,
+      obs:               modalCondo.obs || null,
+    }).eq('id', modalCondo.id)
+    if (error) { onToast('Erro: '+error.message); return }
+    onToast('Condomínio atualizado.'); setModalCondo(null); carregarCondos()
   }
   const excluirCondo = async (id) => {
     if (!window.confirm('Excluir este condomínio? Os blocos serão removidos junto.')) return
@@ -245,6 +279,7 @@ export default function Admin({ onToast }) {
                   </div>
                   <div style={{ display:'flex', gap:6 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => salvarNomeCondo(c.id, nomeEdit)}>Salvar nome</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => setModalCondo({...c})}>✏️ Editar dados</button>
                     <button className="btn btn-danger btn-sm" onClick={() => excluirCondo(c.id)}>Excluir</button>
                   </div>
                 </div>
@@ -541,6 +576,93 @@ export default function Admin({ onToast }) {
           <button className="btn btn-primary btn-block" onClick={cadastrarUsuario} disabled={salvando}>
             {salvando ? 'Cadastrando...' : 'Cadastrar usuário'}
           </button>
+        </div>
+      )}
+
+      {/* ─────────────────── MODAL EDIÇÃO COMPLETA DO CONDOMÍNIO ─────────────────── */}
+      {modalCondo && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalCondo(null)}>
+          <div className="modal" style={{ maxWidth:580, maxHeight:'90vh', overflowY:'auto' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">📋 {modalCondo.nome}</h3>
+              <button className="modal-close" onClick={()=>setModalCondo(null)}>✕</button>
+            </div>
+
+            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Dados gerais</p>
+            <div className="row2">
+              <div className="field"><label>Nome</label><input className="input" value={modalCondo.nome||''} onChange={e=>setModalCondo(m=>({...m,nome:e.target.value}))} /></div>
+              <div className="field"><label>CNPJ</label><input className="input" value={modalCondo.cnpj||''} onChange={e=>setModalCondo(m=>({...m,cnpj:e.target.value}))} placeholder="00.000.000/0001-00"/></div>
+            </div>
+            <div className="row2">
+              <div className="field"><label>Total de unidades</label><input className="input" type="number" value={modalCondo.total_unidades||''} onChange={e=>setModalCondo(m=>({...m,total_unidades:e.target.value}))} /></div>
+              <div className="field"><label>Ano de construção</label><input className="input" type="number" value={modalCondo.ano_construcao||''} onChange={e=>setModalCondo(m=>({...m,ano_construcao:e.target.value}))} /></div>
+            </div>
+
+            <hr className="divider"/>
+            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Endereço</p>
+            <div className="row2">
+              <div className="field"><label>Rua / Avenida</label><input className="input" value={modalCondo.endereco_rua||''} onChange={e=>setModalCondo(m=>({...m,endereco_rua:e.target.value}))} /></div>
+              <div className="field"><label>Número</label><input className="input" value={modalCondo.endereco_numero||''} onChange={e=>setModalCondo(m=>({...m,endereco_numero:e.target.value}))} /></div>
+            </div>
+            <div className="row2">
+              <div className="field"><label>Complemento</label><input className="input" value={modalCondo.endereco_complemento||''} onChange={e=>setModalCondo(m=>({...m,endereco_complemento:e.target.value}))} /></div>
+              <div className="field"><label>Bairro</label><input className="input" value={modalCondo.endereco_bairro||''} onChange={e=>setModalCondo(m=>({...m,endereco_bairro:e.target.value}))} /></div>
+            </div>
+            <div className="row2">
+              <div className="field"><label>Cidade</label><input className="input" value={modalCondo.endereco_cidade||''} onChange={e=>setModalCondo(m=>({...m,endereco_cidade:e.target.value}))} /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div className="field"><label>UF</label><input className="input" maxLength={2} value={modalCondo.endereco_uf||''} onChange={e=>setModalCondo(m=>({...m,endereco_uf:e.target.value.toUpperCase()}))} placeholder="SP"/></div>
+                <div className="field"><label>CEP</label><input className="input" value={modalCondo.endereco_cep||''} onChange={e=>setModalCondo(m=>({...m,endereco_cep:e.target.value}))} placeholder="00000-000"/></div>
+              </div>
+            </div>
+
+            <hr className="divider"/>
+            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Síndico responsável</p>
+            <div className="row2">
+              <div className="field"><label>Nome</label><input className="input" value={modalCondo.sindico_nome||''} onChange={e=>setModalCondo(m=>({...m,sindico_nome:e.target.value}))} /></div>
+              <div className="field"><label>Telefone / WhatsApp</label><input className="input" value={modalCondo.sindico_telefone||''} onChange={e=>setModalCondo(m=>({...m,sindico_telefone:e.target.value}))} /></div>
+            </div>
+            <div className="row2">
+              <div className="field"><label>E-mail</label><input className="input" type="email" value={modalCondo.sindico_email||''} onChange={e=>setModalCondo(m=>({...m,sindico_email:e.target.value}))} /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div className="field"><label>Início mandato</label><input className="input" type="date" value={modalCondo.mandato_inicio||''} onChange={e=>setModalCondo(m=>({...m,mandato_inicio:e.target.value}))} /></div>
+                <div className="field"><label>Fim mandato</label><input className="input" type="date" value={modalCondo.mandato_fim||''} onChange={e=>setModalCondo(m=>({...m,mandato_fim:e.target.value}))} /></div>
+              </div>
+            </div>
+
+            <hr className="divider"/>
+            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Administradora</p>
+            <div className="row2">
+              <div className="field"><label>Nome da administradora</label><input className="input" value={modalCondo.administradora_nome||''} onChange={e=>setModalCondo(m=>({...m,administradora_nome:e.target.value}))} /></div>
+              <div className="field"><label>Contato (tel / e-mail)</label><input className="input" value={modalCondo.administradora_contato||''} onChange={e=>setModalCondo(m=>({...m,administradora_contato:e.target.value}))} /></div>
+            </div>
+
+            <hr className="divider"/>
+            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Portaria / Zelador</p>
+            <div className="row2">
+              <div className="field"><label>Nome</label><input className="input" value={modalCondo.portaria_nome||''} onChange={e=>setModalCondo(m=>({...m,portaria_nome:e.target.value}))} /></div>
+              <div className="field"><label>Telefone</label><input className="input" value={modalCondo.portaria_telefone||''} onChange={e=>setModalCondo(m=>({...m,portaria_telefone:e.target.value}))} /></div>
+            </div>
+
+            <hr className="divider"/>
+            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Seguro</p>
+            <div className="row2">
+              <div className="field"><label>Seguradora</label><input className="input" value={modalCondo.seguro_seguradora||''} onChange={e=>setModalCondo(m=>({...m,seguro_seguradora:e.target.value}))} /></div>
+              <div className="field"><label>Nº da apólice</label><input className="input" value={modalCondo.seguro_apolice||''} onChange={e=>setModalCondo(m=>({...m,seguro_apolice:e.target.value}))} /></div>
+            </div>
+            <div className="field"><label>Vencimento do seguro</label><input className="input" type="date" value={modalCondo.seguro_vencimento||''} onChange={e=>setModalCondo(m=>({...m,seguro_vencimento:e.target.value}))} /></div>
+
+            <hr className="divider"/>
+            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Gestão</p>
+            <div className="row2">
+              <div className="field"><label>Início da gestão</label><input className="input" type="date" value={modalCondo.gestao_inicio||''} onChange={e=>setModalCondo(m=>({...m,gestao_inicio:e.target.value}))} /></div>
+              <div className="field"><label>Observações internas</label><input className="input" value={modalCondo.obs||''} onChange={e=>setModalCondo(m=>({...m,obs:e.target.value}))} /></div>
+            </div>
+
+            <button className="btn btn-primary btn-block" onClick={salvarCondoCompleto} style={{marginTop:8}}>
+              Salvar todos os dados
+            </button>
+          </div>
         </div>
       )}
 
