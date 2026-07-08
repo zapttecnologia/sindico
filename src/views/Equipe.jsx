@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { CATEGORIAS, STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL } from '../lib/constants'
+import { CATEGORIAS, STATUS_LABEL, fmtDate, statusClass, aprovClass, APROVACAO_LABEL } from '../lib/constants'
 import TicketDetail from '../components/TicketDetail'
+import Dashboard from './Dashboard'
 
 const ICONS = {
   dashboard: { bg:'#e8eeff', color:'#2843ad', svg:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> },
@@ -138,84 +139,7 @@ export default function Equipe({ view, onToast }) {
       </div>
 
       {/* ── PAINEL / DASHBOARD ── */}
-      {tela === 'dashboard' && (
-        <div>
-          {/* Filtro por condominio */}
-          {condominios.length > 1 && (
-            <div style={{ marginBottom:20 }}>
-              <select className="input" style={{ width:'auto', minWidth:220 }} value={condoFiltro} onChange={e => setCondoFiltro(e.target.value)}>
-                <option value="todos">Todos os condominios</option>
-                {condominios.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
-            </div>
-          )}
-
-          {/* KPIs */}
-          <div className="stats-grid" style={{ gridTemplateColumns:'repeat(4,1fr)', marginBottom:28 }}>
-            {[
-              { label:'Total', val: filtStats.total, color:'var(--navy)', onClick: () => { setTela('chamados'); setStatusFiltro('todos') } },
-              { label:'Pendentes', val: filtStats.pendentes, color:'var(--amber)', onClick: () => { setTela('chamados'); setStatusFiltro('pendentes') } },
-              { label:'Ag. aprovacao', val: filtStats.aprovacao, color:'#8a5a00', onClick: () => setTela('aprovacao') },
-              { label:'Concluidos', val: filtStats.concluidos, color:'var(--emerald)', onClick: () => { setTela('chamados'); setStatusFiltro('concluido') } },
-            ].map(k => (
-              <div key={k.label} className="stat-card" style={{ cursor:'pointer' }} onClick={k.onClick}>
-                <div className="stat-num" style={{ color:k.color }}>{k.val}</div>
-                <div className="stat-label">{k.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Por condominio */}
-          {condoFiltro === 'todos' && condominios.length > 1 && (
-            <div className="card">
-              <h3 className="section-title">Por condominio</h3>
-              {condominios.map(c => {
-                const t = tickets.filter(tk => tk.condominio_id === c.id)
-                const pendentes = t.filter(tk => tk.status !== 'concluido').length
-                return (
-                  <div key={c.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                    padding:'12px 0', borderBottom:'1px solid var(--gray-100)', flexWrap:'wrap', gap:10 }}>
-                    <div>
-                      <div style={{ fontWeight:600, fontSize:14, color:'var(--gray-800)' }}>{c.nome}</div>
-                      <div style={{ fontSize:12, color:'var(--gray-400)' }}>{t.length} chamado{t.length!==1?'s':''}</div>
-                    </div>
-                    <div style={{ display:'flex', gap:12 }}>
-                      <span style={{ fontSize:13, fontWeight:700, color:pendentes>0?'var(--amber)':'var(--gray-400)' }}>
-                        {pendentes} pendente{pendentes!==1?'s':''}
-                      </span>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setCondoFiltro(c.id); setTela('chamados') }}>
-                        Ver chamados
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Ultimos chamados */}
-          <div className="card" style={{ marginTop:16 }}>
-            <h3 className="section-title">Ultimos chamados</h3>
-            {(condoFiltro==='todos'?tickets:tickets.filter(t=>t.condominio_id===condoFiltro)).slice(0,8).map(t => (
-              <div key={t.id} onClick={() => setTicketSel(t)}
-                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 0',
-                  borderBottom:'1px solid var(--gray-100)', cursor:'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background='var(--gray-50)'}
-                onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:14, fontWeight:600, color:'var(--gray-800)' }}>
-                    {t.categoria_personalizada||t.categoria}
-                  </div>
-                  <div style={{ fontSize:12, color:'var(--gray-400)' }}>
-                    {t.condominios?.nome} {t.bloco?`· Bl. ${t.bloco}`:''} {t.apartamento?`· ${t.apartamento}`:''} · {fmtDate(t.criado_em)}
-                  </div>
-                </div>
-                <span className={`status-badge ${statusClass(t.status)}`} style={{ flexShrink:0 }}>{STATUS_LABEL[t.status]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {tela === 'dashboard' && <Dashboard onToast={onToast} />}
 
       {/* ── CHAMADOS ── */}
       {tela === 'chamados' && (
