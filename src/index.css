@@ -1,16 +1,16 @@
 /* ── Design Tokens ─────────────────────────────────────────── */
 :root {
   /* Palette */
-  --navy:       #0d1a3a;
-  --navy-mid:   #1a2a5a;
-  --emerald:    #2843ad;
-  --emerald-lt: #3554c4;
+  --navy:       #0F2137;
+  --navy-mid:   #1A3451;
+  --emerald:    #1A6E5C;
+  --emerald-lt: #22876F;
   --amber:      #F4A340;
   --amber-lt:   #FDB96A;
-  --mint:       #e8eeff;
-  --mint-mid:   #c0ceee;
+  --mint:       #E8F3F0;
+  --mint-mid:   #C0D9D4;
   --rust:       #C0392B;
-  --moss:       #2843ad;
+  --moss:       #27795E;
 
   /* Neutrals */
   --white:      #FFFFFF;
@@ -66,13 +66,12 @@ input, textarea, select { font-family: var(--font-body); }
   flex: 1;
   margin-left: var(--sidebar-w);
   min-height: 100vh;
-  padding: 32px 28px 80px;
-  max-width: 960px;
+  padding: 28px 32px 80px;
 }
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;
-    padding: 20px 16px calc(var(--bottomnav-h) + 20px);
+    padding: 16px 14px calc(var(--bottomnav-h) + 16px);
   }
 }
 
@@ -170,14 +169,12 @@ input, textarea, select { font-family: var(--font-body); }
 .user-name { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-role { font-size: 11px; color: rgba(255,255,255,.4); text-transform: capitalize; }
 .btn-logout {
-  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
-  color: rgba(255,255,255,.75);
-  padding: 6px 10px; border-radius: 6px;
-  transition: all .15s; cursor: pointer;
-  font-size: 12px; font-weight: 600;
-  display: flex; align-items: center; gap: 5px;
+  background: none; border: none;
+  color: rgba(255,255,255,.35);
+  padding: 4px; border-radius: 6px;
+  transition: color .15s;
 }
-.btn-logout:hover { background: rgba(255,255,255,.15); color: #fff; border-color: rgba(255,255,255,.3); }
+.btn-logout:hover { color: rgba(255,255,255,.8); }
 @media (max-width: 768px) { .sidebar { display: none; } }
 
 /* ── Bottom Nav (mobile) ────────────────────────────────────── */
