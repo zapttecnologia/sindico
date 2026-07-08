@@ -542,7 +542,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
       <div style={{ maxWidth:1100, margin:'0 auto', padding:'24px 20px' }}>
         {/* Tabs */}
         <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24 }}>
-          {[['condominios','🏢 Condomínios'],['usuarios','👤 Usuários'],['chamados','📋 Chamados']].map(([id,label])=>(
+          {[['condominios','🏢 Condomínios'],['chamados','📋 Chamados']].map(([id,label])=>(
             <button key={id} onClick={()=>setAba(id)} style={{
               padding:'9px 18px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
               color:aba===id?'#fff':C.muted, borderBottom:aba===id?`2px solid ${C.purple}`:'2px solid transparent', marginBottom:-1 }}>
@@ -553,91 +553,28 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
 
         {loading && <div style={{ textAlign:'center', color:C.muted, padding:40 }}>Carregando...</div>}
 
-        {/* ── CONDOMÍNIOS ── */}
+        {/* ── CONDOMÍNIOS + USUÁRIOS (aninhados) ── */}
         {!loading && aba==='condominios' && (
           <div>
-            {condominios.map(c => {
-              let nomeEdit = c.nome
-              const qtdUsuarios = usuarios.filter(u=>u.condominio_id===c.id).length
-              const qtdChamados = chamados.filter(ch=>ch.condominio_id===c.id).length
-              return (
-                <div key={c.id} style={{ background:C.surface, border:`1px solid ${C.border}`,
-                  borderRadius:10, padding:'14px 16px', marginBottom:10,
-                  display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                  <div style={{ width:36, height:36, borderRadius:8, background:'#1a3451',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    fontSize:14, fontWeight:700, color:C.blue, flexShrink:0 }}>
-                    {c.nome[0]}
-                  </div>
-                  <input defaultValue={c.nome} onChange={e=>{nomeEdit=e.target.value}}
-                    style={{ flex:1, background:'transparent', border:'none', color:C.text,
-                      fontSize:15, fontWeight:600, outline:'none', minWidth:120 }} />
-                  <span style={{ fontSize:12, color:C.muted, whiteSpace:'nowrap' }}>
-                    {qtdUsuarios} usuário{qtdUsuarios!==1?'s':''} · {qtdChamados} chamado{qtdChamados!==1?'s':''}
-                  </span>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <Btn sm onClick={()=>salvarCondo(c.id, nomeEdit)}>Salvar</Btn>
-                    <Btn sm variant='ghost' onClick={()=>setModalCondo({...c})}>✏️ Detalhes</Btn>
-                    <Btn sm variant='danger' onClick={()=>excluirCondo(c.id)}>Excluir</Btn>
-                  </div>
-                </div>
-              )
-            })}
+            {condominios.map(c => (
+              <CondominioCard
+                key={c.id}
+                condo={c}
+                usuarios={usuarios.filter(u => u.condominio_id === c.id)}
+                chamados={chamados.filter(ch => ch.condominio_id === c.id)}
+                condominios={condominios}
+                empresa={empresa}
+                onToast={onToast}
+                onRefresh={carregar}
+                onEditCondo={() => setModalCondo({...c})}
+                onDeleteCondo={() => excluirCondo(c.id)}
+                onSaveCondo={(nome) => salvarCondo(c.id, nome)}
+              />
+            ))}
             <div style={{ display:'flex', gap:10, marginTop:16 }}>
-              <DI value={novoCondNome} onChange={setNovoCondNome} placeholder="Nome do novo condomínio"
-                style={{ flex:1 }} />
+              <DI value={novoCondNome} onChange={setNovoCondNome} placeholder="Nome do novo condomínio" style={{ flex:1 }} />
               <Btn onClick={adicionarCondo}>+ Adicionar</Btn>
             </div>
-          </div>
-        )}
-
-        {/* ── USUÁRIOS ── */}
-        {!loading && aba==='usuarios' && (
-          <div>
-            <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:16 }}>
-              <Btn onClick={()=>setModalNovaConta(true)}>+ Novo usuário</Btn>
-            </div>
-            {['admin','equipe','conselheiro','morador'].map(papel => {
-              const grupo = usuarios.filter(u=>u.papel===papel)
-              if (!grupo.length) return null
-              return (
-                <div key={papel} style={{ marginBottom:20 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:5,
-                      background:'#21262d', color:PAPEL_COR[papel]||C.muted, textTransform:'uppercase' }}>
-                      {PAPEL_LABEL[papel]}
-                    </span>
-                    <span style={{ fontSize:12, color:C.muted }}>{grupo.length} conta{grupo.length!==1?'s':''}</span>
-                  </div>
-                  {grupo.map(u=>(
-                    <div key={u.id} style={{ background:C.surface, border:`1px solid ${C.border2}`,
-                      borderRadius:9, padding:'12px 14px', marginBottom:8,
-                      display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                      <div style={{ width:36, height:36, borderRadius:'50%', background:'#1a3451',
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:13, fontWeight:700, color:C.blue, flexShrink:0 }}>
-                        {(u.nome||'?')[0].toUpperCase()}
-                      </div>
-                      <div style={{ flex:1, minWidth:140 }}>
-                        <div style={{ fontSize:14, fontWeight:600, color:C.text, display:'flex', alignItems:'center', gap:8 }}>
-                          {u.nome||'—'}
-                          {u.primeiro_acesso===true && (
-                            <span style={{ fontSize:10, background:'#2d1a00', color:C.amber,
-                              padding:'1px 6px', borderRadius:4, fontWeight:700 }}>1º acesso</span>
-                          )}
-                        </div>
-                        <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>
-                          {u.codigo_acesso ? `Código: ${u.codigo_acesso}` : ''}
-                          {u.condominios?.nome ? ` · ${u.condominios.nome}` : ''}
-                        </div>
-                      </div>
-                      <Btn sm variant='ghost' onClick={()=>setModalUsuario({...u, novaSenha:''})}>Editar</Btn>
-                    </div>
-                  ))}
-                </div>
-              )
-            })}
-            {usuarios.length===0 && <div style={{ textAlign:'center', color:C.muted, padding:32 }}>Nenhum usuário cadastrado.</div>}
           </div>
         )}
 
@@ -803,6 +740,205 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
         </Modal>
       )}
     </div>
+  )
+}
+
+// ── Card de condomínio com usuários aninhados ───────────────
+function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToast, onRefresh, onEditCondo, onDeleteCondo, onSaveCondo }) {
+  const [expandido, setExpandido] = useState(false)
+  const [modalUsuario, setModalUsuario] = useState(null)
+  const [modalNovaConta, setModalNovaConta] = useState(false)
+  const [novaConta, setNovaConta] = useState({ nome:'', email:'', codigo:'', senha:'mudar123', papel:'morador' })
+  const [salvando, setSalvando] = useState(false)
+  const [nomeEdit, setNomeEdit] = useState(condo.nome)
+  const PAPEIS = ['morador','conselheiro','equipe','admin']
+  const PAPEL_LABEL = { morador:'Morador', conselheiro:'Conselheiro', equipe:'Síndico', admin:'Admin' }
+
+  const api = async (body) => {
+    const session = (await supabase.auth.getSession()).data.session
+    const URL = import.meta.env.VITE_SUPABASE_URL
+    const r = await fetch(`${URL}/functions/v1/admin-actions`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token}` },
+      body: JSON.stringify(body),
+    })
+    const json = await r.json()
+    if (!r.ok) throw new Error(json.error)
+    return json
+  }
+
+  const criarConta = async () => {
+    if (!novaConta.nome||!novaConta.email||!novaConta.codigo) { onToast('Preencha nome, e-mail e código.'); return }
+    setSalvando(true)
+    try {
+      await api({
+        action:'create_user', email:novaConta.email, password:novaConta.senha,
+        nome:novaConta.nome, papel:novaConta.papel, empresa_id:empresa.id,
+        codigo_acesso:novaConta.codigo.toUpperCase(),
+        condominio_id: condo.id,
+      })
+      onToast('Usuário criado!'); setModalNovaConta(false)
+      setNovaConta({ nome:'', email:'', codigo:'', senha:'mudar123', papel:'morador' })
+      onRefresh()
+    } catch(e) { onToast('Erro: '+e.message) }
+    setSalvando(false)
+  }
+
+  const salvarUsuario = async () => {
+    if (!modalUsuario) return
+    const { error } = await supabase.from('perfis').update({
+      nome:modalUsuario.nome, papel:modalUsuario.papel,
+      codigo_acesso:modalUsuario.codigo_acesso?.toUpperCase(),
+    }).eq('id', modalUsuario.id)
+    if (error) { onToast('Erro: '+error.message); return }
+    onToast('Salvo.'); setModalUsuario(null); onRefresh()
+  }
+
+  const resetarSenha = async () => {
+    if (!modalUsuario?.novaSenha || modalUsuario.novaSenha.length<4) { onToast('Senha muito curta.'); return }
+    try { await api({action:'reset_password', user_id:modalUsuario.id, new_password:modalUsuario.novaSenha}); onToast('Senha alterada.') }
+    catch(e) { onToast('Erro: '+e.message) }
+  }
+
+  const excluirUsuario = async () => {
+    if (!window.confirm('Excluir esta conta?')) return
+    try { await api({action:'delete_user', user_id:modalUsuario.id}); onToast('Excluído.'); setModalUsuario(null); onRefresh() }
+    catch(e) { onToast('Erro: '+e.message) }
+  }
+
+  return (
+    <>
+      <div style={{ background:C.surface, border:`1px solid ${expandido ? C.purple : C.border}`,
+        borderRadius:12, marginBottom:10, overflow:'hidden', transition:'border-color .15s' }}>
+
+        {/* Linha principal */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', flexWrap:'wrap' }}>
+          <div style={{ width:36, height:36, borderRadius:8, background:'#1a3451',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:14, fontWeight:700, color:C.blue, flexShrink:0 }}>
+            {condo.nome[0]}
+          </div>
+          <input value={nomeEdit} onChange={e=>setNomeEdit(e.target.value)}
+            style={{ flex:1, background:'transparent', border:'none', color:C.text,
+              fontSize:15, fontWeight:600, outline:'none', minWidth:120 }} />
+          <span style={{ fontSize:12, color:C.muted, whiteSpace:'nowrap' }}>
+            {usuarios.length} usuário{usuarios.length!==1?'s':''} · {chamados.length} chamado{chamados.length!==1?'s':''}
+          </span>
+          <div style={{ display:'flex', gap:6 }}>
+            <Btn sm onClick={()=>onSaveCondo(nomeEdit)}>Salvar</Btn>
+            <Btn sm variant='ghost' onClick={onEditCondo}>✏️ Dados</Btn>
+            <Btn sm variant='ghost' onClick={()=>setExpandido(!expandido)}
+              style={{ color: expandido ? C.violet : C.muted, borderColor: expandido ? C.purple : C.border }}>
+              {expandido ? '▲ Fechar' : '▼ Usuários'}
+            </Btn>
+            <Btn sm variant='danger' onClick={onDeleteCondo}>Excluir</Btn>
+          </div>
+        </div>
+
+        {/* Usuários aninhados */}
+        {expandido && (
+          <div style={{ borderTop:`1px solid ${C.border}`, padding:'16px 16px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em' }}>
+                Usuários de {condo.nome}
+              </span>
+              <Btn sm onClick={()=>setModalNovaConta(true)}>+ Novo usuário</Btn>
+            </div>
+
+            {usuarios.length === 0 && (
+              <div style={{ textAlign:'center', color:C.muted, padding:'16px 0', fontSize:13 }}>
+                Nenhum usuário neste condomínio.
+              </div>
+            )}
+
+            {['admin','equipe','conselheiro','morador'].map(papel => {
+              const grupo = usuarios.filter(u=>u.papel===papel)
+              if (!grupo.length) return null
+              return (
+                <div key={papel} style={{ marginBottom:12 }}>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:4,
+                    background:'#21262d', color:PAPEL_COR[papel]||C.muted, textTransform:'uppercase',
+                    letterSpacing:'.04em', display:'inline-block', marginBottom:8 }}>
+                    {PAPEL_LABEL[papel]}
+                  </span>
+                  {grupo.map(u=>(
+                    <div key={u.id} style={{ display:'flex', alignItems:'center', gap:10,
+                      padding:'9px 0', borderBottom:`1px solid ${C.border2}`, flexWrap:'wrap' }}>
+                      <div style={{ width:32, height:32, borderRadius:'50%', background:'#1a3451',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:12, fontWeight:700, color:C.blue, flexShrink:0 }}>
+                        {(u.nome||'?')[0].toUpperCase()}
+                      </div>
+                      <div style={{ flex:1, minWidth:100 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:C.text, display:'flex', gap:6, alignItems:'center' }}>
+                          {u.nome||'—'}
+                          {u.primeiro_acesso===true && (
+                            <span style={{ fontSize:9, background:'#2d1a00', color:C.amber,
+                              padding:'1px 5px', borderRadius:3, fontWeight:700 }}>1º acesso</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize:11, color:C.muted }}>
+                          {u.codigo_acesso ? `Código: ${u.codigo_acesso}` : ''}
+                        </div>
+                      </div>
+                      <Btn sm variant='ghost' onClick={()=>setModalUsuario({...u, novaSenha:''})}>Editar</Btn>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal editar usuário */}
+      {modalUsuario && (
+        <Modal title="Editar usuário" onClose={()=>setModalUsuario(null)} maxWidth={420}>
+          <Fld label="Nome"><DI value={modalUsuario.nome||''} onChange={v=>setModalUsuario(m=>({...m,nome:v}))} /></Fld>
+          <G2>
+            <Fld label="Código de acesso">
+              <DI value={modalUsuario.codigo_acesso||''} onChange={v=>setModalUsuario(m=>({...m,codigo_acesso:v.toUpperCase()}))} />
+            </Fld>
+            <Fld label="Papel">
+              <DS value={modalUsuario.papel} onChange={v=>setModalUsuario(m=>({...m,papel:v}))}>
+                {PAPEIS.map(p=><option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}
+              </DS>
+            </Fld>
+          </G2>
+          <Btn onClick={salvarUsuario} style={{ width:'100%', marginBottom:14 }}>Salvar dados</Btn>
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
+            <Lbl>Resetar senha</Lbl>
+            <div style={{ display:'flex', gap:8, marginTop:6 }}>
+              <DI value={modalUsuario.novaSenha||''} onChange={v=>setModalUsuario(m=>({...m,novaSenha:v}))} placeholder="Nova senha" />
+              <Btn sm onClick={resetarSenha}>Resetar</Btn>
+            </div>
+          </div>
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14, marginTop:14 }}>
+            <Btn variant='danger' onClick={excluirUsuario} style={{ width:'100%' }}>Excluir conta</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal novo usuário */}
+      {modalNovaConta && (
+        <Modal title={`Novo usuário — ${condo.nome}`} onClose={()=>setModalNovaConta(false)} maxWidth={420}>
+          <Fld label="Nome *"><DI value={novaConta.nome} onChange={v=>setNovaConta(x=>({...x,nome:v}))} /></Fld>
+          <Fld label="E-mail *"><DI value={novaConta.email} onChange={v=>setNovaConta(x=>({...x,email:v}))} type="email"/></Fld>
+          <G2>
+            <Fld label="Código *"><DI value={novaConta.codigo} onChange={v=>setNovaConta(x=>({...x,codigo:v.toUpperCase()}))} placeholder="Ex.: JDC101"/></Fld>
+            <Fld label="Senha"><DI value={novaConta.senha} onChange={v=>setNovaConta(x=>({...x,senha:v}))} /></Fld>
+          </G2>
+          <Fld label="Papel">
+            <DS value={novaConta.papel} onChange={v=>setNovaConta(x=>({...x,papel:v}))}>
+              {PAPEIS.map(p=><option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}
+            </DS>
+          </Fld>
+          <Btn onClick={criarConta} disabled={salvando} style={{ width:'100%' }}>
+            {salvando?'Criando...':'Criar usuário'}
+          </Btn>
+        </Modal>
+      )}
+    </>
   )
 }
 

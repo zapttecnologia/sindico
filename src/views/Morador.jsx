@@ -4,18 +4,26 @@ import { useAuth } from '../context/AuthContext'
 import { CATEGORIAS, ticketNumber, STATUS_LABEL } from '../lib/constants'
 import TicketCard from '../components/TicketCard'
 
-const ICONS = {
-  novo: { bg:'#E8F3F0', color:'#1A6E5C', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> },
-  lista: { bg:'#EDE8F9', color:'#5B21B6', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 9h8M8 13h5"/></svg> },
+const CAT_ICONS = {
+  'Manutenção':      { bg:'#FFF3DC', color:'#8A5A00', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> },
+  'Reclamação':      { bg:'#FDECEA', color:'#C0392B', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
+  'Elevador':        { bg:'#E0EDFF', color:'#1A47A0', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 9l3-3 3 3M9 15l3 3 3-3"/></svg> },
+  'Limpeza':         { bg:'#E8F3F0', color:'#1A6E5C', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg> },
+  'Portaria':        { bg:'#EDE8F9', color:'#5B21B6', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><circle cx="16" cy="12" r="1.5"/></svg> },
+  'Interfone/Antena':{ bg:'#FFF3DC', color:'#8A5A00', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg> },
+  'Outros':          { bg:'#F1F0EE', color:'#6B6860', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg> },
+}
+
+const NAV_ICONS = {
+  novo:      { bg:'#E8F3F0', color:'#1A6E5C', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> },
+  lista:     { bg:'#EDE8F9', color:'#5B21B6', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 9h8M8 13h5"/></svg> },
   historico: { bg:'#FFF3DC', color:'#8A5A00', svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> },
 }
 
 function IconBtn({ icon, label, active, onClick }) {
   return (
     <button className={`icon-btn${active ? ' active' : ''}`} onClick={onClick}>
-      <div className="icon-btn-icon" style={{ background:icon.bg, color:icon.color }}>
-        {icon.svg}
-      </div>
+      <div className="icon-btn-icon" style={{ background:icon.bg, color:icon.color }}>{icon.svg}</div>
       <span className="icon-btn-label">{label}</span>
     </button>
   )
@@ -108,9 +116,9 @@ export default function Morador({ onToast }) {
       <div className="section-group">
         <div className="section-group-title">Solicitações</div>
         <div className="icon-grid">
-          <IconBtn icon={ICONS.novo} label="Novo chamado" active={tela==='novo'} onClick={() => { setTela('novo'); setConfirmNum(null) }} />
-          <IconBtn icon={ICONS.lista} label="Meus chamados" active={tela==='lista'} onClick={() => setTela('lista')} />
-          <IconBtn icon={ICONS.historico} label="Histórico" active={tela==='historico'} onClick={() => setTela('historico')} />
+          <IconBtn icon={NAV_ICONS.novo} label="Novo chamado" active={tela==='novo'} onClick={() => { setTela('novo'); setConfirmNum(null) }} />
+          <IconBtn icon={NAV_ICONS.lista} label="Meus chamados" active={tela==='lista'} onClick={() => setTela('lista')} />
+          <IconBtn icon={NAV_ICONS.historico} label="Histórico" active={tela==='historico'} onClick={() => setTela('historico')} />
         </div>
       </div>
 
@@ -135,9 +143,22 @@ export default function Morador({ onToast }) {
               <h3 className="section-title">Novo chamado</h3>
               <div className="field">
                 <label>Tipo de solicitação</label>
-                <div className="chip-row">
+          <div className="icon-grid" style={{ marginBottom:10 }}>
                   {CATEGORIAS.map(c => (
-                    <button key={c} className={`chip${catSel === c ? ' selected' : ''}`} onClick={() => setCatSel(c)}>{c}</button>
+                    <button
+                      key={c}
+                      className={`icon-btn${catSel === c ? ' active' : ''}`}
+                      onClick={() => setCatSel(c)}
+                      style={{ minHeight:80 }}
+                    >
+                      <div className="icon-btn-icon" style={{
+                        background: catSel===c ? 'var(--emerald)' : CAT_ICONS[c]?.bg || '#F1F0EE',
+                        color: catSel===c ? '#fff' : CAT_ICONS[c]?.color || '#6B6860',
+                      }}>
+                        {CAT_ICONS[c]?.svg}
+                      </div>
+                      <span className="icon-btn-label" style={{ fontSize:10.5 }}>{c}</span>
+                    </button>
                   ))}
                 </div>
                 {catSel === 'Outros' && (
