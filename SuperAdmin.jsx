@@ -34,7 +34,7 @@ export default function SuperAdmin({ onToast }) {
   const [empresas, setEmpresas] = useState([])
   const [planos, setPlanos] = useState([])
   const [metricas, setMetricas] = useState(null)
-  const [modalNova, setModalNova] = useState(false)
+  const [empresaSelecionada, setEmpresaSelecionada] = useState(null)
   const [modalEditar, setModalEditar] = useState(null)
   const [busca, setBusca] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -279,11 +279,18 @@ export default function SuperAdmin({ onToast }) {
                         )}
                       </td>
                       <td style={{ padding:'12px 14px' }}>
-                        <button onClick={()=>setModalEditar({...e})} style={{
-                          background:'#21262d', border:'1px solid #30363d', borderRadius:6,
-                          color:'#e6edf3', padding:'5px 12px', fontSize:12, cursor:'pointer' }}>
-                          Editar
-                        </button>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button onClick={()=>setEmpresaSelecionada(e)} style={{
+                            background:'#7c3aed', border:'none', borderRadius:6,
+                            color:'#fff', padding:'5px 12px', fontSize:12, cursor:'pointer' }}>
+                            Ver detalhes
+                          </button>
+                          <button onClick={()=>setModalEditar({...e})} style={{
+                            background:'#21262d', border:'1px solid #30363d', borderRadius:6,
+                            color:'#e6edf3', padding:'5px 12px', fontSize:12, cursor:'pointer' }}>
+                            Editar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -327,6 +334,15 @@ export default function SuperAdmin({ onToast }) {
           </div>
         )}
       </div>
+
+      {/* Modal detalhes da empresa */}
+      {empresaSelecionada && (
+        <EmpresaDetalhe
+          empresa={empresaSelecionada}
+          onClose={() => setEmpresaSelecionada(null)}
+          onToast={onToast}
+        />
+      )}
 
       {/* Modal nova empresa */}
       {modalNova && (
@@ -557,6 +573,144 @@ function PlanoCard({ plano, onSave }) {
           color:'#8b949e', fontSize:13, cursor:'pointer' }}>
           Cancelar
         </button>
+      </div>
+    </div>
+  )
+}
+
+function EmpresaDetalhe({ empresa, onClose, onToast }) {
+  const [condominios, setCondominios] = useState([])
+  const [usuarios, setUsuarios] = useState([])
+  const [chamados, setChamados] = useState([])
+  const [aba, setAba] = useState('condominios')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function carregar() {
+      const [{ data: conds }, { data: users }, { data: chams }] = await Promise.all([
+        supabase.from('condominios').select('id, nome').eq('empresa_id', empresa.id).order('nome'),
+        supabase.from('perfis').select('id, nome, email, papel, codigo_acesso, condominio_id, condominios(nome)').eq('empresa_id', empresa.id).order('criado_em', { ascending: false }),
+        supabase.from('solicitacoes').select('id, categoria, status, criado_em, condominios(nome)').in('condominio_id',
+          (await supabase.from('condominios').select('id').eq('empresa_id', empresa.id)).data?.map(c => c.id) || []
+        ).order('criado_em', { ascending: false }).limit(50),
+      ])
+      setCondominios(conds || [])
+      setUsuarios(users || [])
+      setChamados(chams || [])
+      setLoading(false)
+    }
+    carregar()
+  }, [empresa.id])
+
+  const PAPEL_COR = { admin:'#f59e0b', equipe:'#3fb950', conselheiro:'#a78bfa', morador:'#8b949e' }
+  const STATUS_COR = { recebido:'#f59e0b', andamento:'#58a6ff', concluido:'#3fb950' }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:60,
+      display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'20px 16px', overflowY:'auto' }}>
+      <div style={{ background:'#161b22', border:'1px solid #30363d', borderRadius:16,
+        width:'100%', maxWidth:760, padding:'28px 24px' }}>
+
+        {/* Cabeçalho */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+          <div>
+            <h3 style={{ margin:0, fontSize:18, fontWeight:700, color:'#e6edf3' }}>{empresa.nome}</h3>
+            <div style={{ fontSize:12, color:'#8b949e', marginTop:4 }}>
+              Plano: <span style={{ color:'#a78bfa', fontWeight:600 }}>{empresa.plano_nome}</span>
+              {' · '}Status: <span style={{ color: empresa.status==='ativa' ? '#3fb950' : '#f85149', fontWeight:600 }}>{empresa.status}</span>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#8b949e', fontSize:22, cursor:'pointer' }}>✕</button>
+        </div>
+
+        {/* Abas */}
+        <div style={{ display:'flex', borderBottom:'1px solid #30363d', marginBottom:20, gap:0 }}>
+          {[['condominios','🏢 Condomínios'], ['usuarios','👤 Usuários'], ['chamados','📋 Chamados']].map(([id, label]) => (
+            <button key={id} onClick={()=>setAba(id)} style={{
+              padding:'9px 16px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
+              color: aba===id ? '#fff' : '#8b949e',
+              borderBottom: aba===id ? '2px solid #7c3aed' : '2px solid transparent',
+              marginBottom:-1,
+            }}>{label}</button>
+          ))}
+        </div>
+
+        {loading && <div style={{ textAlign:'center', color:'#8b949e', padding:32 }}>Carregando...</div>}
+
+        {/* Condomínios */}
+        {!loading && aba==='condominios' && (
+          <div>
+            {condominios.length === 0
+              ? <p style={{ color:'#8b949e', fontSize:13 }}>Nenhum condomínio cadastrado.</p>
+              : condominios.map(c => (
+                <div key={c.id} style={{ display:'flex', alignItems:'center', padding:'10px 0',
+                  borderBottom:'1px solid #21262d' }}>
+                  <div style={{ width:32, height:32, borderRadius:8, background:'#1a3451',
+                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:13,
+                    fontWeight:700, color:'#58a6ff', marginRight:12, flexShrink:0 }}>
+                    {c.nome[0]}
+                  </div>
+                  <span style={{ fontSize:14, color:'#e6edf3', fontWeight:500 }}>{c.nome}</span>
+                </div>
+              ))
+            }
+          </div>
+        )}
+
+        {/* Usuários */}
+        {!loading && aba==='usuarios' && (
+          <div>
+            {usuarios.length === 0
+              ? <p style={{ color:'#8b949e', fontSize:13 }}>Nenhum usuário cadastrado.</p>
+              : usuarios.map(u => (
+                <div key={u.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'10px 0', borderBottom:'1px solid #21262d', flexWrap:'wrap', gap:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ width:34, height:34, borderRadius:'50%', background:'#1a3451',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:12, fontWeight:700, color:'#58a6ff', flexShrink:0 }}>
+                      {(u.nome||'?')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:600, color:'#e6edf3' }}>{u.nome || '—'}</div>
+                      <div style={{ fontSize:11, color:'#8b949e' }}>
+                        {u.codigo_acesso ? `Código: ${u.codigo_acesso} · ` : ''}{u.condominios?.nome || ''}
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:5,
+                    background:'#21262d', color: PAPEL_COR[u.papel] || '#8b949e' }}>
+                    {u.papel}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+        )}
+
+        {/* Chamados */}
+        {!loading && aba==='chamados' && (
+          <div>
+            {chamados.length === 0
+              ? <p style={{ color:'#8b949e', fontSize:13 }}>Nenhum chamado registrado.</p>
+              : chamados.map(s => (
+                <div key={s.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'10px 0', borderBottom:'1px solid #21262d', flexWrap:'wrap', gap:8 }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:600, color:'#e6edf3' }}>{s.categoria}</div>
+                    <div style={{ fontSize:11, color:'#8b949e' }}>
+                      {s.condominios?.nome} · {new Date(s.criado_em).toLocaleDateString('pt-BR')}
+                    </div>
+                  </div>
+                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:5,
+                    background:'#21262d', color: STATUS_COR[s.status] || '#8b949e' }}>
+                    {s.status}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+        )}
       </div>
     </div>
   )
