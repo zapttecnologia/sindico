@@ -46,7 +46,7 @@ export default function Admin({ onToast }) {
     administradora_nome:'', administradora_contato:'',
     portaria_nome:'', portaria_telefone:'',
     seguro_seguradora:'', seguro_apolice:'', seguro_vencimento:'',
-    gestao_inicio:'', obs:''
+    gestao_inicio:'', obs:'', regulamento_pdf_url:'', convencao_pdf_url:''
   }
   const [novoCondo, setNovoCondo] = useState(CONDO_VAZIO)
   const [usuariosPorCondo, setUsuariosPorCondo] = useState({})
@@ -109,6 +109,8 @@ export default function Admin({ onToast }) {
       portaria_nome:modalCondo.portaria_nome||null, portaria_telefone:modalCondo.portaria_telefone||null,
       seguro_seguradora:modalCondo.seguro_seguradora||null, seguro_apolice:modalCondo.seguro_apolice||null, seguro_vencimento:modalCondo.seguro_vencimento||null,
       gestao_inicio:modalCondo.gestao_inicio||null, obs:modalCondo.obs||null,
+      regulamento_pdf_url:modalCondo.regulamento_pdf_url||null,
+      convencao_pdf_url:modalCondo.convencao_pdf_url||null,
     }).eq('id', modalCondo.id)
     if (error) { onToast('Erro: '+error.message); return }
     onToast('Condominio atualizado.'); setModalCondo(null); carregarCondos()
@@ -340,7 +342,10 @@ export default function Admin({ onToast }) {
               [['Seguradora','seguro_seguradora'],['Apolice','seguro_apolice']],
               [['Vencimento','seguro_vencimento','date']],
             ]},
-            { titulo:'Gestao', campos:[[['Inicio da gestao','gestao_inicio','date'],['Observacoes','obs']]]},
+            { titulo:'Gestao', campos:[
+              [['Inicio da gestao','gestao_inicio','date'],['Observacoes','obs']],
+              [['URL Regulamento Interno (PDF)','regulamento_pdf_url'],['URL Convencao (PDF)','convencao_pdf_url']],
+            ]},
           ].map(sec => (
             <div key={sec.titulo} style={{ marginBottom:20 }}>
               <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12, borderBottom:'1px solid var(--gray-100)', paddingBottom:6 }}>
@@ -386,6 +391,7 @@ export default function Admin({ onToast }) {
               [['Seguradora','seguro_seguradora'],['Apolice','seguro_apolice']],
               [['Vencimento seguro','seguro_vencimento','date'],['Inicio gestao','gestao_inicio','date']],
               [['Observacoes','obs']],
+            [['URL Regulamento Interno (PDF)','regulamento_pdf_url'],['URL Convencao (PDF)','convencao_pdf_url']],
             ].map((row,ri) => (
               <div key={ri} style={{ display:'grid', gridTemplateColumns:`repeat(${row.length},1fr)`, gap:10, marginBottom:10 }}>
                 {row.map(([label,key,type='text']) => (
