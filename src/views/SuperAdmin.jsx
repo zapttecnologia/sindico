@@ -382,8 +382,9 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
   const [chamados, setChamados] = useState([])
   const [loading, setLoading] = useState(true)
   const [novoCondNome, setNovoCondNome] = useState('')
-  const [modalUsuario, setModalUsuario] = useState(null) // null | objeto usuario
+  const [modalUsuario, setModalUsuario] = useState(null)
   const [modalNovaConta, setModalNovaConta] = useState(false)
+  const [modalCondo, setModalCondo] = useState(null)
   const [novaConta, setNovaConta] = useState({ nome:'', email:'', codigo:'', senha:'mudar123', papel:'morador', condominio_id:'' })
   const [salvando, setSalvando] = useState(false)
 
@@ -392,7 +393,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
     const ids = condominios.map(c=>c.id)
 
     const [{ data:conds }, { data:users }] = await Promise.all([
-      supabase.from('condominios').select('id, nome').eq('empresa_id', empresa.id).order('nome'),
+      supabase.from('condominios').select('*').eq('empresa_id', empresa.id).order('nome'),
       supabase.from('perfis').select('id, nome, email, papel, codigo_acesso, condominio_id, primeiro_acesso, condominios(nome)')
         .eq('empresa_id', empresa.id).order('criado_em', { ascending:false }),
     ])
@@ -423,6 +424,38 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
   const salvarCondo = async (id, nome) => {
     await supabase.from('condominios').update({ nome }).eq('id', id)
     onToast('Salvo.'); await carregar()
+  }
+  const salvarCondoCompleto = async () => {
+    if (!modalCondo) return
+    const { error } = await supabase.from('condominios').update({
+      nome:               modalCondo.nome,
+      cnpj:               modalCondo.cnpj||null,
+      total_unidades:     modalCondo.total_unidades ? Number(modalCondo.total_unidades) : null,
+      ano_construcao:     modalCondo.ano_construcao ? Number(modalCondo.ano_construcao) : null,
+      endereco_rua:       modalCondo.endereco_rua||null,
+      endereco_numero:    modalCondo.endereco_numero||null,
+      endereco_complemento: modalCondo.endereco_complemento||null,
+      endereco_bairro:    modalCondo.endereco_bairro||null,
+      endereco_cidade:    modalCondo.endereco_cidade||null,
+      endereco_uf:        modalCondo.endereco_uf||null,
+      endereco_cep:       modalCondo.endereco_cep||null,
+      sindico_nome:       modalCondo.sindico_nome||null,
+      sindico_telefone:   modalCondo.sindico_telefone||null,
+      sindico_email:      modalCondo.sindico_email||null,
+      mandato_inicio:     modalCondo.mandato_inicio||null,
+      mandato_fim:        modalCondo.mandato_fim||null,
+      administradora_nome:    modalCondo.administradora_nome||null,
+      administradora_contato: modalCondo.administradora_contato||null,
+      portaria_nome:      modalCondo.portaria_nome||null,
+      portaria_telefone:  modalCondo.portaria_telefone||null,
+      seguro_seguradora:  modalCondo.seguro_seguradora||null,
+      seguro_apolice:     modalCondo.seguro_apolice||null,
+      seguro_vencimento:  modalCondo.seguro_vencimento||null,
+      gestao_inicio:      modalCondo.gestao_inicio||null,
+      obs:                modalCondo.obs||null,
+    }).eq('id', modalCondo.id)
+    if (error) { onToast('Erro: '+error.message); return }
+    onToast('Condomínio atualizado.'); setModalCondo(null); await carregar()
   }
   const excluirCondo = async (id) => {
     if (!window.confirm('Excluir condomínio? Os chamados vinculados também serão afetados.')) return
@@ -544,6 +577,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
                   </span>
                   <div style={{ display:'flex', gap:6 }}>
                     <Btn sm onClick={()=>salvarCondo(c.id, nomeEdit)}>Salvar</Btn>
+                    <Btn sm variant='ghost' onClick={()=>setModalCondo({...c})}>✏️ Detalhes</Btn>
                     <Btn sm variant='danger' onClick={()=>excluirCondo(c.id)}>Excluir</Btn>
                   </div>
                 </div>
@@ -634,6 +668,74 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
           </div>
         )}
       </div>
+
+      {/* Modal edição completa do condomínio */}
+      {modalCondo && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:70,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:16, overflowY:'auto' }}>
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:16,
+            width:'100%', maxWidth:580, padding:'24px 22px', maxHeight:'92vh', overflowY:'auto' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+              <h3 style={{ margin:0, fontSize:17, fontWeight:700, color:C.text }}>📋 {modalCondo.nome}</h3>
+              <button onClick={()=>setModalCondo(null)} style={{ background:'none', border:'none', color:C.muted, fontSize:22, cursor:'pointer' }}>✕</button>
+            </div>
+
+            {[
+              { title:'Dados gerais', fields:[
+                [['Nome','nome'],['CNPJ','cnpj']],
+                [['Total de unidades','total_unidades','number'],['Ano de construção','ano_construcao','number']],
+              ]},
+              { title:'Endereço', fields:[
+                [['Rua / Avenida','endereco_rua'],['Número','endereco_numero']],
+                [['Complemento','endereco_complemento'],['Bairro','endereco_bairro']],
+                [['Cidade','endereco_cidade'],['UF (2 letras)','endereco_uf'],['CEP','endereco_cep']],
+              ]},
+              { title:'Síndico responsável', fields:[
+                [['Nome','sindico_nome'],['Telefone / WhatsApp','sindico_telefone']],
+                [['E-mail','sindico_email'],['Início mandato','mandato_inicio','date'],['Fim mandato','mandato_fim','date']],
+              ]},
+              { title:'Administradora', fields:[
+                [['Nome','administradora_nome'],['Contato','administradora_contato']],
+              ]},
+              { title:'Portaria / Zelador', fields:[
+                [['Nome','portaria_nome'],['Telefone','portaria_telefone']],
+              ]},
+              { title:'Seguro', fields:[
+                [['Seguradora','seguro_seguradora'],['Nº Apólice','seguro_apolice']],
+                [['Vencimento','seguro_vencimento','date']],
+              ]},
+              { title:'Gestão', fields:[
+                [['Início da gestão','gestao_inicio','date'],['Observações','obs']],
+              ]},
+            ].map(sec => (
+              <div key={sec.title} style={{ marginBottom:16 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase',
+                  letterSpacing:'.05em', marginBottom:10, paddingBottom:6, borderBottom:`1px solid ${C.border}` }}>
+                  {sec.title}
+                </div>
+                {sec.fields.map((row, ri) => (
+                  <div key={ri} style={{ display:'grid', gridTemplateColumns:`repeat(${row.length}, 1fr)`, gap:10, marginBottom:10 }}>
+                    {row.map(([label, key, type='text']) => (
+                      <div key={key}>
+                        <Lbl>{label}</Lbl>
+                        <DI
+                          value={modalCondo[key]||''}
+                          onChange={v=>setModalCondo(m=>({...m,[key]: key==='endereco_uf'?v.toUpperCase().slice(0,2):v}))}
+                          type={type}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            <Btn onClick={salvarCondoCompleto} style={{ width:'100%', marginTop:8 }}>
+              Salvar todos os dados
+            </Btn>
+          </div>
+        </div>
+      )}
 
       {/* Modal editar usuário */}
       {modalUsuario && (
