@@ -72,7 +72,7 @@ export default function Navigation({ activeView, onNavigate }) {
             </svg>
           </div>
           <div>
-            <div className="sidebar-name">Central de<br/>Solicitações</div>
+            <div className="sidebar-name">Portal de<br/>Chamados</div>
           </div>
         </div>
         <nav className="sidebar-nav">
