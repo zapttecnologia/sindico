@@ -34,8 +34,9 @@ export default function SuperAdmin({ onToast }) {
   const [empresas, setEmpresas] = useState([])
   const [planos, setPlanos] = useState([])
   const [metricas, setMetricas] = useState(null)
-  const [modalNova, setModalNova] = useState(false)
+  const [empresaSelecionada, setEmpresaSelecionada] = useState(null)
   const [modalEditar, setModalEditar] = useState(null)
+  const [modalNova, setModalNova] = useState(false)
   const [busca, setBusca] = useState('')
   const [salvando, setSalvando] = useState(false)
 
@@ -279,11 +280,18 @@ export default function SuperAdmin({ onToast }) {
                         )}
                       </td>
                       <td style={{ padding:'12px 14px' }}>
-                        <button onClick={()=>setModalEditar({...e})} style={{
-                          background:'#21262d', border:'1px solid #30363d', borderRadius:6,
-                          color:'#e6edf3', padding:'5px 12px', fontSize:12, cursor:'pointer' }}>
-                          Editar
-                        </button>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button onClick={()=>setEmpresaSelecionada(e)} style={{
+                            background:'#7c3aed', border:'none', borderRadius:6,
+                            color:'#fff', padding:'5px 12px', fontSize:12, cursor:'pointer' }}>
+                            Ver detalhes
+                          </button>
+                          <button onClick={()=>setModalEditar({...e})} style={{
+                            background:'#21262d', border:'1px solid #30363d', borderRadius:6,
+                            color:'#e6edf3', padding:'5px 12px', fontSize:12, cursor:'pointer' }}>
+                            Editar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -304,26 +312,38 @@ export default function SuperAdmin({ onToast }) {
 
         {/* ── PLANOS ── */}
         {tab==='planos' && (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:16 }}>
-            {planos.map(p => (
-              <div key={p.id} style={{ background:'#161b22', border:'1px solid #30363d',
-                borderRadius:12, padding:'20px 18px' }}>
-                <Badge label={p.nome} map={PLANO_CORES} />
-                <div style={{ fontFamily:'var(--font-display)', fontSize:24, fontWeight:800,
-                  color:'#e6edf3', margin:'12px 0 4px' }}>
-                  {p.valor_mensal === 0 ? 'Grátis' : `R$ ${Number(p.valor_mensal).toLocaleString('pt-BR')}/mês`}
-                </div>
-                <div style={{ fontSize:13, color:'#e6edf3', fontWeight:600, marginBottom:8 }}>{p.nome_exibicao}</div>
-                <div style={{ fontSize:12, color:'#8b949e', lineHeight:1.6 }}>
-                  Até {p.max_condominios >= 999 ? '∞' : p.max_condominios} condomínios<br/>
-                  Até {p.max_usuarios >= 9999 ? '∞' : p.max_usuarios} usuários<br/>
-                  {p.descricao}
-                </div>
-              </div>
-            ))}
+          <div>
+            <p style={{ fontSize:13, color:'#8b949e', marginBottom:16 }}>
+              Clique em um plano para editar valores e limites.
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:16 }}>
+              {planos.map(p => (
+                <PlanoCard key={p.id} plano={p} onSave={async (atualizado) => {
+                  const { error } = await supabase.from('planos').update({
+                    nome_exibicao: atualizado.nome_exibicao,
+                    max_condominios: Number(atualizado.max_condominios),
+                    max_usuarios: Number(atualizado.max_usuarios),
+                    valor_mensal: Number(atualizado.valor_mensal),
+                    descricao: atualizado.descricao,
+                  }).eq('id', p.id)
+                  if (error) { onToast('Erro: '+error.message); return }
+                  onToast('Plano atualizado.')
+                  await carregar()
+                }} />
+              ))}
+            </div>
           </div>
         )}
       </div>
+
+      {/* Modal detalhes da empresa */}
+      {empresaSelecionada && (
+        <EmpresaDetalhe
+          empresa={empresaSelecionada}
+          onClose={() => setEmpresaSelecionada(null)}
+          onToast={onToast}
+        />
+      )}
 
       {/* Modal nova empresa */}
       {modalNova && (
@@ -482,5 +502,217 @@ function DarkSelect({ value, onChange, children }) {
         padding:'9px 11px', color:'#e6edf3', fontSize:13, outline:'none', boxSizing:'border-box' }}>
       {children}
     </select>
+  )
+}
+
+function PlanoCard({ plano, onSave }) {
+  const [editando, setEditando] = useState(false)
+  const [form, setForm] = useState({ ...plano })
+  const [salvando, setSalvando] = useState(false)
+
+  const salvar = async () => {
+    setSalvando(true)
+    await onSave(form)
+    setSalvando(false)
+    setEditando(false)
+  }
+
+  if (!editando) return (
+    <div style={{ background:'#161b22', border:'1px solid #30363d', borderRadius:12, padding:'20px 18px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
+        <Badge label={plano.nome} map={PLANO_CORES} />
+        <button onClick={()=>setEditando(true)} style={{ background:'#21262d', border:'1px solid #30363d',
+          borderRadius:6, color:'#8b949e', padding:'4px 10px', fontSize:12, cursor:'pointer' }}>
+          Editar
+        </button>
+      </div>
+      <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:'#e6edf3', margin:'8px 0 4px' }}>
+        {plano.valor_mensal === 0 ? 'Grátis' : `R$ ${Number(plano.valor_mensal).toLocaleString('pt-BR')}/mês`}
+      </div>
+      <div style={{ fontSize:13, color:'#e6edf3', fontWeight:600, marginBottom:8 }}>{plano.nome_exibicao}</div>
+      <div style={{ fontSize:12, color:'#8b949e', lineHeight:1.8 }}>
+        Até {plano.max_condominios >= 999 ? '∞' : plano.max_condominios} condomínios<br/>
+        Até {plano.max_usuarios >= 9999 ? '∞' : plano.max_usuarios} usuários<br/>
+        {plano.descricao}
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={{ background:'#161b22', border:'2px solid #7c3aed', borderRadius:12, padding:'20px 18px' }}>
+      <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', textTransform:'uppercase',
+        letterSpacing:'.05em', marginBottom:14 }}>Editando: {plano.nome}</div>
+      <div style={{ marginBottom:10 }}>
+        <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>NOME DE EXIBIÇÃO</label>
+        <DarkInput value={form.nome_exibicao} onChange={v=>setForm(f=>({...f,nome_exibicao:v}))} />
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+        <div>
+          <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>VALOR MENSAL (R$)</label>
+          <DarkInput value={form.valor_mensal} onChange={v=>setForm(f=>({...f,valor_mensal:v}))} type="number" />
+        </div>
+        <div>
+          <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>MÁX. CONDOMÍNIOS</label>
+          <DarkInput value={form.max_condominios} onChange={v=>setForm(f=>({...f,max_condominios:v}))} type="number" />
+        </div>
+      </div>
+      <div style={{ marginBottom:10 }}>
+        <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>MÁX. USUÁRIOS</label>
+        <DarkInput value={form.max_usuarios} onChange={v=>setForm(f=>({...f,max_usuarios:v}))} type="number" />
+      </div>
+      <div style={{ marginBottom:14 }}>
+        <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>DESCRIÇÃO</label>
+        <DarkInput value={form.descricao||''} onChange={v=>setForm(f=>({...f,descricao:v}))} />
+      </div>
+      <div style={{ display:'flex', gap:8 }}>
+        <button onClick={salvar} disabled={salvando} style={{ flex:1, padding:'9px', background:'#7c3aed',
+          border:'none', borderRadius:7, color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+          {salvando ? 'Salvando...' : 'Salvar'}
+        </button>
+        <button onClick={()=>{ setEditando(false); setForm({...plano}) }} style={{ padding:'9px 14px',
+          background:'#21262d', border:'1px solid #30363d', borderRadius:7,
+          color:'#8b949e', fontSize:13, cursor:'pointer' }}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function EmpresaDetalhe({ empresa, onClose, onToast }) {
+  const [condominios, setCondominios] = useState([])
+  const [usuarios, setUsuarios] = useState([])
+  const [chamados, setChamados] = useState([])
+  const [aba, setAba] = useState('condominios')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function carregar() {
+      const [{ data: conds }, { data: users }, { data: chams }] = await Promise.all([
+        supabase.from('condominios').select('id, nome').eq('empresa_id', empresa.id).order('nome'),
+        supabase.from('perfis').select('id, nome, email, papel, codigo_acesso, condominio_id, condominios(nome)').eq('empresa_id', empresa.id).order('criado_em', { ascending: false }),
+        supabase.from('solicitacoes').select('id, categoria, status, criado_em, condominios(nome)').in('condominio_id',
+          (await supabase.from('condominios').select('id').eq('empresa_id', empresa.id)).data?.map(c => c.id) || []
+        ).order('criado_em', { ascending: false }).limit(50),
+      ])
+      setCondominios(conds || [])
+      setUsuarios(users || [])
+      setChamados(chams || [])
+      setLoading(false)
+    }
+    carregar()
+  }, [empresa.id])
+
+  const PAPEL_COR = { admin:'#f59e0b', equipe:'#3fb950', conselheiro:'#a78bfa', morador:'#8b949e' }
+  const STATUS_COR = { recebido:'#f59e0b', andamento:'#58a6ff', concluido:'#3fb950' }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:60,
+      display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'20px 16px', overflowY:'auto' }}>
+      <div style={{ background:'#161b22', border:'1px solid #30363d', borderRadius:16,
+        width:'100%', maxWidth:760, padding:'28px 24px' }}>
+
+        {/* Cabeçalho */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+          <div>
+            <h3 style={{ margin:0, fontSize:18, fontWeight:700, color:'#e6edf3' }}>{empresa.nome}</h3>
+            <div style={{ fontSize:12, color:'#8b949e', marginTop:4 }}>
+              Plano: <span style={{ color:'#a78bfa', fontWeight:600 }}>{empresa.plano_nome}</span>
+              {' · '}Status: <span style={{ color: empresa.status==='ativa' ? '#3fb950' : '#f85149', fontWeight:600 }}>{empresa.status}</span>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#8b949e', fontSize:22, cursor:'pointer' }}>✕</button>
+        </div>
+
+        {/* Abas */}
+        <div style={{ display:'flex', borderBottom:'1px solid #30363d', marginBottom:20, gap:0 }}>
+          {[['condominios','🏢 Condomínios'], ['usuarios','👤 Usuários'], ['chamados','📋 Chamados']].map(([id, label]) => (
+            <button key={id} onClick={()=>setAba(id)} style={{
+              padding:'9px 16px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
+              color: aba===id ? '#fff' : '#8b949e',
+              borderBottom: aba===id ? '2px solid #7c3aed' : '2px solid transparent',
+              marginBottom:-1,
+            }}>{label}</button>
+          ))}
+        </div>
+
+        {loading && <div style={{ textAlign:'center', color:'#8b949e', padding:32 }}>Carregando...</div>}
+
+        {/* Condomínios */}
+        {!loading && aba==='condominios' && (
+          <div>
+            {condominios.length === 0
+              ? <p style={{ color:'#8b949e', fontSize:13 }}>Nenhum condomínio cadastrado.</p>
+              : condominios.map(c => (
+                <div key={c.id} style={{ display:'flex', alignItems:'center', padding:'10px 0',
+                  borderBottom:'1px solid #21262d' }}>
+                  <div style={{ width:32, height:32, borderRadius:8, background:'#1a3451',
+                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:13,
+                    fontWeight:700, color:'#58a6ff', marginRight:12, flexShrink:0 }}>
+                    {c.nome[0]}
+                  </div>
+                  <span style={{ fontSize:14, color:'#e6edf3', fontWeight:500 }}>{c.nome}</span>
+                </div>
+              ))
+            }
+          </div>
+        )}
+
+        {/* Usuários */}
+        {!loading && aba==='usuarios' && (
+          <div>
+            {usuarios.length === 0
+              ? <p style={{ color:'#8b949e', fontSize:13 }}>Nenhum usuário cadastrado.</p>
+              : usuarios.map(u => (
+                <div key={u.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'10px 0', borderBottom:'1px solid #21262d', flexWrap:'wrap', gap:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ width:34, height:34, borderRadius:'50%', background:'#1a3451',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:12, fontWeight:700, color:'#58a6ff', flexShrink:0 }}>
+                      {(u.nome||'?')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:600, color:'#e6edf3' }}>{u.nome || '—'}</div>
+                      <div style={{ fontSize:11, color:'#8b949e' }}>
+                        {u.codigo_acesso ? `Código: ${u.codigo_acesso} · ` : ''}{u.condominios?.nome || ''}
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:5,
+                    background:'#21262d', color: PAPEL_COR[u.papel] || '#8b949e' }}>
+                    {u.papel}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+        )}
+
+        {/* Chamados */}
+        {!loading && aba==='chamados' && (
+          <div>
+            {chamados.length === 0
+              ? <p style={{ color:'#8b949e', fontSize:13 }}>Nenhum chamado registrado.</p>
+              : chamados.map(s => (
+                <div key={s.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'10px 0', borderBottom:'1px solid #21262d', flexWrap:'wrap', gap:8 }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:600, color:'#e6edf3' }}>{s.categoria}</div>
+                    <div style={{ fontSize:11, color:'#8b949e' }}>
+                      {s.condominios?.nome} · {new Date(s.criado_em).toLocaleDateString('pt-BR')}
+                    </div>
+                  </div>
+                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:5,
+                    background:'#21262d', color: STATUS_COR[s.status] || '#8b949e' }}>
+                    {s.status}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
