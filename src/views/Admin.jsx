@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { gerarCodigo } from '../lib/constants'
 
-const PAPEL_LABEL = { morador:'Morador', equipe:'Síndico', admin:'Admin', conselheiro:'Conselheiro' }
+const PAPEL_LABEL = { morador:'Morador', equipe:'Sindico', admin:'Admin', conselheiro:'Conselheiro' }
 const PAPEIS = ['morador','conselheiro','equipe','admin']
 const SENHA_PADRAO = 'mudar123'
 function initials(n){ return (n||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase() }
@@ -28,23 +28,28 @@ export default function Admin({ onToast }) {
   const [secao, setSecao] = useState('condominios')
   const [condominios, setCondominios] = useState([])
   const [blocos, setBlocos] = useState([])
-  const [contas, setContas] = useState([])
-  const [sindicoCondos, setSindicoCondos] = useState({})
-  const [buscaConta, setBuscaConta] = useState('')
-  const [filtroCondo, setFiltroCondo] = useState('todos')
-  const [novoCondo, setNovoCondo] = useState('')
-  const [modalConta, setModalConta] = useState(null)
-  const [modalCondo, setModalCondo] = useState(null) // edição completa do condomínio
-  const [blocosCarregados, setBlocosCarregados] = useState(true)
-
-  // Form cadastro — ordem: papel → condo → bloco → apto → código auto
-  const VAZIO = { nome:'', email:'', codigo:'', senha:SENHA_PADRAO, telefone:'', papel:'morador', condo:'', bloco:'', apto:'' }
-  const [nm, setNm] = useState(VAZIO)
-  const [nmCondosSindico, setNmCondosSindico] = useState([])
+  const [buscaCondo, setBuscaCondo] = useState('')
+  const [condoExpandido, setCondoExpandido] = useState(null)
+  const [modalCondo, setModalCondo] = useState(null)
+  const [novoCondoNome, setNovoCondoNome] = useState('')
+  const [blocoNovoMap, setBlocoNovoMap] = useState({})
+  const [modalUsuario, setModalUsuario] = useState(null)
+  const [modalNovaConta, setModalNovaConta] = useState(null) // condominio_id
+  const [novaConta, setNovaConta] = useState({ nome:'', email:'', codigo:'', senha:SENHA_PADRAO, papel:'morador', bloco:'', apto:'' })
   const [salvando, setSalvando] = useState(false)
 
-  // Novo bloco inline
-  const [novoBloco, setNovoBloco] = useState({}) // { [condoId]: {nome:'', total:''} }
+  // Form cadastrar novo condomínio
+  const CONDO_VAZIO = {
+    nome:'', cnpj:'', total_unidades:'', ano_construcao:'',
+    endereco_rua:'', endereco_numero:'', endereco_complemento:'', endereco_bairro:'', endereco_cidade:'', endereco_uf:'', endereco_cep:'',
+    sindico_nome:'', sindico_telefone:'', sindico_email:'', mandato_inicio:'', mandato_fim:'',
+    administradora_nome:'', administradora_contato:'',
+    portaria_nome:'', portaria_telefone:'',
+    seguro_seguradora:'', seguro_apolice:'', seguro_vencimento:'',
+    gestao_inicio:'', obs:''
+  }
+  const [novoCondo, setNovoCondo] = useState(CONDO_VAZIO)
+  const [usuariosPorCondo, setUsuariosPorCondo] = useState({})
 
   const carregarCondos = useCallback(async () => {
     const { data } = await supabase.from('condominios').select('*').order('nome')
@@ -52,665 +57,421 @@ export default function Admin({ onToast }) {
   }, [])
 
   const carregarBlocos = useCallback(async () => {
-    const { data, error } = await supabase.from('blocos').select('*').order('nome')
-    if (error) {
-      console.warn('Tabela blocos:', error.message)
-      setBlocosCarregados(false)
-    } else {
-      setBlocos(data || [])
-      setBlocosCarregados(true)
-    }
+    const { data } = await supabase.from('blocos').select('*').order('nome')
+    if (data) setBlocos(data)
   }, [])
 
-  const carregarContas = useCallback(async () => {
+  const carregarUsuariosCondo = async (condoId) => {
     const { data } = await supabase.from('perfis')
-      .select('id,nome,email,codigo_acesso,papel,condominio_id,telefone,primeiro_acesso,condominios(nome)')
-      .order('criado_em',{ascending:false})
-    if (data) setContas(data)
-    const { data:sc } = await supabase.from('sindico_condominios').select('perfil_id,condominio_id')
-    if (sc) {
-      const map = {}
-      sc.forEach(r=>{ if(!map[r.perfil_id]) map[r.perfil_id]=[]; map[r.perfil_id].push(r.condominio_id) })
-      setSindicoCondos(map)
-    }
-  }, [])
+      .select('id,nome,email,papel,codigo_acesso,bloco,apartamento,primeiro_acesso')
+      .eq('condominio_id', condoId).order('criado_em', { ascending:false })
+    setUsuariosPorCondo(prev => ({ ...prev, [condoId]: data||[] }))
+  }
 
-  useEffect(() => { carregarCondos(); carregarBlocos(); carregarContas() }, [])
+  useEffect(() => { carregarCondos(); carregarBlocos() }, [])
 
-  // Gera código automático ao mudar condo/bloco/apto
+  // Auto-código
   useEffect(() => {
-    if (nm.papel !== 'morador' && nm.papel !== 'conselheiro') return
-    if (!nm.condo) return
-    const condo = condominios.find(c => c.id === nm.condo)
-    if (!condo) return
-    // Só gera quando pelo menos bloco OU apto estão preenchidos
-    if (!nm.bloco && !nm.apto) return
-    const auto = gerarCodigo(condo.nome, nm.bloco, nm.apto)
-    if (auto) setNm(x => ({ ...x, codigo: auto }))
-  }, [nm.condo, nm.bloco, nm.apto, nm.papel, condominios])
+    const condo = condominios.find(c => c.id === modalNovaConta)
+    if (condo && (novaConta.bloco || novaConta.apto)) {
+      const auto = gerarCodigo(condo.nome, novaConta.bloco, novaConta.apto)
+      if (auto) setNovaConta(x => ({ ...x, codigo: auto }))
+    }
+  }, [novaConta.bloco, novaConta.apto, modalNovaConta, condominios])
 
   const blocosDoCondo = (condoId) => blocos.filter(b => b.condominio_id === condoId)
 
-  // ── Condomínios ────────────────────────────────────────────
-  const adicionarCondo = async () => {
-    if (!novoCondo.trim()) return
-    const { error } = await supabase.from('condominios').insert({ nome: novoCondo.trim() })
+  // Cadastrar novo condomínio
+  const cadastrarCondo = async () => {
+    if (!novoCondo.nome.trim()) { onToast('Informe o nome do condominio.'); return }
+    setSalvando(true)
+    const { error } = await supabase.from('condominios').insert({
+      ...novoCondo,
+      total_unidades: novoCondo.total_unidades ? Number(novoCondo.total_unidades) : null,
+      ano_construcao: novoCondo.ano_construcao ? Number(novoCondo.ano_construcao) : null,
+    })
+    setSalvando(false)
     if (error) { onToast('Erro: '+error.message); return }
-    setNovoCondo(''); onToast('Condomínio adicionado.'); carregarCondos()
-  }
-  const salvarNomeCondo = async (id, nome) => {
-    const { error } = await supabase.from('condominios').update({ nome }).eq('id', id)
-    if (error) { onToast('Erro ao salvar: '+error.message); return }
-    onToast('Nome atualizado.'); carregarCondos()
+    onToast('Condominio cadastrado!'); setNovoCondo(CONDO_VAZIO); setSecao('condominios'); carregarCondos()
   }
 
   const salvarCondoCompleto = async () => {
     if (!modalCondo) return
     const { error } = await supabase.from('condominios').update({
-      nome:              modalCondo.nome,
-      cnpj:              modalCondo.cnpj || null,
-      total_unidades:    modalCondo.total_unidades ? Number(modalCondo.total_unidades) : null,
-      ano_construcao:    modalCondo.ano_construcao ? Number(modalCondo.ano_construcao) : null,
-      endereco_rua:      modalCondo.endereco_rua || null,
-      endereco_numero:   modalCondo.endereco_numero || null,
-      endereco_complemento: modalCondo.endereco_complemento || null,
-      endereco_bairro:   modalCondo.endereco_bairro || null,
-      endereco_cidade:   modalCondo.endereco_cidade || null,
-      endereco_uf:       modalCondo.endereco_uf || null,
-      endereco_cep:      modalCondo.endereco_cep || null,
-      sindico_nome:      modalCondo.sindico_nome || null,
-      sindico_telefone:  modalCondo.sindico_telefone || null,
-      sindico_email:     modalCondo.sindico_email || null,
-      mandato_inicio:    modalCondo.mandato_inicio || null,
-      mandato_fim:       modalCondo.mandato_fim || null,
-      administradora_nome:    modalCondo.administradora_nome || null,
-      administradora_contato: modalCondo.administradora_contato || null,
-      portaria_nome:     modalCondo.portaria_nome || null,
-      portaria_telefone: modalCondo.portaria_telefone || null,
-      seguro_seguradora: modalCondo.seguro_seguradora || null,
-      seguro_apolice:    modalCondo.seguro_apolice || null,
-      seguro_vencimento: modalCondo.seguro_vencimento || null,
-      gestao_inicio:     modalCondo.gestao_inicio || null,
-      obs:               modalCondo.obs || null,
+      nome:modalCondo.nome, cnpj:modalCondo.cnpj||null, total_unidades:modalCondo.total_unidades?Number(modalCondo.total_unidades):null,
+      ano_construcao:modalCondo.ano_construcao?Number(modalCondo.ano_construcao):null,
+      endereco_rua:modalCondo.endereco_rua||null, endereco_numero:modalCondo.endereco_numero||null,
+      endereco_complemento:modalCondo.endereco_complemento||null, endereco_bairro:modalCondo.endereco_bairro||null,
+      endereco_cidade:modalCondo.endereco_cidade||null, endereco_uf:modalCondo.endereco_uf||null, endereco_cep:modalCondo.endereco_cep||null,
+      sindico_nome:modalCondo.sindico_nome||null, sindico_telefone:modalCondo.sindico_telefone||null, sindico_email:modalCondo.sindico_email||null,
+      mandato_inicio:modalCondo.mandato_inicio||null, mandato_fim:modalCondo.mandato_fim||null,
+      administradora_nome:modalCondo.administradora_nome||null, administradora_contato:modalCondo.administradora_contato||null,
+      portaria_nome:modalCondo.portaria_nome||null, portaria_telefone:modalCondo.portaria_telefone||null,
+      seguro_seguradora:modalCondo.seguro_seguradora||null, seguro_apolice:modalCondo.seguro_apolice||null, seguro_vencimento:modalCondo.seguro_vencimento||null,
+      gestao_inicio:modalCondo.gestao_inicio||null, obs:modalCondo.obs||null,
     }).eq('id', modalCondo.id)
     if (error) { onToast('Erro: '+error.message); return }
-    onToast('Condomínio atualizado.'); setModalCondo(null); carregarCondos()
-  }
-  const excluirCondo = async (id) => {
-    if (!window.confirm('Excluir este condomínio? Os blocos serão removidos junto.')) return
-    const { error } = await supabase.from('condominios').delete().eq('id', id)
-    if (error) { onToast('Não foi possível excluir: '+error.message); return }
-    onToast('Condomínio excluído.'); carregarCondos(); carregarBlocos()
+    onToast('Condominio atualizado.'); setModalCondo(null); carregarCondos()
   }
 
-  // ── Blocos ─────────────────────────────────────────────────
+  const excluirCondo = async (id) => {
+    if (!window.confirm('Excluir este condominio?')) return
+    const { error } = await supabase.from('condominios').delete().eq('id', id)
+    if (error) { onToast('Nao foi possivel excluir: '+error.message); return }
+    onToast('Excluido.'); carregarCondos()
+  }
+
+  // Blocos
   const adicionarBloco = async (condoId) => {
-    const nb = novoBloco[condoId] || {}
-    if (!nb.nome?.trim()) { onToast('Digite o nome do bloco.'); return }
-    const { error } = await supabase.from('blocos').insert({
-      condominio_id: condoId,
-      nome: nb.nome.trim(),
-      total_apartamentos: Number(nb.total) || 0,
-    })
-    if (error) { onToast('Erro: '+error.message); return }
-    setNovoBloco(p => ({ ...p, [condoId]: { nome:'', total:'' } }))
+    const nb = blocoNovoMap[condoId] || {}
+    if (!nb.nome?.trim()) return
+    await supabase.from('blocos').insert({ condominio_id:condoId, nome:nb.nome.trim(), total_apartamentos:Number(nb.total)||0 })
+    setBlocoNovoMap(p=>({...p,[condoId]:{nome:'',total:''}}))
     onToast('Bloco adicionado.'); carregarBlocos()
   }
-  const excluirBloco = async (id) => {
-    if (!window.confirm('Remover este bloco?')) return
-    await supabase.from('blocos').delete().eq('id', id)
-    onToast('Bloco removido.'); carregarBlocos()
-  }
 
-  // ── API ────────────────────────────────────────────────────
+  // Usuários
   const api = async (body) => {
-    const session = (await supabase.auth.getSession()).data.session
-    const URL = import.meta.env.VITE_SUPABASE_URL
-    const r = await fetch(`${URL}/functions/v1/admin-actions`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token}`},
+    const sess = (await supabase.auth.getSession()).data.session
+    const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
+      method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${sess?.access_token}`},
       body: JSON.stringify(body),
     })
     const json = await r.json()
-    if (!r.ok) throw new Error(json.error || 'Erro')
+    if (!r.ok) throw new Error(json.error||'Erro')
     return json
   }
 
-  const cadastrarUsuario = async () => {
-    if (!nm.nome || !nm.email || !nm.codigo || nm.senha.length < 4) { onToast('Preencha nome, e-mail, código e senha.'); return }
-    if ((nm.papel==='morador'||nm.papel==='conselheiro') && !nm.condo) { onToast('Selecione o condomínio.'); return }
+  const criarConta = async () => {
+    if (!novaConta.nome||!novaConta.email||!novaConta.codigo) { onToast('Preencha nome, e-mail e codigo.'); return }
     setSalvando(true)
     try {
-      await api({
-        action:'create_user', email:nm.email, password:nm.senha,
-        nome:nm.nome, telefone:nm.telefone, codigo_acesso:nm.codigo.toUpperCase(),
-        papel:nm.papel,
-        condominio_id:(nm.papel==='morador'||nm.papel==='conselheiro')?nm.condo:null,
-        bloco:nm.bloco, apartamento:nm.apto,
-        condominios_sindico: nm.papel==='equipe' ? nmCondosSindico : [],
-      })
-      onToast(`✅ Usuário cadastrado! Código: ${nm.codigo.toUpperCase()} · Senha: ${nm.senha}`)
-      setNm(VAZIO); setNmCondosSindico([]); carregarContas()
+      await api({ action:'create_user', email:novaConta.email, password:novaConta.senha,
+        nome:novaConta.nome, papel:novaConta.papel, codigo_acesso:novaConta.codigo.toUpperCase(),
+        condominio_id: modalNovaConta, bloco:novaConta.bloco, apartamento:novaConta.apto })
+      onToast('Usuario criado! Codigo: '+novaConta.codigo.toUpperCase())
+      setModalNovaConta(null)
+      setNovaConta({ nome:'', email:'', codigo:'', senha:SENHA_PADRAO, papel:'morador', bloco:'', apto:'' })
+      carregarUsuariosCondo(modalNovaConta)
     } catch(e) { onToast('Erro: '+e.message) }
     setSalvando(false)
   }
 
-  const salvarConta = async () => {
-    if (!modalConta) return
+  const salvarUsuario = async () => {
+    if (!modalUsuario) return
     const { error } = await supabase.from('perfis').update({
-      nome:modalConta.nome, telefone:modalConta.telefone,
-      codigo_acesso:modalConta.codigo_acesso?.toUpperCase(),
-      papel:modalConta.papel,
-      condominio_id:(modalConta.papel==='morador'||modalConta.papel==='conselheiro')?modalConta.condominio_id:null,
-    }).eq('id', modalConta.id)
+      nome:modalUsuario.nome, codigo_acesso:modalUsuario.codigo_acesso?.toUpperCase(), papel:modalUsuario.papel,
+    }).eq('id', modalUsuario.id)
     if (error) { onToast('Erro: '+error.message); return }
-    if (modalConta.papel==='equipe') {
-      await supabase.rpc('definir_condominios_sindico',{p_perfil_id:modalConta.id,p_condominio_ids:modalConta.condosSindico||[]})
-    }
-    onToast('Salvo.'); setModalConta(null); carregarContas()
+    onToast('Salvo.'); setModalUsuario(null); carregarUsuariosCondo(modalUsuario.condominio_id)
   }
 
   const resetarSenha = async () => {
-    if (!modalConta?.novaSenha || modalConta.novaSenha.length < 4) { onToast('Senha muito curta.'); return }
-    try { await api({action:'reset_password',user_id:modalConta.id,new_password:modalConta.novaSenha}); onToast('Senha alterada.') }
+    if (!modalUsuario?.novaSenha||modalUsuario.novaSenha.length<4) { onToast('Senha muito curta.'); return }
+    try { await api({action:'reset_password',user_id:modalUsuario.id,new_password:modalUsuario.novaSenha}); onToast('Senha alterada.') }
     catch(e) { onToast('Erro: '+e.message) }
   }
 
   const excluirConta = async () => {
-    if (!window.confirm('Excluir definitivamente?')) return
-    try { await api({action:'delete_user',user_id:modalConta.id}); onToast('Excluído.'); setModalConta(null); carregarContas() }
+    if (!window.confirm('Excluir esta conta?')) return
+    try { await api({action:'delete_user',user_id:modalUsuario.id}); onToast('Excluido.'); setModalUsuario(null); carregarUsuariosCondo(modalUsuario.condominio_id) }
     catch(e) { onToast('Erro: '+e.message) }
   }
 
-  const contasFiltradas = contas.filter(c => {
-    if (filtroCondo!=='todos' && c.condominio_id!==filtroCondo && !(sindicoCondos[c.id]||[]).includes(filtroCondo)) return false
-    const t = buscaConta.toLowerCase()
-    return !t||(c.nome||'').toLowerCase().includes(t)||(c.email||'').toLowerCase().includes(t)||(c.codigo_acesso||'').toLowerCase().includes(t)
-  })
+  const condosFiltrados = condominios.filter(c => !buscaCondo || c.nome.toLowerCase().includes(buscaCondo.toLowerCase()))
 
-  // Blocos do condo selecionado no formulário de cadastro
-  const blocosDisponiveis = nm.condo ? blocosDoCondo(nm.condo) : []
+  const SecTitle = ({ children }) => (
+    <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', margin:'0 0 10px', paddingBottom:8, borderBottom:'1px solid var(--gray-100)' }}>
+      {children}
+    </div>
+  )
 
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Administração</h1>
-        <p className="page-sub">Condomínios, blocos e usuários</p>
+        <h1 className="page-title">Condominios</h1>
       </div>
 
       <TabBar
-        tabs={[
-          {id:'condominios', label:'Condomínios', icon:'🏢'},
-          {id:'contas',      label:'Contas',       icon:'👤'},
-          {id:'cadastrar',   label:'Cadastrar',    icon:'➕'},
-        ]}
-        active={secao}
-        onChange={setSecao}
+        tabs={[{id:'condominios',label:'Condominios',icon:'🏢'},{id:'cadastrar',label:'Cadastrar novo',icon:'➕'}]}
+        active={secao} onChange={setSecao}
       />
 
-      {/* ─────────────────── ABA CONDOMÍNIOS ─────────────────── */}
+      {/* ── LISTA DE CONDOMINIOS ── */}
       {secao==='condominios' && (
         <div>
-          {!blocosCarregados && (
-            <div style={{ background:'#FFF3DC', border:'1.5px solid #F4A340', borderRadius:'var(--r-md)', padding:'14px 16px', marginBottom:20, fontSize:14 }}>
-              ⚠️ <strong>Execute o arquivo <code>fix-schema.sql</code> no SQL Editor do Supabase</strong> para habilitar o cadastro de blocos.
-            </div>
-          )}
+          <div style={{ marginBottom:16 }}>
+            <input className="input" placeholder="Buscar condominio..." value={buscaCondo} onChange={e=>setBuscaCondo(e.target.value)} style={{ maxWidth:320 }}/>
+          </div>
 
-          {/* Lista de condomínios existentes */}
-          {condominios.map(c => {
-            let nomeEdit = c.nome
+          {condosFiltrados.length===0 && <div className="empty-state">Nenhum condominio encontrado.</div>}
+
+          {condosFiltrados.map(c => {
             const bls = blocosDoCondo(c.id)
-            const totalUnidades = bls.reduce((s,b)=>s+(b.total_apartamentos||0), 0)
-            const nb = novoBloco[c.id] || { nome:'', total:'' }
+            const aberto = condoExpandido===c.id
+            const users = usuariosPorCondo[c.id] || []
+            const blocosSelectCond = bls
 
             return (
-              <div key={c.id} className="card" style={{ marginBottom:16 }}>
-                {/* Cabeçalho do condomínio */}
-                <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginBottom: blocosCarregados ? 16 : 0 }}>
-                  <input
-                    className="input"
-                    style={{ border:'none', padding:'4px 0', fontWeight:700, background:'transparent', fontSize:16, flex:1, minWidth:140 }}
-                    defaultValue={c.nome}
-                    onChange={e => { nomeEdit = e.target.value }}
-                  />
-                  <div style={{ fontSize:12, color:'var(--gray-400)', whiteSpace:'nowrap' }}>
-                    {bls.length} bloco{bls.length!==1?'s':''} · {totalUnidades} unidade{totalUnidades!==1?'s':''}
+              <div key={c.id} className="card" style={{ marginBottom:12 }}>
+                {/* Header do condomínio */}
+                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <div style={{ width:40, height:40, borderRadius:'var(--r-md)', background:'var(--mint)',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontFamily:'var(--font-display)', fontSize:16, fontWeight:700, color:'var(--emerald)', flexShrink:0 }}>
+                    {c.nome[0]}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:15, fontWeight:700, color:'var(--gray-800)' }}>{c.nome}</div>
+                    <div style={{ fontSize:12, color:'var(--gray-400)' }}>
+                      {bls.length} bloco{bls.length!==1?'s':''} · {c.total_unidades||'?'} unidades
+                      {c.endereco_cidade ? ` · ${c.endereco_cidade}` : ''}
+                    </div>
                   </div>
                   <div style={{ display:'flex', gap:6 }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => salvarNomeCondo(c.id, nomeEdit)}>Salvar nome</button>
-                    <button className="btn btn-primary btn-sm" onClick={() => setModalCondo({...c})}>✏️ Editar dados</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setCondoExpandido(aberto?null:c.id); if (!aberto) carregarUsuariosCondo(c.id) }}>
+                      {aberto ? '▲ Fechar' : '▼ Gerenciar'}
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={() => setModalCondo({...c})}>Editar dados</button>
                     <button className="btn btn-danger btn-sm" onClick={() => excluirCondo(c.id)}>Excluir</button>
                   </div>
                 </div>
 
-                {/* Blocos — sempre visíveis */}
-                {blocosCarregados && (
-                  <div style={{ borderTop:'1px solid var(--gray-100)', paddingTop:14 }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-600)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>
-                      Blocos e unidades
-                    </div>
-
-                    {bls.length === 0 && (
-                      <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 12px' }}>
-                        Nenhum bloco cadastrado. Adicione abaixo.
-                      </p>
-                    )}
-
-                    {/* Lista de blocos */}
+                {/* Painel expandido */}
+                {aberto && (
+                  <div style={{ marginTop:18, paddingTop:18, borderTop:'1px solid var(--gray-200)' }}>
+                    {/* Blocos */}
+                    <SecTitle>Blocos</SecTitle>
                     {bls.map(b => (
-                      <div key={b.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:'1px solid var(--gray-100)' }}>
-                        <div style={{ width:36, height:36, borderRadius:'var(--r-sm)', background:'var(--mint)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontSize:12, fontWeight:700, color:'var(--emerald)', flexShrink:0 }}>
-                          {b.nome.slice(0,2).toUpperCase()}
+                      <div key={b.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:'1px solid var(--gray-100)' }}>
+                        <div style={{ width:32, height:32, borderRadius:'var(--r-sm)', background:'var(--mint)',
+                          display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'var(--emerald)' }}>
+                          {b.nome.slice(0,2)}
                         </div>
-                        <div style={{ flex:1 }}>
-                          <div style={{ fontWeight:700, fontSize:14 }}>{b.nome}</div>
-                          <div style={{ fontSize:12, color:'var(--gray-400)' }}>{b.total_apartamentos} unidade{b.total_apartamentos!==1?'s':''}</div>
-                        </div>
-                        <button className="btn btn-danger btn-sm" onClick={() => excluirBloco(b.id)}>Remover</button>
+                        <div style={{ flex:1, fontSize:13 }}><b>{b.nome}</b> · {b.total_apartamentos} unidades</div>
+                        <button className="btn btn-danger btn-sm" onClick={async()=>{ await supabase.from('blocos').delete().eq('id',b.id); carregarBlocos() }}>Remover</button>
                       </div>
                     ))}
+                    <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
+                      <input className="input" placeholder="Nome do bloco" value={(blocoNovoMap[c.id]||{}).nome||''}
+                        onChange={e=>setBlocoNovoMap(p=>({...p,[c.id]:{...(p[c.id]||{}),nome:e.target.value}}))}
+                        style={{ flex:'2 1 120px', fontSize:13 }}/>
+                      <input className="input" type="number" placeholder="Unidades" value={(blocoNovoMap[c.id]||{}).total||''}
+                        onChange={e=>setBlocoNovoMap(p=>({...p,[c.id]:{...(p[c.id]||{}),total:e.target.value}}))}
+                        style={{ flex:'1 1 80px', fontSize:13 }}/>
+                      <button className="btn btn-primary btn-sm" onClick={()=>adicionarBloco(c.id)}>+ Bloco</button>
+                    </div>
 
-                    {/* Formulário de novo bloco */}
-                    <div style={{ display:'flex', gap:8, marginTop:14, alignItems:'flex-end', flexWrap:'wrap' }}>
-                      <div style={{ flex:'2 1 130px' }}>
-                        <label style={{ fontSize:11, fontWeight:700, color:'var(--gray-600)', textTransform:'uppercase', display:'block', marginBottom:4 }}>Nome do bloco</label>
-                        <input
-                          className="input"
-                          placeholder="Ex.: Bloco A"
-                          value={nb.nome}
-                          onChange={e => setNovoBloco(p=>({...p,[c.id]:{...nb,nome:e.target.value}}))}
-                          onKeyDown={e => e.key==='Enter' && adicionarBloco(c.id)}
-                          style={{ fontSize:13 }}
-                        />
+                    {/* Moradores e conselheiros */}
+                    <div style={{ marginTop:20 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                        <SecTitle>Moradores e conselheiros</SecTitle>
+                        <button className="btn btn-primary btn-sm" onClick={()=>{ setModalNovaConta(c.id); setNovaConta({nome:'',email:'',codigo:'',senha:SENHA_PADRAO,papel:'morador',bloco:'',apto:''}) }}>
+                          + Novo usuario
+                        </button>
                       </div>
-                      <div style={{ flex:'1 1 80px' }}>
-                        <label style={{ fontSize:11, fontWeight:700, color:'var(--gray-600)', textTransform:'uppercase', display:'block', marginBottom:4 }}>Unidades</label>
-                        <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          placeholder="Ex.: 70"
-                          value={nb.total}
-                          onChange={e => setNovoBloco(p=>({...p,[c.id]:{...nb,total:e.target.value}}))}
-                          style={{ fontSize:13 }}
-                        />
-                      </div>
-                      <button className="btn btn-primary btn-sm" onClick={() => adicionarBloco(c.id)} style={{ marginBottom:1 }}>
-                        + Adicionar bloco
-                      </button>
+
+                      {users.length===0 && <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 8px' }}>Nenhum usuario neste condominio.</p>}
+
+                      {['conselheiro','morador'].map(papel => {
+                        const grupo = users.filter(u=>u.papel===papel)
+                        if (!grupo.length) return null
+                        return (
+                          <div key={papel} style={{ marginBottom:14 }}>
+                            <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', marginBottom:8 }}>
+                              {PAPEL_LABEL[papel]} ({grupo.length})
+                            </div>
+                            {grupo.map(u => (
+                              <div key={u.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:'1px solid var(--gray-100)' }}>
+                                <div style={{ width:32, height:32, borderRadius:'50%', background:'var(--mint)',
+                                  display:'flex', alignItems:'center', justifyContent:'center',
+                                  fontSize:12, fontWeight:700, color:'var(--emerald)', flexShrink:0 }}>{initials(u.nome)}</div>
+                                <div style={{ flex:1 }}>
+                                  <div style={{ fontSize:13, fontWeight:600, color:'var(--gray-800)', display:'flex', gap:6, alignItems:'center' }}>
+                                    {u.nome}
+                                    {u.primeiro_acesso===true && <span style={{ fontSize:10, background:'#fff3dc', color:'#8a5a00', padding:'1px 5px', borderRadius:3, fontWeight:600 }}>1o acesso</span>}
+                                  </div>
+                                  <div style={{ fontSize:11, color:'var(--gray-400)' }}>
+                                    {u.codigo_acesso?`Cod: ${u.codigo_acesso}`:''}
+                                    {u.bloco?` · Bl. ${u.bloco}`:''}
+                                    {u.apartamento?` Ap. ${u.apartamento}`:''}
+                                  </div>
+                                </div>
+                                <button className="btn btn-ghost btn-sm" onClick={()=>setModalUsuario({...u,novaSenha:'',condominio_id:c.id})}>Editar</button>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
               </div>
             )
           })}
-
-          {/* Adicionar novo condomínio */}
-          <div className="card">
-            <p style={{ fontSize:13, fontWeight:700, color:'var(--gray-600)', margin:'0 0 12px' }}>
-              + Novo condomínio
-            </p>
-            <div className="row2">
-              <input className="input" placeholder="Nome do condomínio" value={novoCondo} onChange={e=>setNovoCondo(e.target.value)} onKeyDown={e=>e.key==='Enter'&&adicionarCondo()} />
-              <button className="btn btn-primary" onClick={adicionarCondo}>Adicionar</button>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* ─────────────────── ABA CONTAS ─────────────────── */}
-      {secao==='contas' && (
-        <div>
-          <div className="card" style={{ marginBottom:12 }}>
-            <div className="row2">
-              <input className="input" placeholder="Buscar nome, e-mail ou código..." value={buscaConta} onChange={e=>setBuscaConta(e.target.value)} />
-              <select className="input" value={filtroCondo} onChange={e=>setFiltroCondo(e.target.value)}>
-                <option value="todos">Todos os condomínios</option>
-                {condominios.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
-            </div>
-          </div>
-          {['admin','equipe','conselheiro','morador'].map(papel => {
-            const grupo = contasFiltradas.filter(c=>c.papel===papel)
-            if (!grupo.length) return null
-            return (
-              <div key={papel} className="card" style={{ marginBottom:12 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
-                  <span className={`badge badge-${papel}`}>{PAPEL_LABEL[papel]}</span>
-                  <span style={{ fontSize:12, color:'var(--gray-400)' }}>{grupo.length} conta{grupo.length!==1?'s':''}</span>
-                </div>
-                {grupo.map(c => {
-                  const condosNomes = c.papel==='equipe'
-                    ? (sindicoCondos[c.id]||[]).map(id=>condominios.find(x=>x.id===id)?.nome).filter(Boolean).join(', ')
-                    : c.condominios?.nome
-                  return (
-                    <div key={c.id} className="manage-row">
-                      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                        <div style={{ width:38, height:38, borderRadius:'50%', background:'var(--mint)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontSize:13, fontWeight:700, color:'var(--emerald)', flexShrink:0 }}>
-                          {initials(c.nome)}
-                        </div>
-                        <div className="info">
-                          <strong>
-                            {c.nome||'(sem nome)'}
-                            {c.primeiro_acesso===true && (
-                              <span style={{ fontSize:10, background:'#FFF3DC', color:'#8A5A00', padding:'2px 6px', borderRadius:4, marginLeft:6, fontWeight:600 }}>1º acesso</span>
-                            )}
-                          </strong>
-                          <span>
-                            {c.codigo_acesso ? `Código: ${c.codigo_acesso}` : ''}
-                            {condosNomes ? ` · ${condosNomes}` : ''}
-                            {c.telefone ? ` · ${c.telefone}` : ''}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="actions">
-                        {c.telefone && (
-                          <a className="btn btn-ghost btn-sm" href={`https://wa.me/55${c.telefone.replace(/\D/g,'')}`} target="_blank" rel="noopener">WhatsApp</a>
-                        )}
-                        <button className="btn btn-ghost btn-sm" onClick={()=>setModalConta({...c,condosSindico:sindicoCondos[c.id]||[],novaSenha:''})}>Editar</button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })}
-          {contasFiltradas.length===0 && <div className="empty-state">Nenhuma conta encontrada.</div>}
-        </div>
-      )}
-
-      {/* ─────────────────── ABA CADASTRAR ─────────────────── */}
+      {/* ── CADASTRAR NOVO CONDOMINIO ── */}
       {secao==='cadastrar' && (
         <div className="card">
-          <h3 className="section-title">Novo usuário</h3>
-
-          <div style={{ background:'var(--mint)', borderRadius:'var(--r-md)', padding:'12px 14px', marginBottom:24, fontSize:13, color:'var(--emerald)' }}>
-            🔑 Senha padrão: <b>{SENHA_PADRAO}</b> — o usuário criará uma senha pessoal no primeiro acesso.
+          <h3 className="section-title">Cadastrar novo condominio</h3>
+          <div style={{ padding:'12px 14px', background:'var(--mint)', borderRadius:'var(--r-md)', marginBottom:20, fontSize:13, color:'var(--emerald)' }}>
+            Preencha os dados cadastrais. Voce podera adicionar blocos e usuarios apos o cadastro.
           </div>
 
-          {/* Dados pessoais */}
-          <div className="row2">
-            <div className="field"><label>Nome completo *</label><input className="input" value={nm.nome} onChange={e=>setNm(x=>({...x,nome:e.target.value}))} /></div>
-            <div className="field"><label>Telefone (WhatsApp)</label><input className="input" value={nm.telefone} onChange={e=>setNm(x=>({...x,telefone:e.target.value}))} placeholder="(11) 9..." /></div>
-          </div>
-          <div className="field">
-            <label>E-mail * <span style={{ fontSize:10, color:'var(--gray-400)', fontWeight:400 }}>(não usado para login)</span></label>
-            <input className="input" type="email" value={nm.email} onChange={e=>setNm(x=>({...x,email:e.target.value}))} />
-          </div>
-
-          {/* Papel */}
-          <div className="field">
-            <label>Papel</label>
-            <div className="chip-row">
-              {PAPEIS.map(p=>(
-                <button key={p}
-                  className={`chip${nm.papel===p?' selected':''}`}
-                  onClick={()=>setNm(x=>({...x,papel:p,condo:'',bloco:'',apto:'',codigo:''}))}
-                >{PAPEL_LABEL[p]}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Fluxo morador/conselheiro: condo → bloco → apto → código */}
-          {(nm.papel==='morador'||nm.papel==='conselheiro') && (
-            <>
-              {/* Passo 1: Condomínio */}
-              <div className="field">
-                <label>
-                  <span style={{ background:'var(--emerald)', color:'#fff', borderRadius:999, padding:'2px 8px', fontSize:11, fontWeight:700, marginRight:8 }}>1</span>
-                  Condomínio *
-                </label>
-                <select className="input" value={nm.condo} onChange={e=>setNm(x=>({...x,condo:e.target.value,bloco:'',apto:'',codigo:''}))}>
-                  <option value="">Selecione o condomínio...</option>
-                  {condominios.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
+          {[
+            { titulo:'Dados gerais', campos:[
+              [['Nome do condominio *','nome'],['CNPJ','cnpj']],
+              [['Total de unidades','total_unidades','number'],['Ano de construcao','ano_construcao','number']],
+            ]},
+            { titulo:'Endereco', campos:[
+              [['Rua / Avenida','endereco_rua'],['Numero','endereco_numero']],
+              [['Complemento','endereco_complemento'],['Bairro','endereco_bairro']],
+              [['Cidade','endereco_cidade'],['UF','endereco_uf'],['CEP','endereco_cep']],
+            ]},
+            { titulo:'Sindico responsavel', campos:[
+              [['Nome','sindico_nome'],['Telefone / WhatsApp','sindico_telefone']],
+              [['E-mail','sindico_email'],['Inicio mandato','mandato_inicio','date'],['Fim mandato','mandato_fim','date']],
+            ]},
+            { titulo:'Administradora', campos:[[['Nome','administradora_nome'],['Contato','administradora_contato']]]},
+            { titulo:'Portaria / Zelador', campos:[[['Nome','portaria_nome'],['Telefone','portaria_telefone']]]},
+            { titulo:'Seguro', campos:[
+              [['Seguradora','seguro_seguradora'],['Apolice','seguro_apolice']],
+              [['Vencimento','seguro_vencimento','date']],
+            ]},
+            { titulo:'Gestao', campos:[[['Inicio da gestao','gestao_inicio','date'],['Observacoes','obs']]]},
+          ].map(sec => (
+            <div key={sec.titulo} style={{ marginBottom:20 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12, borderBottom:'1px solid var(--gray-100)', paddingBottom:6 }}>
+                {sec.titulo}
               </div>
-
-              {/* Passo 2: Bloco (só aparece após selecionar condomínio) */}
-              {nm.condo && (
-                <div className="field">
-                  <label>
-                    <span style={{ background:'var(--emerald)', color:'#fff', borderRadius:999, padding:'2px 8px', fontSize:11, fontWeight:700, marginRight:8 }}>2</span>
-                    Bloco *
-                  </label>
-                  {blocosDisponiveis.length > 0 ? (
-                    <select className="input" value={nm.bloco} onChange={e=>setNm(x=>({...x,bloco:e.target.value,apto:'',codigo:''}))}>
-                      <option value="">Selecione o bloco...</option>
-                      {blocosDisponiveis.map(b=>(
-                        <option key={b.id} value={b.nome}>{b.nome} — {b.total_apartamentos} unidade{b.total_apartamentos!==1?'s':''}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div>
-                      <input className="input" placeholder="Ex.: Bloco A" value={nm.bloco} onChange={e=>setNm(x=>({...x,bloco:e.target.value}))} />
-                      <p className="hint">
-                        💡 Cadastre os blocos deste condomínio na aba <b>Condomínios</b> para ter um menu de seleção aqui.
-                      </p>
+              {sec.campos.map((row, ri) => (
+                <div key={ri} style={{ display:'grid', gridTemplateColumns:`repeat(${row.length},1fr)`, gap:12, marginBottom:12 }}>
+                  {row.map(([label,key,type='text']) => (
+                    <div key={key} className="field" style={{ margin:0 }}>
+                      <label>{label}</label>
+                      <input className="input" type={type} value={novoCondo[key]||''}
+                        onChange={e=>setNovoCondo(x=>({...x,[key]:key==='endereco_uf'?e.target.value.toUpperCase().slice(0,2):e.target.value}))} />
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* Passo 3: Apartamento (só aparece após selecionar bloco) */}
-              {nm.condo && nm.bloco && (
-                <div className="field">
-                  <label>
-                    <span style={{ background:'var(--emerald)', color:'#fff', borderRadius:999, padding:'2px 8px', fontSize:11, fontWeight:700, marginRight:8 }}>3</span>
-                    Apartamento / Unidade *
-                  </label>
-                  <input className="input" placeholder="Ex.: 302" value={nm.apto} onChange={e=>setNm(x=>({...x,apto:e.target.value}))} />
-                </div>
-              )}
-
-              {/* Código gerado automaticamente */}
-              {nm.codigo && (
-                <div className="field">
-                  <label>
-                    <span style={{ background:'var(--emerald)', color:'#fff', borderRadius:999, padding:'2px 8px', fontSize:11, fontWeight:700, marginRight:8 }}>4</span>
-                    Código de acesso
-                    <span style={{ fontSize:11, color:'var(--emerald)', fontWeight:600, marginLeft:8 }}>✅ gerado automaticamente</span>
-                  </label>
-                  <input
-                    className="input"
-                    value={nm.codigo}
-                    onChange={e=>setNm(x=>({...x,codigo:e.target.value.toUpperCase()}))}
-                    style={{ fontFamily:'var(--font-mono)', fontSize:18, fontWeight:700, letterSpacing:2, color:'var(--emerald)', borderColor:'var(--emerald)' }}
-                  />
-                  <p className="hint">Pode editar manualmente se precisar.</p>
-                </div>
-              )}
-
-              {/* Se condo+bloco+apto preenchidos mas código ainda não gerou */}
-              {nm.condo && nm.bloco && nm.apto && !nm.codigo && (
-                <div className="field">
-                  <label>
-                    <span style={{ background:'var(--emerald)', color:'#fff', borderRadius:999, padding:'2px 8px', fontSize:11, fontWeight:700, marginRight:8 }}>4</span>
-                    Código de acesso *
-                  </label>
-                  <input className="input" placeholder="Ex.: JDCB302" value={nm.codigo} onChange={e=>setNm(x=>({...x,codigo:e.target.value.toUpperCase()}))} />
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Síndico: condomínios atribuídos */}
-          {nm.papel==='equipe' && (
-            <>
-              <div className="field">
-                <label>Código de acesso *</label>
-                <input className="input" value={nm.codigo} onChange={e=>setNm(x=>({...x,codigo:e.target.value.toUpperCase()}))} placeholder="Ex.: SINDICO01" />
-              </div>
-              <div className="field">
-                <label>Condomínios atribuídos</label>
-                <div style={{ border:'1.5px solid var(--gray-200)', borderRadius:'var(--r-md)', padding:'10px 14px', maxHeight:180, overflowY:'auto', background:'var(--gray-50)' }}>
-                  {condominios.map(c=>(
-                    <label key={c.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'6px 0', cursor:'pointer', fontSize:14 }}>
-                      <input type="checkbox" checked={nmCondosSindico.includes(c.id)} onChange={()=>setNmCondosSindico(p=>p.includes(c.id)?p.filter(x=>x!==c.id):[...p,c.id])} />
-                      {c.nome}
-                    </label>
                   ))}
                 </div>
-              </div>
-            </>
-          )}
+              ))}
+            </div>
+          ))}
 
-          {nm.papel==='admin' && (
-            <>
-              <div className="field">
-                <label>Código de acesso *</label>
-                <input className="input" value={nm.codigo} onChange={e=>setNm(x=>({...x,codigo:e.target.value.toUpperCase()}))} placeholder="Ex.: ADMIN01" />
-              </div>
-              <div style={{ padding:'12px 14px', background:'var(--mint)', borderRadius:'var(--r-md)', marginBottom:16, fontSize:13, color:'var(--emerald)' }}>
-                Admins têm acesso a todos os condomínios automaticamente.
-              </div>
-            </>
-          )}
-
-          {/* Senha (sempre visível) */}
-          <div className="field">
-            <label>Senha inicial</label>
-            <input className="input" value={nm.senha} onChange={e=>setNm(x=>({...x,senha:e.target.value}))} />
-          </div>
-
-          <button className="btn btn-primary btn-block" onClick={cadastrarUsuario} disabled={salvando}>
-            {salvando ? 'Cadastrando...' : 'Cadastrar usuário'}
+          <button className="btn btn-primary btn-block" onClick={cadastrarCondo} disabled={salvando}>
+            {salvando ? 'Cadastrando...' : 'Cadastrar condominio'}
           </button>
         </div>
       )}
 
-      {/* ─────────────────── MODAL EDIÇÃO COMPLETA DO CONDOMÍNIO ─────────────────── */}
+      {/* Modal editar dados do condomínio */}
       {modalCondo && (
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalCondo(null)}>
-          <div className="modal" style={{ maxWidth:580, maxHeight:'90vh', overflowY:'auto' }}>
+          <div className="modal" style={{ maxWidth:560 }}>
             <div className="modal-header">
-              <h3 className="modal-title">📋 {modalCondo.nome}</h3>
-              <button className="modal-close" onClick={()=>setModalCondo(null)}>✕</button>
+              <h3 className="modal-title">Editar: {modalCondo.nome}</h3>
+              <button className="modal-close" onClick={()=>setModalCondo(null)}>X</button>
             </div>
-
-            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Dados gerais</p>
-            <div className="row2">
-              <div className="field"><label>Nome</label><input className="input" value={modalCondo.nome||''} onChange={e=>setModalCondo(m=>({...m,nome:e.target.value}))} /></div>
-              <div className="field"><label>CNPJ</label><input className="input" value={modalCondo.cnpj||''} onChange={e=>setModalCondo(m=>({...m,cnpj:e.target.value}))} placeholder="00.000.000/0001-00"/></div>
-            </div>
-            <div className="row2">
-              <div className="field"><label>Total de unidades</label><input className="input" type="number" value={modalCondo.total_unidades||''} onChange={e=>setModalCondo(m=>({...m,total_unidades:e.target.value}))} /></div>
-              <div className="field"><label>Ano de construção</label><input className="input" type="number" value={modalCondo.ano_construcao||''} onChange={e=>setModalCondo(m=>({...m,ano_construcao:e.target.value}))} /></div>
-            </div>
-
-            <hr className="divider"/>
-            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Endereço</p>
-            <div className="row2">
-              <div className="field"><label>Rua / Avenida</label><input className="input" value={modalCondo.endereco_rua||''} onChange={e=>setModalCondo(m=>({...m,endereco_rua:e.target.value}))} /></div>
-              <div className="field"><label>Número</label><input className="input" value={modalCondo.endereco_numero||''} onChange={e=>setModalCondo(m=>({...m,endereco_numero:e.target.value}))} /></div>
-            </div>
-            <div className="row2">
-              <div className="field"><label>Complemento</label><input className="input" value={modalCondo.endereco_complemento||''} onChange={e=>setModalCondo(m=>({...m,endereco_complemento:e.target.value}))} /></div>
-              <div className="field"><label>Bairro</label><input className="input" value={modalCondo.endereco_bairro||''} onChange={e=>setModalCondo(m=>({...m,endereco_bairro:e.target.value}))} /></div>
-            </div>
-            <div className="row2">
-              <div className="field"><label>Cidade</label><input className="input" value={modalCondo.endereco_cidade||''} onChange={e=>setModalCondo(m=>({...m,endereco_cidade:e.target.value}))} /></div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                <div className="field"><label>UF</label><input className="input" maxLength={2} value={modalCondo.endereco_uf||''} onChange={e=>setModalCondo(m=>({...m,endereco_uf:e.target.value.toUpperCase()}))} placeholder="SP"/></div>
-                <div className="field"><label>CEP</label><input className="input" value={modalCondo.endereco_cep||''} onChange={e=>setModalCondo(m=>({...m,endereco_cep:e.target.value}))} placeholder="00000-000"/></div>
+            {[
+              [['Nome','nome'],['CNPJ','cnpj']],
+              [['Total unidades','total_unidades','number'],['Ano construcao','ano_construcao','number']],
+              [['Rua','endereco_rua'],['Numero','endereco_numero']],
+              [['Cidade','endereco_cidade'],['UF','endereco_uf']],
+              [['CEP','endereco_cep'],['Bairro','endereco_bairro']],
+              [['Sindico','sindico_nome'],['Telefone sindico','sindico_telefone']],
+              [['Administradora','administradora_nome'],['Contato adm.','administradora_contato']],
+              [['Portaria/zelador','portaria_nome'],['Tel. portaria','portaria_telefone']],
+              [['Seguradora','seguro_seguradora'],['Apolice','seguro_apolice']],
+              [['Vencimento seguro','seguro_vencimento','date'],['Inicio gestao','gestao_inicio','date']],
+              [['Observacoes','obs']],
+            ].map((row,ri) => (
+              <div key={ri} style={{ display:'grid', gridTemplateColumns:`repeat(${row.length},1fr)`, gap:10, marginBottom:10 }}>
+                {row.map(([label,key,type='text']) => (
+                  <div key={key} className="field" style={{ margin:0 }}>
+                    <label>{label}</label>
+                    <input className="input" type={type} value={modalCondo[key]||''}
+                      onChange={e=>setModalCondo(m=>({...m,[key]:e.target.value}))} style={{ fontSize:13 }}/>
+                  </div>
+                ))}
               </div>
-            </div>
-
-            <hr className="divider"/>
-            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Síndico responsável</p>
-            <div className="row2">
-              <div className="field"><label>Nome</label><input className="input" value={modalCondo.sindico_nome||''} onChange={e=>setModalCondo(m=>({...m,sindico_nome:e.target.value}))} /></div>
-              <div className="field"><label>Telefone / WhatsApp</label><input className="input" value={modalCondo.sindico_telefone||''} onChange={e=>setModalCondo(m=>({...m,sindico_telefone:e.target.value}))} /></div>
-            </div>
-            <div className="row2">
-              <div className="field"><label>E-mail</label><input className="input" type="email" value={modalCondo.sindico_email||''} onChange={e=>setModalCondo(m=>({...m,sindico_email:e.target.value}))} /></div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                <div className="field"><label>Início mandato</label><input className="input" type="date" value={modalCondo.mandato_inicio||''} onChange={e=>setModalCondo(m=>({...m,mandato_inicio:e.target.value}))} /></div>
-                <div className="field"><label>Fim mandato</label><input className="input" type="date" value={modalCondo.mandato_fim||''} onChange={e=>setModalCondo(m=>({...m,mandato_fim:e.target.value}))} /></div>
-              </div>
-            </div>
-
-            <hr className="divider"/>
-            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Administradora</p>
-            <div className="row2">
-              <div className="field"><label>Nome da administradora</label><input className="input" value={modalCondo.administradora_nome||''} onChange={e=>setModalCondo(m=>({...m,administradora_nome:e.target.value}))} /></div>
-              <div className="field"><label>Contato (tel / e-mail)</label><input className="input" value={modalCondo.administradora_contato||''} onChange={e=>setModalCondo(m=>({...m,administradora_contato:e.target.value}))} /></div>
-            </div>
-
-            <hr className="divider"/>
-            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Portaria / Zelador</p>
-            <div className="row2">
-              <div className="field"><label>Nome</label><input className="input" value={modalCondo.portaria_nome||''} onChange={e=>setModalCondo(m=>({...m,portaria_nome:e.target.value}))} /></div>
-              <div className="field"><label>Telefone</label><input className="input" value={modalCondo.portaria_telefone||''} onChange={e=>setModalCondo(m=>({...m,portaria_telefone:e.target.value}))} /></div>
-            </div>
-
-            <hr className="divider"/>
-            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Seguro</p>
-            <div className="row2">
-              <div className="field"><label>Seguradora</label><input className="input" value={modalCondo.seguro_seguradora||''} onChange={e=>setModalCondo(m=>({...m,seguro_seguradora:e.target.value}))} /></div>
-              <div className="field"><label>Nº da apólice</label><input className="input" value={modalCondo.seguro_apolice||''} onChange={e=>setModalCondo(m=>({...m,seguro_apolice:e.target.value}))} /></div>
-            </div>
-            <div className="field"><label>Vencimento do seguro</label><input className="input" type="date" value={modalCondo.seguro_vencimento||''} onChange={e=>setModalCondo(m=>({...m,seguro_vencimento:e.target.value}))} /></div>
-
-            <hr className="divider"/>
-            <p style={{fontSize:12,fontWeight:700,color:'var(--gray-400)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 12px'}}>Gestão</p>
-            <div className="row2">
-              <div className="field"><label>Início da gestão</label><input className="input" type="date" value={modalCondo.gestao_inicio||''} onChange={e=>setModalCondo(m=>({...m,gestao_inicio:e.target.value}))} /></div>
-              <div className="field"><label>Observações internas</label><input className="input" value={modalCondo.obs||''} onChange={e=>setModalCondo(m=>({...m,obs:e.target.value}))} /></div>
-            </div>
-
-            <button className="btn btn-primary btn-block" onClick={salvarCondoCompleto} style={{marginTop:8}}>
-              Salvar todos os dados
-            </button>
+            ))}
+            <button className="btn btn-primary btn-block" onClick={salvarCondoCompleto}>Salvar todos os dados</button>
           </div>
         </div>
       )}
 
-      {/* ─────────────────── MODAL EDITAR CONTA ─────────────────── */}
-      {modalConta && (
-        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalConta(null)}>
+      {/* Modal editar usuario */}
+      {modalUsuario && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalUsuario(null)}>
           <div className="modal">
             <div className="modal-header">
-              <h3 className="modal-title">Editar conta</h3>
-              <button className="modal-close" onClick={()=>setModalConta(null)}>✕</button>
+              <h3 className="modal-title">Editar usuario</h3>
+              <button className="modal-close" onClick={()=>setModalUsuario(null)}>X</button>
             </div>
-            <div className="field"><label>Nome</label><input className="input" value={modalConta.nome||''} onChange={e=>setModalConta(m=>({...m,nome:e.target.value}))} /></div>
+            <div className="field"><label>Nome</label><input className="input" value={modalUsuario.nome||''} onChange={e=>setModalUsuario(m=>({...m,nome:e.target.value}))}/></div>
             <div className="row2">
-              <div className="field"><label>Telefone</label><input className="input" value={modalConta.telefone||''} onChange={e=>setModalConta(m=>({...m,telefone:e.target.value}))} /></div>
-              <div className="field"><label>Código de acesso</label><input className="input" value={modalConta.codigo_acesso||''} onChange={e=>setModalConta(m=>({...m,codigo_acesso:e.target.value.toUpperCase()}))} /></div>
-            </div>
-            <div className="field"><label>Papel</label>
-              <select className="input" value={modalConta.papel} onChange={e=>setModalConta(m=>({...m,papel:e.target.value}))}>
-                {PAPEIS.map(p=><option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}
-              </select>
-            </div>
-            {(modalConta.papel==='morador'||modalConta.papel==='conselheiro') && (
-              <div className="field"><label>Condomínio</label>
-                <select className="input" value={modalConta.condominio_id||''} onChange={e=>setModalConta(m=>({...m,condominio_id:e.target.value}))}>
-                  <option value="">Sem condomínio</option>
-                  {condominios.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+              <div className="field"><label>Codigo de acesso</label><input className="input" value={modalUsuario.codigo_acesso||''} onChange={e=>setModalUsuario(m=>({...m,codigo_acesso:e.target.value.toUpperCase()}))}/></div>
+              <div className="field"><label>Papel</label>
+                <select className="input" value={modalUsuario.papel} onChange={e=>setModalUsuario(m=>({...m,papel:e.target.value}))}>
+                  {PAPEIS.map(p=><option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}
                 </select>
               </div>
-            )}
-            {modalConta.papel==='equipe' && (
-              <div className="field"><label>Condomínios atribuídos</label>
-                <div style={{ border:'1.5px solid var(--gray-200)', borderRadius:'var(--r-md)', padding:'10px 14px', maxHeight:160, overflowY:'auto', background:'var(--gray-50)' }}>
-                  {condominios.map(c=>(
-                    <label key={c.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'5px 0', cursor:'pointer', fontSize:14 }}>
-                      <input type="checkbox" checked={modalConta.condosSindico?.includes(c.id)||false} onChange={()=>setModalConta(m=>({...m,condosSindico:m.condosSindico.includes(c.id)?m.condosSindico.filter(x=>x!==c.id):[...m.condosSindico,c.id]}))} /> {c.nome}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-            <button className="btn btn-primary btn-block" onClick={salvarConta}>Salvar dados</button>
+            </div>
+            <button className="btn btn-primary btn-block" onClick={salvarUsuario}>Salvar dados</button>
             <hr className="divider"/>
             <div className="row2">
-              <input className="input" type="text" placeholder="Nova senha" value={modalConta.novaSenha||''} onChange={e=>setModalConta(m=>({...m,novaSenha:e.target.value}))} />
-              <button className="btn btn-ghost" onClick={resetarSenha}>Resetar</button>
+              <input className="input" type="text" placeholder="Nova senha" value={modalUsuario.novaSenha||''} onChange={e=>setModalUsuario(m=>({...m,novaSenha:e.target.value}))}/>
+              <button className="btn btn-ghost" onClick={resetarSenha}>Resetar senha</button>
             </div>
             <hr className="divider"/>
             <button className="btn btn-danger btn-block" onClick={excluirConta}>Excluir conta</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal novo usuario no condomínio */}
+      {modalNovaConta && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalNovaConta(null)}>
+          <div className="modal">
+            <div className="modal-header">
+              <h3 className="modal-title">Novo usuario</h3>
+              <button className="modal-close" onClick={()=>setModalNovaConta(null)}>X</button>
+            </div>
+            <div style={{ padding:'10px 12px', background:'var(--mint)', borderRadius:'var(--r-md)', marginBottom:16, fontSize:13, color:'var(--emerald)' }}>
+              Senha padrao: <b>{SENHA_PADRAO}</b> - o usuario criara senha propria no 1o acesso.
+            </div>
+            <div className="field"><label>Nome *</label><input className="input" value={novaConta.nome} onChange={e=>setNovaConta(x=>({...x,nome:e.target.value}))}/></div>
+            <div className="field"><label>E-mail *</label><input className="input" type="email" value={novaConta.email} onChange={e=>setNovaConta(x=>({...x,email:e.target.value}))}/></div>
+            <div className="field"><label>Papel</label>
+              <div className="chip-row">
+                {['morador','conselheiro'].map(p=>(
+                  <button key={p} className={`chip${novaConta.papel===p?' selected':''}`} onClick={()=>setNovaConta(x=>({...x,papel:p}))}>{PAPEL_LABEL[p]}</button>
+                ))}
+              </div>
+            </div>
+            {/* Bloco e Apartamento com auto-código */}
+            <div className="row2">
+              <div className="field">
+                <label>Bloco</label>
+                {blocosDoCondo(modalNovaConta).length > 0 ? (
+                  <select className="input" value={novaConta.bloco} onChange={e=>setNovaConta(x=>({...x,bloco:e.target.value}))}>
+                    <option value="">Selecione...</option>
+                    {blocosDoCondo(modalNovaConta).map(b=><option key={b.id} value={b.nome}>{b.nome} ({b.total_apartamentos} un.)</option>)}
+                  </select>
+                ) : (
+                  <input className="input" value={novaConta.bloco} onChange={e=>setNovaConta(x=>({...x,bloco:e.target.value}))} placeholder="Ex.: Bloco A"/>
+                )}
+              </div>
+              <div className="field"><label>Apartamento</label><input className="input" value={novaConta.apto} onChange={e=>setNovaConta(x=>({...x,apto:e.target.value}))} placeholder="Ex.: 302"/></div>
+            </div>
+            <div className="field">
+              <label>Codigo de acesso {novaConta.codigo && <span style={{ fontSize:11, color:'var(--emerald)', fontWeight:600 }}>gerado automaticamente</span>}</label>
+              <input className="input" value={novaConta.codigo} onChange={e=>setNovaConta(x=>({...x,codigo:e.target.value.toUpperCase()}))}
+                style={novaConta.codigo?{borderColor:'var(--emerald)',fontWeight:700,letterSpacing:1}:{}}/>
+            </div>
+            <button className="btn btn-primary btn-block" onClick={criarConta} disabled={salvando}>{salvando?'Criando...':'Criar usuario'}</button>
           </div>
         </div>
       )}
