@@ -94,7 +94,10 @@ export default function Navigation({ activeView, onNavigate }) {
               <div className="user-name">{perfil?.nome || '—'}</div>
               <div className="user-role">{ROLE_LABEL[perfil?.papel] || perfil?.papel}</div>
             </div>
-            <button className="btn-logout btn-icon" onClick={logout} title="Sair">{ICONS.logout}</button>
+            <button className="btn-logout" onClick={logout} title="Sair">
+              {ICONS.logout}
+              Sair
+            </button>
           </div>
         </div>
       </aside>
