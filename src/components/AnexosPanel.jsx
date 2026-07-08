@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 import { BUCKET_ANEXOS } from '../lib/constants'
 import { useAuth } from '../context/AuthContext'
 
+const MAX_MB = 10
+const MAX_BYTES = MAX_MB * 1024 * 1024
+
 export default function AnexosPanel({ solicitacaoId, onToast }) {
   const { perfil } = useAuth()
   const [arquivos, setArquivos] = useState([])
@@ -24,13 +27,24 @@ export default function AnexosPanel({ solicitacaoId, onToast }) {
   }
 
   const handleUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+
+    const invalidos = files.filter(f => f.size > MAX_BYTES)
+    if (invalidos.length) {
+      onToast?.(`Arquivo(s) acima de ${MAX_MB}MB ignorados: ${invalidos.map(f=>f.name).join(', ')}`)
+    }
+    const validos = files.filter(f => f.size <= MAX_BYTES)
+    if (!validos.length) return
+
     setUploading(true)
-    const nomeSeguro = `${Date.now()}_${file.name}`.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const { error } = await supabase.storage.from(BUCKET_ANEXOS).upload(`${solicitacaoId}/${nomeSeguro}`, file)
-    if (error) onToast?.('Erro ao enviar arquivo: ' + error.message)
-    else { onToast?.('Arquivo anexado.'); await carregar() }
+    for (const file of validos) {
+      const nomeSeguro = `${Date.now()}_${file.name}`.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const { error } = await supabase.storage.from(BUCKET_ANEXOS).upload(`${solicitacaoId}/${nomeSeguro}`, file)
+      if (error) onToast?.('Erro: ' + error.message)
+    }
+    onToast?.(`${validos.length} arquivo(s) anexado(s).`)
+    await carregar()
     setUploading(false)
     e.target.value = ''
   }
@@ -39,7 +53,9 @@ export default function AnexosPanel({ solicitacaoId, onToast }) {
 
   return (
     <div className="attachments">
-      {arquivos.length === 0 && <p style={{ fontSize: 13, color: 'var(--gray-400)', margin: '0 0 10px' }}>Nenhum arquivo ainda.</p>}
+      {arquivos.length === 0 && (
+        <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 10px' }}>Nenhum arquivo ainda.</p>
+      )}
       <div className="attachment-list">
         {arquivos.map(f => (
           <div key={f.name} className="attachment-item">
@@ -49,21 +65,26 @@ export default function AnexosPanel({ solicitacaoId, onToast }) {
             <a href="#" onClick={async e => { e.preventDefault(); const url = await getUrl(f.name); if (url) window.open(url, '_blank') }}>
               {f.name.replace(/^\d+_/, '')}
             </a>
-            {ehAdmin && (
-              <a href="#" style={{ fontSize: 12, color: 'var(--gray-400)' }} onClick={async e => { e.preventDefault(); const url = await getUrl(f.name, true); if (url) { const a = document.createElement('a'); a.href = url; a.click() } }}>
-                ⬇
-              </a>
-            )}
+            <a href="#" style={{ fontSize:12, color:'var(--gray-400)' }} onClick={async e => {
+              e.preventDefault(); const url = await getUrl(f.name, true)
+              if (url) { const a = document.createElement('a'); a.href = url; a.click() }
+            }}>⬇</a>
           </div>
         ))}
       </div>
-      <label className="file-upload-btn">
+
+      <label className="file-upload-btn" style={{ cursor: uploading ? 'not-allowed' : 'pointer' }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
-        {uploading ? 'Enviando...' : 'Adicionar arquivo'}
-        <input type="file" style={{ display: 'none' }} onChange={handleUpload} disabled={uploading} />
+        {uploading ? 'Enviando...' : `Anexar arquivo (máx. ${MAX_MB}MB)`}
+        <input type="file" multiple style={{ display:'none' }} onChange={handleUpload} disabled={uploading} />
       </label>
+      <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:6 }}>
+        Limite: {MAX_MB}MB por arquivo. Múltiplos arquivos permitidos.
+      </div>
     </div>
   )
 }
