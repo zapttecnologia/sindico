@@ -170,12 +170,14 @@ input, textarea, select { font-family: var(--font-body); }
 .user-name { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-role { font-size: 11px; color: rgba(255,255,255,.4); text-transform: capitalize; }
 .btn-logout {
-  background: none; border: none;
-  color: rgba(255,255,255,.35);
-  padding: 4px; border-radius: 6px;
-  transition: color .15s;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+  color: rgba(255,255,255,.75);
+  padding: 6px 10px; border-radius: 6px;
+  transition: all .15s; cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; gap: 5px;
 }
-.btn-logout:hover { color: rgba(255,255,255,.8); }
+.btn-logout:hover { background: rgba(255,255,255,.15); color: #fff; border-color: rgba(255,255,255,.3); }
 @media (max-width: 768px) { .sidebar { display: none; } }
 
 /* ── Bottom Nav (mobile) ────────────────────────────────────── */
