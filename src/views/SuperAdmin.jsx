@@ -1,50 +1,120 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { fmtDate } from '../lib/constants'
 
-const STATUS_CORES = {
-  ativa:        { bg:'#E2F5ED', color:'#27795E' },
-  trial:        { bg:'#FFF3DC', color:'#8A5A00' },
-  inadimplente: { bg:'#FDECEA', color:'#C0392B' },
-  suspensa:     { bg:'#F1F0EE', color:'#6B6860' },
-  cancelada:    { bg:'#F1F0EE', color:'#6B6860' },
+// ── Design tokens dark ─────────────────────────────────────
+const C = {
+  bg:      '#0d1117',
+  surface: '#161b22',
+  border:  '#30363d',
+  border2: '#21262d',
+  text:    '#e6edf3',
+  muted:   '#8b949e',
+  purple:  '#7c3aed',
+  green:   '#3fb950',
+  amber:   '#f59e0b',
+  red:     '#f85149',
+  blue:    '#58a6ff',
+  violet:  '#a78bfa',
 }
 
-const PLANO_CORES = {
-  trial:        { bg:'#F1F0EE', color:'#6B6860' },
-  basico:       { bg:'#E0EDFF', color:'#1A47A0' },
-  profissional: { bg:'#EDE8F9', color:'#5B21B6' },
-  enterprise:   { bg:'#FFF3DC', color:'#8A5A00' },
+const PLANO_COR = {
+  trial:        { bg:'#21262d', color:C.muted },
+  basico:       { bg:'#0d1f3c', color:C.blue },
+  profissional: { bg:'#1a0f3c', color:C.violet },
+  enterprise:   { bg:'#2d1a00', color:C.amber },
+}
+const STATUS_COR = {
+  ativa:        { bg:'#0d2b1a', color:C.green },
+  inadimplente: { bg:'#2d0e0e', color:C.red },
+  suspensa:     { bg:'#21262d', color:C.muted },
+  cancelada:    { bg:'#21262d', color:C.muted },
+}
+const PAPEL_COR = {
+  admin:        C.amber,
+  equipe:       C.green,
+  conselheiro:  C.violet,
+  morador:      C.muted,
+}
+const STATUS_CHAM = {
+  recebido:  C.amber,
+  andamento: C.blue,
+  concluido: C.green,
 }
 
 function Badge({ label, map }) {
-  const c = map[label] || { bg:'var(--gray-100)', color:'var(--gray-600)' }
+  const c = (map||{})[label] || { bg:'#21262d', color:C.muted }
   return (
     <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.04em',
-      padding:'3px 8px', borderRadius:6, background:c.bg, color:c.color }}>
+      padding:'2px 8px', borderRadius:5, background:c.bg, color:c.color, whiteSpace:'nowrap' }}>
       {label}
     </span>
   )
 }
+function DI({ value, onChange, type='text', placeholder='', style={} }) {
+  return <input type={type} value={value||''} placeholder={placeholder} onChange={e=>onChange(e.target.value)}
+    style={{ width:'100%', background:'#0d1117', border:`1px solid ${C.border}`, borderRadius:7,
+      padding:'8px 11px', color:C.text, fontSize:13, outline:'none', boxSizing:'border-box', ...style }} />
+}
+function DS({ value, onChange, children }) {
+  return <select value={value||''} onChange={e=>onChange(e.target.value)}
+    style={{ width:'100%', background:'#0d1117', border:`1px solid ${C.border}`, borderRadius:7,
+      padding:'8px 11px', color:C.text, fontSize:13, outline:'none', boxSizing:'border-box' }}>
+    {children}
+  </select>
+}
+function Lbl({ children }) {
+  return <label style={{ display:'block', fontSize:11, fontWeight:600, color:C.muted,
+    marginBottom:4, textTransform:'uppercase', letterSpacing:'.04em' }}>{children}</label>
+}
+function Fld({ label, children, style={} }) {
+  return <div style={{ marginBottom:14, ...style }}><Lbl>{label}</Lbl>{children}</div>
+}
+function G2({ children, gap=12 }) {
+  return <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap }}>{children}</div>
+}
+function Btn({ children, onClick, variant='primary', sm, disabled, style={} }) {
+  const bg = variant==='primary' ? C.purple : variant==='danger' ? 'transparent' : '#21262d'
+  const border = variant==='danger' ? `1px solid ${C.red}` : `1px solid ${C.border}`
+  const color = variant==='danger' ? C.red : C.text
+  return <button onClick={onClick} disabled={disabled}
+    style={{ padding: sm ? '5px 12px' : '9px 16px', background:bg, border,
+      borderRadius:7, color, fontSize: sm ? 12 : 13, fontWeight:600, cursor:'pointer',
+      opacity: disabled ? .5 : 1, whiteSpace:'nowrap', ...style }}>
+    {children}
+  </button>
+}
+function Modal({ title, onClose, children, maxWidth=500 }) {
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:60,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:16, overflowY:'auto' }}>
+      <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:16,
+        width:'100%', maxWidth, padding:'24px 22px', maxHeight:'92vh', overflowY:'auto' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+          <h3 style={{ margin:0, fontSize:17, fontWeight:700, color:C.text }}>{title}</h3>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, fontSize:22, cursor:'pointer' }}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
 
+// ── Componente principal ────────────────────────────────────
 export default function SuperAdmin({ onToast }) {
   const { logout } = useAuth()
   const [tab, setTab] = useState('empresas')
   const [empresas, setEmpresas] = useState([])
   const [planos, setPlanos] = useState([])
   const [metricas, setMetricas] = useState(null)
-  const [empresaSelecionada, setEmpresaSelecionada] = useState(null)
-  const [modalEditar, setModalEditar] = useState(null)
-  const [modalNova, setModalNova] = useState(false)
   const [busca, setBusca] = useState('')
+  const [empresaSel, setEmpresaSel] = useState(null)
+  const [modalNova, setModalNova] = useState(false)
+  const [modalEditarEmpresa, setModalEditarEmpresa] = useState(null)
   const [salvando, setSalvando] = useState(false)
-
-  // Form nova empresa
-  const VAZIO_EMPRESA = { nome:'', cnpj:'', email_contato:'', telefone_contato:'',
-    plano_nome:'trial', plano_vencimento:'', obs:'',
-    admin_nome:'', admin_email:'', admin_senha:'mudar123' }
-  const [nova, setNova] = useState(VAZIO_EMPRESA)
+  const VAZIO = { nome:'', cnpj:'', email_contato:'', telefone_contato:'',
+    plano_nome:'trial', plano_vencimento:'', obs:'', admin_nome:'', admin_email:'', admin_senha:'mudar123' }
+  const [nova, setNova] = useState(VAZIO)
 
   const carregar = async () => {
     const [{ data: emp }, { data: pl }] = await Promise.all([
@@ -58,9 +128,9 @@ export default function SuperAdmin({ onToast }) {
         ativas: emp.filter(e=>e.status==='ativa').length,
         trial: emp.filter(e=>e.plano_nome==='trial').length,
         inadimplentes: emp.filter(e=>e.status==='inadimplente').length,
-        totalCondominios: emp.reduce((s,e)=>s+(e.total_condominios||0),0),
-        totalChamados: emp.reduce((s,e)=>s+(e.total_chamados||0),0),
-        chamadosAbertos: emp.reduce((s,e)=>s+(e.chamados_abertos||0),0),
+        condominios: emp.reduce((s,e)=>s+(e.total_condominios||0),0),
+        usuarios: emp.reduce((s,e)=>s+(e.total_usuarios||0),0),
+        abertos: emp.reduce((s,e)=>s+(e.chamados_abertos||0),0),
       })
     }
     if (pl) setPlanos(pl)
@@ -69,228 +139,160 @@ export default function SuperAdmin({ onToast }) {
   useEffect(() => { carregar() }, [])
 
   const criarEmpresa = async () => {
-    if (!nova.nome || !nova.admin_email || !nova.admin_nome) {
-      onToast('Preencha nome da empresa, nome e e-mail do admin.')
-      return
-    }
+    if (!nova.nome || !nova.admin_email || !nova.admin_nome) { onToast('Preencha os campos obrigatórios.'); return }
     setSalvando(true)
     try {
-      // 1. Cria a empresa
-      const planoEscolhido = planos.find(p=>p.nome===nova.plano_nome)
-      const vencimento = nova.plano_nome === 'trial'
-        ? new Date(Date.now() + 30*86400000).toISOString().split('T')[0]
-        : nova.plano_vencimento || null
-
-      const { data: empresa, error: errEmp } = await supabase
-        .from('empresas').insert({
-          nome: nova.nome, cnpj: nova.cnpj || null,
-          email_contato: nova.email_contato || null,
-          telefone_contato: nova.telefone_contato || null,
-          plano_id: planoEscolhido?.id || null,
-          plano_nome: nova.plano_nome,
-          status: 'ativa',
-          plano_vencimento: vencimento,
-          obs: nova.obs || null,
-        }).select().single()
-      if (errEmp) throw new Error(errEmp.message)
-
-      // 2. Cria o usuário admin via Edge Function
+      const planoObj = planos.find(p=>p.nome===nova.plano_nome)
+      const venc = nova.plano_nome==='trial'
+        ? new Date(Date.now()+30*86400000).toISOString().split('T')[0]
+        : nova.plano_vencimento||null
+      const { data: emp, error: eErr } = await supabase.from('empresas').insert({
+        nome:nova.nome, cnpj:nova.cnpj||null, email_contato:nova.email_contato||null,
+        telefone_contato:nova.telefone_contato||null, plano_id:planoObj?.id||null,
+        plano_nome:nova.plano_nome, status:'ativa', plano_vencimento:venc, obs:nova.obs||null,
+      }).select().single()
+      if (eErr) throw new Error(eErr.message)
       const session = (await supabase.auth.getSession()).data.session
-      const URL = import.meta.env.VITE_SUPABASE_URL
-      const resp = await fetch(`${URL}/functions/v1/admin-actions`, {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token}` },
-        body: JSON.stringify({
-          action: 'create_user',
-          email: nova.admin_email,
-          password: nova.admin_senha,
-          nome: nova.admin_nome,
-          papel: 'admin',
-          empresa_id: empresa.id,
-          codigo_acesso: 'ADMIN' + empresa.id.slice(-4).toUpperCase(),
-        }),
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token}` },
+        body: JSON.stringify({ action:'create_user', email:nova.admin_email, password:nova.admin_senha,
+          nome:nova.admin_nome, papel:'admin', empresa_id:emp.id,
+          codigo_acesso:'ADMIN'+emp.id.slice(-4).toUpperCase() }),
       })
       const json = await resp.json()
-      if (!resp.ok) throw new Error(json.error || 'Erro ao criar usuário')
-
-      onToast(`✅ Empresa "${nova.nome}" criada com sucesso!`)
-      setModalNova(false)
-      setNova(VAZIO_EMPRESA)
-      await carregar()
-    } catch(e) {
-      onToast('Erro: ' + e.message)
-    }
+      if (!resp.ok) throw new Error(json.error)
+      onToast('✅ Empresa criada!'); setModalNova(false); setNova(VAZIO); await carregar()
+    } catch(e) { onToast('Erro: '+e.message) }
     setSalvando(false)
   }
 
-  const salvarEdicao = async () => {
-    if (!modalEditar) return
+  const salvarEmpresa = async () => {
+    if (!modalEditarEmpresa) return
     const { error } = await supabase.from('empresas').update({
-      nome: modalEditar.nome,
-      cnpj: modalEditar.cnpj,
-      email_contato: modalEditar.email_contato,
-      telefone_contato: modalEditar.telefone_contato,
-      plano_nome: modalEditar.plano_nome,
-      status: modalEditar.status,
-      plano_vencimento: modalEditar.plano_vencimento || null,
-      obs: modalEditar.obs,
-    }).eq('id', modalEditar.id)
+      nome:modalEditarEmpresa.nome, cnpj:modalEditarEmpresa.cnpj,
+      email_contato:modalEditarEmpresa.email_contato, telefone_contato:modalEditarEmpresa.telefone_contato,
+      plano_nome:modalEditarEmpresa.plano_nome, status:modalEditarEmpresa.status,
+      plano_vencimento:modalEditarEmpresa.plano_vencimento||null, obs:modalEditarEmpresa.obs,
+    }).eq('id', modalEditarEmpresa.id)
     if (error) { onToast('Erro: '+error.message); return }
-    onToast('Empresa atualizada.')
-    setModalEditar(null)
-    await carregar()
+    onToast('Empresa atualizada.'); setModalEditarEmpresa(null); await carregar()
   }
 
-  const empresasFiltradas = empresas.filter(e =>
-    !busca || e.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    (e.email_contato||'').toLowerCase().includes(busca.toLowerCase())
+  const filtradas = empresas.filter(e => !busca ||
+    e.nome.toLowerCase().includes(busca.toLowerCase()) ||
+    (e.email_contato||'').toLowerCase().includes(busca.toLowerCase()))
+
+  // Se uma empresa está selecionada, mostra o painel dela
+  if (empresaSel) return (
+    <EmpresaPanel
+      empresa={empresaSel}
+      planos={planos}
+      onBack={() => { setEmpresaSel(null); carregar() }}
+      onToast={onToast}
+    />
   )
 
-  const TABS = [
-    { id:'empresas', label:'🏢 Clientes' },
-    { id:'metricas', label:'📊 Métricas' },
-    { id:'planos',   label:'💳 Planos' },
-  ]
-
   return (
-    <div style={{ minHeight:'100vh', background:'#0d1117', color:'#e6edf3',
-      fontFamily:'var(--font-body)' }}>
-
+    <div style={{ minHeight:'100vh', background:C.bg, color:C.text, fontFamily:'var(--font-body)' }}>
       {/* Header */}
-      <div style={{ background:'#13111a', borderBottom:'1px solid #2d2438',
-        padding:'0 24px', display:'flex', alignItems:'center', gap:16, height:56 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <div style={{ width:28, height:28, borderRadius:8, background:'#7c3aed',
-            display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-              <path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/>
-            </svg>
-          </div>
-          <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:'#fff' }}>
-            Central de Solicitações
-          </span>
-          <span style={{ fontSize:10, background:'#2d1a4e', color:'#a78bfa',
-            padding:'2px 7px', borderRadius:4, fontWeight:700, letterSpacing:'.05em' }}>
-            SUPER ADMIN
-          </span>
-        </div>
-        <div style={{ flex:1 }}></div>
-        <button onClick={logout} style={{ background:'none', border:'none', color:'rgba(255,255,255,.4)',
-          fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+      <div style={{ background:'#13111a', borderBottom:`1px solid #2d2438`,
+        padding:'0 24px', display:'flex', alignItems:'center', gap:12, height:52 }}>
+        <div style={{ width:26, height:26, borderRadius:7, background:C.purple,
+          display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+            <path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/>
           </svg>
-          Sair
-        </button>
+        </div>
+        <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, color:'#fff' }}>
+          Central de Solicitações
+        </span>
+        <span style={{ fontSize:10, background:'#2d1a4e', color:C.violet,
+          padding:'2px 7px', borderRadius:4, fontWeight:700 }}>SUPER ADMIN</span>
+        <div style={{ flex:1 }}/>
+        <button onClick={logout} style={{ background:'none', border:'none', color:'rgba(255,255,255,.4)',
+          fontSize:13, cursor:'pointer' }}>Sair →</button>
       </div>
 
-      <div style={{ maxWidth:1100, margin:'0 auto', padding:'28px 24px' }}>
-
-        {/* KPIs rápidos */}
+      <div style={{ maxWidth:1200, margin:'0 auto', padding:'24px 20px' }}>
+        {/* KPIs */}
         {metricas && (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',
-            gap:12, marginBottom:28 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:10, marginBottom:24 }}>
             {[
-              { label:'Total de clientes', val:metricas.total, color:'#e6edf3' },
-              { label:'Clientes ativos', val:metricas.ativas, color:'#3fb950' },
-              { label:'Em trial', val:metricas.trial, color:'#f59e0b' },
-              { label:'Inadimplentes', val:metricas.inadimplentes, color:'#f85149' },
-              { label:'Condomínios', val:metricas.totalCondominios, color:'#58a6ff' },
-              { label:'Chamados abertos', val:metricas.chamadosAbertos, color:'#a78bfa' },
-            ].map(k => (
-              <div key={k.label} style={{ background:'#161b22', border:'1px solid #30363d',
-                borderRadius:10, padding:'14px 16px' }}>
-                <div style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:800,
-                  color:k.color, lineHeight:1 }}>{k.val}</div>
-                <div style={{ fontSize:11, color:'#8b949e', marginTop:4, fontWeight:600,
-                  textTransform:'uppercase', letterSpacing:'.04em' }}>{k.label}</div>
+              { l:'Clientes',        v:metricas.total,        c:C.text },
+              { l:'Ativos',          v:metricas.ativas,       c:C.green },
+              { l:'Trial',           v:metricas.trial,        c:C.amber },
+              { l:'Inadimplentes',   v:metricas.inadimplentes,c:C.red },
+              { l:'Condomínios',     v:metricas.condominios,  c:C.blue },
+              { l:'Usuários',        v:metricas.usuarios,     c:C.violet },
+              { l:'Chamados abertos',v:metricas.abertos,      c:C.amber },
+            ].map(k=>(
+              <div key={k.l} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:10, padding:'12px 14px' }}>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:k.c, lineHeight:1 }}>{k.v}</div>
+                <div style={{ fontSize:10, color:C.muted, marginTop:4, fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>{k.l}</div>
               </div>
             ))}
           </div>
         )}
 
         {/* Tabs */}
-        <div style={{ display:'flex', gap:0, borderBottom:'1px solid #30363d', marginBottom:24 }}>
-          {TABS.map(t => (
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{
-              padding:'10px 18px', background:'none', border:'none', cursor:'pointer',
-              fontSize:13, fontWeight:600,
-              color: tab===t.id ? '#fff' : '#8b949e',
-              borderBottom: tab===t.id ? '2px solid #7c3aed' : '2px solid transparent',
-              marginBottom:-1, transition:'color .15s',
-            }}>{t.label}</button>
+        <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:20 }}>
+          {[['empresas','🏢 Clientes'],['planos','💳 Planos']].map(([id,label])=>(
+            <button key={id} onClick={()=>setTab(id)} style={{
+              padding:'9px 18px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
+              color:tab===id?'#fff':C.muted, borderBottom:tab===id?`2px solid ${C.purple}`:'2px solid transparent', marginBottom:-1 }}>
+              {label}
+            </button>
           ))}
         </div>
 
-        {/* ── CLIENTES ── */}
+        {/* ── ABA CLIENTES ── */}
         {tab==='empresas' && (
           <div>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:10 }}>
-              <input
-                style={{ background:'#161b22', border:'1px solid #30363d', borderRadius:8,
-                  padding:'8px 12px', color:'#e6edf3', fontSize:13, width:260, outline:'none' }}
-                placeholder="Buscar empresa..."
-                value={busca} onChange={e=>setBusca(e.target.value)}
-              />
-              <button onClick={()=>setModalNova(true)} style={{
-                background:'#7c3aed', border:'none', borderRadius:8, padding:'9px 18px',
-                color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>
-                + Nova empresa
-              </button>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, gap:10, flexWrap:'wrap' }}>
+              <input placeholder="Buscar empresa..." value={busca} onChange={e=>setBusca(e.target.value)}
+                style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:8,
+                  padding:'8px 12px', color:C.text, fontSize:13, width:240, outline:'none' }} />
+              <Btn onClick={()=>setModalNova(true)}>+ Nova empresa</Btn>
             </div>
-
-            <div style={{ border:'1px solid #30363d', borderRadius:10, overflow:'hidden' }}>
+            <div style={{ border:`1px solid ${C.border}`, borderRadius:10, overflow:'hidden' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead>
-                  <tr style={{ background:'#161b22', borderBottom:'1px solid #30363d' }}>
-                    {['Empresa','Plano','Status','Condomínios','Chamados abertos','Criada em',''].map(h => (
-                      <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:11,
-                        fontWeight:700, color:'#8b949e', textTransform:'uppercase', letterSpacing:'.04em',
-                        whiteSpace:'nowrap' }}>{h}</th>
+                  <tr style={{ background:C.surface, borderBottom:`1px solid ${C.border}` }}>
+                    {['Empresa','Plano','Status','Condomínios','Usuários','Chamados abertos','Criada em',''].map(h=>(
+                      <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:11, fontWeight:700,
+                        color:C.muted, textTransform:'uppercase', letterSpacing:'.04em', whiteSpace:'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {empresasFiltradas.length === 0 && (
-                    <tr><td colSpan={7} style={{ padding:32, textAlign:'center', color:'#8b949e' }}>
-                      Nenhuma empresa cadastrada ainda.
-                    </td></tr>
+                  {filtradas.length===0 && (
+                    <tr><td colSpan={8} style={{ padding:32, textAlign:'center', color:C.muted }}>Nenhuma empresa cadastrada.</td></tr>
                   )}
-                  {empresasFiltradas.map(e => (
-                    <tr key={e.id} style={{ borderBottom:'1px solid #21262d' }}>
-                      <td style={{ padding:'12px 14px' }}>
-                        <div style={{ fontWeight:600, color:'#e6edf3' }}>{e.nome}</div>
-                        <div style={{ fontSize:11, color:'#8b949e', marginTop:2 }}>{e.email_contato || '—'}</div>
+                  {filtradas.map(e=>(
+                    <tr key={e.id} style={{ borderBottom:`1px solid ${C.border2}` }}>
+                      <td style={{ padding:'11px 12px' }}>
+                        <div style={{ fontWeight:600, color:C.text }}>{e.nome}</div>
+                        <div style={{ fontSize:11, color:C.muted }}>{e.email_contato||'—'}</div>
                       </td>
-                      <td style={{ padding:'12px 14px' }}><Badge label={e.plano_nome} map={PLANO_CORES} /></td>
-                      <td style={{ padding:'12px 14px' }}><Badge label={e.status} map={STATUS_CORES} /></td>
-                      <td style={{ padding:'12px 14px', textAlign:'center', color:'#58a6ff', fontWeight:700 }}>
-                        {e.total_condominios}
-                      </td>
-                      <td style={{ padding:'12px 14px', textAlign:'center',
-                        color: e.chamados_abertos > 0 ? '#f59e0b' : '#8b949e', fontWeight:700 }}>
-                        {e.chamados_abertos}
-                      </td>
-                      <td style={{ padding:'12px 14px', color:'#8b949e', fontSize:12 }}>
+                      <td style={{ padding:'11px 12px' }}><Badge label={e.plano_nome} map={PLANO_COR}/></td>
+                      <td style={{ padding:'11px 12px' }}><Badge label={e.status} map={STATUS_COR}/></td>
+                      <td style={{ padding:'11px 12px', textAlign:'center', color:C.blue, fontWeight:700 }}>{e.total_condominios}</td>
+                      <td style={{ padding:'11px 12px', textAlign:'center', color:C.violet, fontWeight:700 }}>{e.total_usuarios}</td>
+                      <td style={{ padding:'11px 12px', textAlign:'center', fontWeight:700,
+                        color:e.chamados_abertos>0?C.amber:C.muted }}>{e.chamados_abertos}</td>
+                      <td style={{ padding:'11px 12px', color:C.muted, fontSize:12 }}>
                         {new Date(e.criado_em).toLocaleDateString('pt-BR')}
                         {e.plano_vencimento && (
-                          <div style={{ color: new Date(e.plano_vencimento) < new Date() ? '#f85149' : '#8b949e' }}>
+                          <div style={{ color:new Date(e.plano_vencimento)<new Date()?C.red:C.muted, fontSize:11 }}>
                             vence {new Date(e.plano_vencimento).toLocaleDateString('pt-BR')}
                           </div>
                         )}
                       </td>
-                      <td style={{ padding:'12px 14px' }}>
+                      <td style={{ padding:'11px 12px' }}>
                         <div style={{ display:'flex', gap:6 }}>
-                          <button onClick={()=>setEmpresaSelecionada(e)} style={{
-                            background:'#7c3aed', border:'none', borderRadius:6,
-                            color:'#fff', padding:'5px 12px', fontSize:12, cursor:'pointer' }}>
-                            Ver detalhes
-                          </button>
-                          <button onClick={()=>setModalEditar({...e})} style={{
-                            background:'#21262d', border:'1px solid #30363d', borderRadius:6,
-                            color:'#e6edf3', padding:'5px 12px', fontSize:12, cursor:'pointer' }}>
-                            Editar
-                          </button>
+                          <Btn sm onClick={()=>setEmpresaSel(e)}>Gerenciar</Btn>
+                          <Btn sm variant='ghost' onClick={()=>setModalEditarEmpresa({...e})}>Editar</Btn>
                         </div>
                       </td>
                     </tr>
@@ -301,410 +303,329 @@ export default function SuperAdmin({ onToast }) {
           </div>
         )}
 
-        {/* ── MÉTRICAS ── */}
-        {tab==='metricas' && (
-          <div style={{ color:'#8b949e', textAlign:'center', padding:40 }}>
-            <div style={{ fontSize:32, marginBottom:12 }}>📊</div>
-            <p>Dashboard de métricas detalhadas em breve.</p>
-            <p style={{ fontSize:13 }}>Use a aba Clientes para ver dados por empresa.</p>
-          </div>
-        )}
-
-        {/* ── PLANOS ── */}
+        {/* ── ABA PLANOS ── */}
         {tab==='planos' && (
-          <div>
-            <p style={{ fontSize:13, color:'#8b949e', marginBottom:16 }}>
-              Clique em um plano para editar valores e limites.
-            </p>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:16 }}>
-              {planos.map(p => (
-                <PlanoCard key={p.id} plano={p} onSave={async (atualizado) => {
-                  const { error } = await supabase.from('planos').update({
-                    nome_exibicao: atualizado.nome_exibicao,
-                    max_condominios: Number(atualizado.max_condominios),
-                    max_usuarios: Number(atualizado.max_usuarios),
-                    valor_mensal: Number(atualizado.valor_mensal),
-                    descricao: atualizado.descricao,
-                  }).eq('id', p.id)
-                  if (error) { onToast('Erro: '+error.message); return }
-                  onToast('Plano atualizado.')
-                  await carregar()
-                }} />
-              ))}
-            </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px,1fr))', gap:16 }}>
+            {planos.map(p=><PlanoCard key={p.id} plano={p} onToast={onToast} onSaved={carregar} />)}
           </div>
         )}
       </div>
-
-      {/* Modal detalhes da empresa */}
-      {empresaSelecionada && (
-        <EmpresaDetalhe
-          empresa={empresaSelecionada}
-          onClose={() => setEmpresaSelecionada(null)}
-          onToast={onToast}
-        />
-      )}
 
       {/* Modal nova empresa */}
       {modalNova && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)',
-          display:'flex', alignItems:'center', justifyContent:'center', zIndex:50, padding:16 }}>
-          <div style={{ background:'#161b22', border:'1px solid #30363d', borderRadius:16,
-            padding:'28px 24px', width:'100%', maxWidth:520, maxHeight:'90vh', overflowY:'auto' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24 }}>
-              <h3 style={{ margin:0, fontSize:18, fontWeight:700, color:'#e6edf3' }}>Nova empresa cliente</h3>
-              <button onClick={()=>setModalNova(false)} style={{ background:'none', border:'none',
-                color:'#8b949e', fontSize:20, cursor:'pointer' }}>✕</button>
-            </div>
-
-            <Section label="Dados da empresa">
-              <Field label="Nome da empresa *">
-                <DarkInput value={nova.nome} onChange={v=>setNova(x=>({...x,nome:v}))} placeholder="Ex.: Síndico Prime Ltda" />
-              </Field>
-              <Row2>
-                <Field label="CNPJ">
-                  <DarkInput value={nova.cnpj} onChange={v=>setNova(x=>({...x,cnpj:v}))} placeholder="00.000.000/0001-00" />
-                </Field>
-                <Field label="Plano">
-                  <DarkSelect value={nova.plano_nome} onChange={v=>setNova(x=>({...x,plano_nome:v}))}>
-                    {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao} — R$ {p.valor_mensal}/mês</option>)}
-                  </DarkSelect>
-                </Field>
-              </Row2>
-              <Row2>
-                <Field label="E-mail de contato">
-                  <DarkInput value={nova.email_contato} onChange={v=>setNova(x=>({...x,email_contato:v}))} type="email" />
-                </Field>
-                <Field label="Telefone">
-                  <DarkInput value={nova.telefone_contato} onChange={v=>setNova(x=>({...x,telefone_contato:v}))} />
-                </Field>
-              </Row2>
-              {nova.plano_nome !== 'trial' && (
-                <Field label="Vencimento do plano">
-                  <DarkInput value={nova.plano_vencimento} onChange={v=>setNova(x=>({...x,plano_vencimento:v}))} type="date" />
-                </Field>
-              )}
-              <Field label="Observações">
-                <DarkInput value={nova.obs} onChange={v=>setNova(x=>({...x,obs:v}))} placeholder="Anotações internas..." />
-              </Field>
-            </Section>
-
-            <Section label="Usuário administrador da empresa">
-              <Row2>
-                <Field label="Nome *">
-                  <DarkInput value={nova.admin_nome} onChange={v=>setNova(x=>({...x,admin_nome:v}))} />
-                </Field>
-                <Field label="E-mail *">
-                  <DarkInput value={nova.admin_email} onChange={v=>setNova(x=>({...x,admin_email:v}))} type="email" />
-                </Field>
-              </Row2>
-              <Field label="Senha inicial">
-                <DarkInput value={nova.admin_senha} onChange={v=>setNova(x=>({...x,admin_senha:v}))} />
-              </Field>
-              <p style={{ fontSize:12, color:'#8b949e', margin:'4px 0 0' }}>
-                O admin entrará com o e-mail + essa senha e será solicitado a criar uma senha pessoal no primeiro acesso.
-              </p>
-            </Section>
-
-            <button onClick={criarEmpresa} disabled={salvando} style={{
-              width:'100%', padding:'12px', background:'#7c3aed', border:'none',
-              borderRadius:8, color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer',
-              opacity: salvando ? .6 : 1 }}>
-              {salvando ? 'Criando...' : 'Criar empresa e usuário admin'}
-            </button>
-          </div>
-        </div>
+        <Modal title="Nova empresa cliente" onClose={()=>setModalNova(false)} maxWidth={540}>
+          <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', marginBottom:12, borderBottom:`1px solid ${C.border}`, paddingBottom:8 }}>Dados da empresa</div>
+          <Fld label="Nome *"><DI value={nova.nome} onChange={v=>setNova(x=>({...x,nome:v}))} placeholder="Ex.: Síndico Prime Ltda" /></Fld>
+          <G2>
+            <Fld label="CNPJ"><DI value={nova.cnpj} onChange={v=>setNova(x=>({...x,cnpj:v}))} /></Fld>
+            <Fld label="Plano">
+              <DS value={nova.plano_nome} onChange={v=>setNova(x=>({...x,plano_nome:v}))}>
+                {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
+              </DS>
+            </Fld>
+          </G2>
+          <G2>
+            <Fld label="E-mail"><DI value={nova.email_contato} onChange={v=>setNova(x=>({...x,email_contato:v}))} type="email"/></Fld>
+            <Fld label="Telefone"><DI value={nova.telefone_contato} onChange={v=>setNova(x=>({...x,telefone_contato:v}))} /></Fld>
+          </G2>
+          {nova.plano_nome!=='trial' && <Fld label="Vencimento"><DI value={nova.plano_vencimento} onChange={v=>setNova(x=>({...x,plano_vencimento:v}))} type="date"/></Fld>}
+          <Fld label="Obs. internas"><DI value={nova.obs} onChange={v=>setNova(x=>({...x,obs:v}))} placeholder="Anotações..."/></Fld>
+          <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', margin:'16px 0 12px', borderBottom:`1px solid ${C.border}`, paddingBottom:8 }}>Usuário admin</div>
+          <G2>
+            <Fld label="Nome *"><DI value={nova.admin_nome} onChange={v=>setNova(x=>({...x,admin_nome:v}))} /></Fld>
+            <Fld label="E-mail *"><DI value={nova.admin_email} onChange={v=>setNova(x=>({...x,admin_email:v}))} type="email"/></Fld>
+          </G2>
+          <Fld label="Senha inicial"><DI value={nova.admin_senha} onChange={v=>setNova(x=>({...x,admin_senha:v}))} /></Fld>
+          <Btn onClick={criarEmpresa} disabled={salvando} style={{ width:'100%', marginTop:4 }}>
+            {salvando?'Criando...':'Criar empresa + admin'}
+          </Btn>
+        </Modal>
       )}
 
       {/* Modal editar empresa */}
-      {modalEditar && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)',
-          display:'flex', alignItems:'center', justifyContent:'center', zIndex:50, padding:16 }}>
-          <div style={{ background:'#161b22', border:'1px solid #30363d', borderRadius:16,
-            padding:'28px 24px', width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24 }}>
-              <h3 style={{ margin:0, fontSize:18, fontWeight:700, color:'#e6edf3' }}>Editar empresa</h3>
-              <button onClick={()=>setModalEditar(null)} style={{ background:'none', border:'none',
-                color:'#8b949e', fontSize:20, cursor:'pointer' }}>✕</button>
-            </div>
-            <Field label="Nome"><DarkInput value={modalEditar.nome} onChange={v=>setModalEditar(m=>({...m,nome:v}))} /></Field>
-            <Row2>
-              <Field label="CNPJ"><DarkInput value={modalEditar.cnpj||''} onChange={v=>setModalEditar(m=>({...m,cnpj:v}))} /></Field>
-              <Field label="Status">
-                <DarkSelect value={modalEditar.status} onChange={v=>setModalEditar(m=>({...m,status:v}))}>
-                  {['ativa','inadimplente','suspensa','cancelada'].map(s=><option key={s} value={s}>{s}</option>)}
-                </DarkSelect>
-              </Field>
-            </Row2>
-            <Row2>
-              <Field label="Plano">
-                <DarkSelect value={modalEditar.plano_nome} onChange={v=>setModalEditar(m=>({...m,plano_nome:v}))}>
-                  {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
-                </DarkSelect>
-              </Field>
-              <Field label="Vencimento">
-                <DarkInput value={modalEditar.plano_vencimento||''} onChange={v=>setModalEditar(m=>({...m,plano_vencimento:v}))} type="date" />
-              </Field>
-            </Row2>
-            <Row2>
-              <Field label="E-mail"><DarkInput value={modalEditar.email_contato||''} onChange={v=>setModalEditar(m=>({...m,email_contato:v}))} type="email" /></Field>
-              <Field label="Telefone"><DarkInput value={modalEditar.telefone_contato||''} onChange={v=>setModalEditar(m=>({...m,telefone_contato:v}))} /></Field>
-            </Row2>
-            <Field label="Observações"><DarkInput value={modalEditar.obs||''} onChange={v=>setModalEditar(m=>({...m,obs:v}))} /></Field>
-            <button onClick={salvarEdicao} style={{ width:'100%', padding:'12px', background:'#7c3aed',
-              border:'none', borderRadius:8, color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', marginTop:8 }}>
-              Salvar alterações
-            </button>
-          </div>
-        </div>
+      {modalEditarEmpresa && (
+        <Modal title="Editar empresa" onClose={()=>setModalEditarEmpresa(null)} maxWidth={460}>
+          <Fld label="Nome"><DI value={modalEditarEmpresa.nome} onChange={v=>setModalEditarEmpresa(m=>({...m,nome:v}))} /></Fld>
+          <G2>
+            <Fld label="CNPJ"><DI value={modalEditarEmpresa.cnpj||''} onChange={v=>setModalEditarEmpresa(m=>({...m,cnpj:v}))} /></Fld>
+            <Fld label="Status">
+              <DS value={modalEditarEmpresa.status} onChange={v=>setModalEditarEmpresa(m=>({...m,status:v}))}>
+                {['ativa','inadimplente','suspensa','cancelada'].map(s=><option key={s}>{s}</option>)}
+              </DS>
+            </Fld>
+          </G2>
+          <G2>
+            <Fld label="Plano">
+              <DS value={modalEditarEmpresa.plano_nome} onChange={v=>setModalEditarEmpresa(m=>({...m,plano_nome:v}))}>
+                {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
+              </DS>
+            </Fld>
+            <Fld label="Vencimento"><DI value={modalEditarEmpresa.plano_vencimento||''} onChange={v=>setModalEditarEmpresa(m=>({...m,plano_vencimento:v}))} type="date"/></Fld>
+          </G2>
+          <G2>
+            <Fld label="E-mail"><DI value={modalEditarEmpresa.email_contato||''} onChange={v=>setModalEditarEmpresa(m=>({...m,email_contato:v}))} type="email"/></Fld>
+            <Fld label="Telefone"><DI value={modalEditarEmpresa.telefone_contato||''} onChange={v=>setModalEditarEmpresa(m=>({...m,telefone_contato:v}))} /></Fld>
+          </G2>
+          <Fld label="Obs."><DI value={modalEditarEmpresa.obs||''} onChange={v=>setModalEditarEmpresa(m=>({...m,obs:v}))} /></Fld>
+          <Btn onClick={salvarEmpresa} style={{ width:'100%' }}>Salvar</Btn>
+        </Modal>
       )}
     </div>
   )
 }
 
-// Componentes auxiliares para o dark mode do super admin
-function Section({ label, children }) {
-  return (
-    <div style={{ marginBottom:20 }}>
-      <div style={{ fontSize:11, fontWeight:700, color:'#8b949e', textTransform:'uppercase',
-        letterSpacing:'.06em', marginBottom:12, paddingBottom:8, borderBottom:'1px solid #30363d' }}>
-        {label}
-      </div>
-      {children}
-    </div>
-  )
-}
-function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom:14 }}>
-      <label style={{ display:'block', fontSize:11, fontWeight:600, color:'#8b949e',
-        marginBottom:5, textTransform:'uppercase', letterSpacing:'.04em' }}>{label}</label>
-      {children}
-    </div>
-  )
-}
-function Row2({ children }) {
-  return <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>{children}</div>
-}
-function DarkInput({ value, onChange, type='text', placeholder='' }) {
-  return (
-    <input type={type} value={value} placeholder={placeholder}
-      onChange={e=>onChange(e.target.value)}
-      style={{ width:'100%', background:'#0d1117', border:'1px solid #30363d', borderRadius:7,
-        padding:'9px 11px', color:'#e6edf3', fontSize:13, outline:'none', boxSizing:'border-box' }}
-    />
-  )
-}
-function DarkSelect({ value, onChange, children }) {
-  return (
-    <select value={value} onChange={e=>onChange(e.target.value)}
-      style={{ width:'100%', background:'#0d1117', border:'1px solid #30363d', borderRadius:7,
-        padding:'9px 11px', color:'#e6edf3', fontSize:13, outline:'none', boxSizing:'border-box' }}>
-      {children}
-    </select>
-  )
-}
-
-function PlanoCard({ plano, onSave }) {
-  const [editando, setEditando] = useState(false)
-  const [form, setForm] = useState({ ...plano })
-  const [salvando, setSalvando] = useState(false)
-
-  const salvar = async () => {
-    setSalvando(true)
-    await onSave(form)
-    setSalvando(false)
-    setEditando(false)
-  }
-
-  if (!editando) return (
-    <div style={{ background:'#161b22', border:'1px solid #30363d', borderRadius:12, padding:'20px 18px' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
-        <Badge label={plano.nome} map={PLANO_CORES} />
-        <button onClick={()=>setEditando(true)} style={{ background:'#21262d', border:'1px solid #30363d',
-          borderRadius:6, color:'#8b949e', padding:'4px 10px', fontSize:12, cursor:'pointer' }}>
-          Editar
-        </button>
-      </div>
-      <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:'#e6edf3', margin:'8px 0 4px' }}>
-        {plano.valor_mensal === 0 ? 'Grátis' : `R$ ${Number(plano.valor_mensal).toLocaleString('pt-BR')}/mês`}
-      </div>
-      <div style={{ fontSize:13, color:'#e6edf3', fontWeight:600, marginBottom:8 }}>{plano.nome_exibicao}</div>
-      <div style={{ fontSize:12, color:'#8b949e', lineHeight:1.8 }}>
-        Até {plano.max_condominios >= 999 ? '∞' : plano.max_condominios} condomínios<br/>
-        Até {plano.max_usuarios >= 9999 ? '∞' : plano.max_usuarios} usuários<br/>
-        {plano.descricao}
-      </div>
-    </div>
-  )
-
-  return (
-    <div style={{ background:'#161b22', border:'2px solid #7c3aed', borderRadius:12, padding:'20px 18px' }}>
-      <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', textTransform:'uppercase',
-        letterSpacing:'.05em', marginBottom:14 }}>Editando: {plano.nome}</div>
-      <div style={{ marginBottom:10 }}>
-        <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>NOME DE EXIBIÇÃO</label>
-        <DarkInput value={form.nome_exibicao} onChange={v=>setForm(f=>({...f,nome_exibicao:v}))} />
-      </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
-        <div>
-          <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>VALOR MENSAL (R$)</label>
-          <DarkInput value={form.valor_mensal} onChange={v=>setForm(f=>({...f,valor_mensal:v}))} type="number" />
-        </div>
-        <div>
-          <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>MÁX. CONDOMÍNIOS</label>
-          <DarkInput value={form.max_condominios} onChange={v=>setForm(f=>({...f,max_condominios:v}))} type="number" />
-        </div>
-      </div>
-      <div style={{ marginBottom:10 }}>
-        <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>MÁX. USUÁRIOS</label>
-        <DarkInput value={form.max_usuarios} onChange={v=>setForm(f=>({...f,max_usuarios:v}))} type="number" />
-      </div>
-      <div style={{ marginBottom:14 }}>
-        <label style={{ fontSize:11, color:'#8b949e', display:'block', marginBottom:4 }}>DESCRIÇÃO</label>
-        <DarkInput value={form.descricao||''} onChange={v=>setForm(f=>({...f,descricao:v}))} />
-      </div>
-      <div style={{ display:'flex', gap:8 }}>
-        <button onClick={salvar} disabled={salvando} style={{ flex:1, padding:'9px', background:'#7c3aed',
-          border:'none', borderRadius:7, color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>
-          {salvando ? 'Salvando...' : 'Salvar'}
-        </button>
-        <button onClick={()=>{ setEditando(false); setForm({...plano}) }} style={{ padding:'9px 14px',
-          background:'#21262d', border:'1px solid #30363d', borderRadius:7,
-          color:'#8b949e', fontSize:13, cursor:'pointer' }}>
-          Cancelar
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function EmpresaDetalhe({ empresa, onClose, onToast }) {
+// ── Painel de gestão de uma empresa ────────────────────────
+function EmpresaPanel({ empresa, planos, onBack, onToast }) {
+  const [aba, setAba] = useState('condominios')
   const [condominios, setCondominios] = useState([])
   const [usuarios, setUsuarios] = useState([])
   const [chamados, setChamados] = useState([])
-  const [aba, setAba] = useState('condominios')
   const [loading, setLoading] = useState(true)
+  const [novoCondNome, setNovoCondNome] = useState('')
+  const [modalUsuario, setModalUsuario] = useState(null) // null | objeto usuario
+  const [modalNovaConta, setModalNovaConta] = useState(false)
+  const [novaConta, setNovaConta] = useState({ nome:'', email:'', codigo:'', senha:'mudar123', papel:'morador', condominio_id:'' })
+  const [salvando, setSalvando] = useState(false)
 
-  useEffect(() => {
-    async function carregar() {
-      const [{ data: conds }, { data: users }, { data: chams }] = await Promise.all([
-        supabase.from('condominios').select('id, nome').eq('empresa_id', empresa.id).order('nome'),
-        supabase.from('perfis').select('id, nome, email, papel, codigo_acesso, condominio_id, condominios(nome)').eq('empresa_id', empresa.id).order('criado_em', { ascending: false }),
-        supabase.from('solicitacoes').select('id, categoria, status, criado_em, condominios(nome)').in('condominio_id',
-          (await supabase.from('condominios').select('id').eq('empresa_id', empresa.id)).data?.map(c => c.id) || []
-        ).order('criado_em', { ascending: false }).limit(50),
-      ])
-      setCondominios(conds || [])
-      setUsuarios(users || [])
-      setChamados(chams || [])
-      setLoading(false)
+  const carregar = async () => {
+    setLoading(true)
+    const ids = condominios.map(c=>c.id)
+
+    const [{ data:conds }, { data:users }] = await Promise.all([
+      supabase.from('condominios').select('id, nome').eq('empresa_id', empresa.id).order('nome'),
+      supabase.from('perfis').select('id, nome, email, papel, codigo_acesso, condominio_id, primeiro_acesso, condominios(nome)')
+        .eq('empresa_id', empresa.id).order('criado_em', { ascending:false }),
+    ])
+    setCondominios(conds||[])
+    setUsuarios(users||[])
+
+    if (conds?.length) {
+      const { data:chams } = await supabase.from('solicitacoes')
+        .select('id, categoria, status, criado_em, nome_solicitante, condominios(nome)')
+        .in('condominio_id', conds.map(c=>c.id))
+        .order('criado_em', { ascending:false }).limit(100)
+      setChamados(chams||[])
+    } else {
+      setChamados([])
     }
-    carregar()
-  }, [empresa.id])
+    setLoading(false)
+  }
 
-  const PAPEL_COR = { admin:'#f59e0b', equipe:'#3fb950', conselheiro:'#a78bfa', morador:'#8b949e' }
-  const STATUS_COR = { recebido:'#f59e0b', andamento:'#58a6ff', concluido:'#3fb950' }
+  useEffect(() => { carregar() }, [empresa.id])
+
+  // Condomínios
+  const adicionarCondo = async () => {
+    if (!novoCondNome.trim()) return
+    const { error } = await supabase.from('condominios').insert({ nome:novoCondNome.trim(), empresa_id:empresa.id })
+    if (error) { onToast('Erro: '+error.message); return }
+    setNovoCondNome(''); onToast('Condomínio adicionado.'); await carregar()
+  }
+  const salvarCondo = async (id, nome) => {
+    await supabase.from('condominios').update({ nome }).eq('id', id)
+    onToast('Salvo.'); await carregar()
+  }
+  const excluirCondo = async (id) => {
+    if (!window.confirm('Excluir condomínio? Os chamados vinculados também serão afetados.')) return
+    const { error } = await supabase.from('condominios').delete().eq('id', id)
+    if (error) { onToast('Não foi possível excluir: '+error.message); return }
+    onToast('Condomínio excluído.'); await carregar()
+  }
+
+  // Usuários
+  const salvarUsuario = async () => {
+    if (!modalUsuario) return
+    const { error } = await supabase.from('perfis').update({
+      nome:modalUsuario.nome, papel:modalUsuario.papel,
+      codigo_acesso:modalUsuario.codigo_acesso?.toUpperCase(),
+      condominio_id: ['morador','conselheiro'].includes(modalUsuario.papel) ? modalUsuario.condominio_id||null : null,
+    }).eq('id', modalUsuario.id)
+    if (error) { onToast('Erro: '+error.message); return }
+    onToast('Usuário atualizado.'); setModalUsuario(null); await carregar()
+  }
+
+  const resetarSenha = async (userId, novaSenha) => {
+    if (!novaSenha || novaSenha.length<4) { onToast('Senha muito curta.'); return }
+    const session = (await supabase.auth.getSession()).data.session
+    const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token}` },
+      body: JSON.stringify({ action:'reset_password', user_id:userId, new_password:novaSenha }),
+    })
+    const json = await resp.json()
+    if (!resp.ok) { onToast('Erro: '+json.error); return }
+    onToast('Senha alterada.')
+  }
+
+  const excluirUsuario = async (userId) => {
+    if (!window.confirm('Excluir esta conta definitivamente?')) return
+    const session = (await supabase.auth.getSession()).data.session
+    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token}` },
+      body: JSON.stringify({ action:'delete_user', user_id:userId }),
+    })
+    onToast('Conta excluída.'); setModalUsuario(null); await carregar()
+  }
+
+  const criarConta = async () => {
+    if (!novaConta.nome||!novaConta.email||!novaConta.codigo) { onToast('Preencha nome, e-mail e código.'); return }
+    setSalvando(true)
+    const session = (await supabase.auth.getSession()).data.session
+    const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token}` },
+      body: JSON.stringify({
+        action:'create_user', email:novaConta.email, password:novaConta.senha,
+        nome:novaConta.nome, papel:novaConta.papel, empresa_id:empresa.id,
+        codigo_acesso:novaConta.codigo.toUpperCase(),
+        condominio_id: ['morador','conselheiro'].includes(novaConta.papel) ? novaConta.condominio_id||null : null,
+      }),
+    })
+    const json = await resp.json()
+    setSalvando(false)
+    if (!resp.ok) { onToast('Erro: '+json.error); return }
+    onToast('Conta criada!'); setModalNovaConta(false)
+    setNovaConta({ nome:'', email:'', codigo:'', senha:'mudar123', papel:'morador', condominio_id:'' })
+    await carregar()
+  }
+
+  const PAPEIS = ['morador','conselheiro','equipe','admin']
+  const PAPEL_LABEL = { morador:'Morador', conselheiro:'Conselheiro', equipe:'Síndico', admin:'Admin' }
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:60,
-      display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'20px 16px', overflowY:'auto' }}>
-      <div style={{ background:'#161b22', border:'1px solid #30363d', borderRadius:16,
-        width:'100%', maxWidth:760, padding:'28px 24px' }}>
+    <div style={{ minHeight:'100vh', background:C.bg, color:C.text, fontFamily:'var(--font-body)' }}>
+      {/* Header */}
+      <div style={{ background:'#13111a', borderBottom:`1px solid #2d2438`,
+        padding:'0 20px', display:'flex', alignItems:'center', gap:12, height:52 }}>
+        <button onClick={onBack} style={{ background:'none', border:`1px solid ${C.border}`, borderRadius:7,
+          color:C.muted, padding:'5px 12px', fontSize:12, cursor:'pointer' }}>← Voltar</button>
+        <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:'#fff' }}>{empresa.nome}</span>
+        <Badge label={empresa.plano_nome} map={PLANO_COR} />
+        <Badge label={empresa.status} map={STATUS_COR} />
+        <div style={{ flex:1 }}/>
+        <span style={{ fontSize:12, color:C.muted }}>{condominios.length} condomínio{condominios.length!==1?'s':''} · {usuarios.length} usuário{usuarios.length!==1?'s':''}</span>
+      </div>
 
-        {/* Cabeçalho */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <div>
-            <h3 style={{ margin:0, fontSize:18, fontWeight:700, color:'#e6edf3' }}>{empresa.nome}</h3>
-            <div style={{ fontSize:12, color:'#8b949e', marginTop:4 }}>
-              Plano: <span style={{ color:'#a78bfa', fontWeight:600 }}>{empresa.plano_nome}</span>
-              {' · '}Status: <span style={{ color: empresa.status==='ativa' ? '#3fb950' : '#f85149', fontWeight:600 }}>{empresa.status}</span>
-            </div>
-          </div>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'#8b949e', fontSize:22, cursor:'pointer' }}>✕</button>
-        </div>
-
-        {/* Abas */}
-        <div style={{ display:'flex', borderBottom:'1px solid #30363d', marginBottom:20, gap:0 }}>
-          {[['condominios','🏢 Condomínios'], ['usuarios','👤 Usuários'], ['chamados','📋 Chamados']].map(([id, label]) => (
+      <div style={{ maxWidth:1100, margin:'0 auto', padding:'24px 20px' }}>
+        {/* Tabs */}
+        <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24 }}>
+          {[['condominios','🏢 Condomínios'],['usuarios','👤 Usuários'],['chamados','📋 Chamados']].map(([id,label])=>(
             <button key={id} onClick={()=>setAba(id)} style={{
-              padding:'9px 16px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
-              color: aba===id ? '#fff' : '#8b949e',
-              borderBottom: aba===id ? '2px solid #7c3aed' : '2px solid transparent',
-              marginBottom:-1,
-            }}>{label}</button>
+              padding:'9px 18px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
+              color:aba===id?'#fff':C.muted, borderBottom:aba===id?`2px solid ${C.purple}`:'2px solid transparent', marginBottom:-1 }}>
+              {label}
+            </button>
           ))}
         </div>
 
-        {loading && <div style={{ textAlign:'center', color:'#8b949e', padding:32 }}>Carregando...</div>}
+        {loading && <div style={{ textAlign:'center', color:C.muted, padding:40 }}>Carregando...</div>}
 
-        {/* Condomínios */}
+        {/* ── CONDOMÍNIOS ── */}
         {!loading && aba==='condominios' && (
           <div>
-            {condominios.length === 0
-              ? <p style={{ color:'#8b949e', fontSize:13 }}>Nenhum condomínio cadastrado.</p>
-              : condominios.map(c => (
-                <div key={c.id} style={{ display:'flex', alignItems:'center', padding:'10px 0',
-                  borderBottom:'1px solid #21262d' }}>
-                  <div style={{ width:32, height:32, borderRadius:8, background:'#1a3451',
-                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:13,
-                    fontWeight:700, color:'#58a6ff', marginRight:12, flexShrink:0 }}>
+            {condominios.map(c => {
+              let nomeEdit = c.nome
+              const qtdUsuarios = usuarios.filter(u=>u.condominio_id===c.id).length
+              const qtdChamados = chamados.filter(ch=>ch.condominio_id===c.id).length
+              return (
+                <div key={c.id} style={{ background:C.surface, border:`1px solid ${C.border}`,
+                  borderRadius:10, padding:'14px 16px', marginBottom:10,
+                  display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <div style={{ width:36, height:36, borderRadius:8, background:'#1a3451',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:14, fontWeight:700, color:C.blue, flexShrink:0 }}>
                     {c.nome[0]}
                   </div>
-                  <span style={{ fontSize:14, color:'#e6edf3', fontWeight:500 }}>{c.nome}</span>
+                  <input defaultValue={c.nome} onChange={e=>{nomeEdit=e.target.value}}
+                    style={{ flex:1, background:'transparent', border:'none', color:C.text,
+                      fontSize:15, fontWeight:600, outline:'none', minWidth:120 }} />
+                  <span style={{ fontSize:12, color:C.muted, whiteSpace:'nowrap' }}>
+                    {qtdUsuarios} usuário{qtdUsuarios!==1?'s':''} · {qtdChamados} chamado{qtdChamados!==1?'s':''}
+                  </span>
+                  <div style={{ display:'flex', gap:6 }}>
+                    <Btn sm onClick={()=>salvarCondo(c.id, nomeEdit)}>Salvar</Btn>
+                    <Btn sm variant='danger' onClick={()=>excluirCondo(c.id)}>Excluir</Btn>
+                  </div>
                 </div>
-              ))
-            }
+              )
+            })}
+            <div style={{ display:'flex', gap:10, marginTop:16 }}>
+              <DI value={novoCondNome} onChange={setNovoCondNome} placeholder="Nome do novo condomínio"
+                style={{ flex:1 }} />
+              <Btn onClick={adicionarCondo}>+ Adicionar</Btn>
+            </div>
           </div>
         )}
 
-        {/* Usuários */}
+        {/* ── USUÁRIOS ── */}
         {!loading && aba==='usuarios' && (
           <div>
-            {usuarios.length === 0
-              ? <p style={{ color:'#8b949e', fontSize:13 }}>Nenhum usuário cadastrado.</p>
-              : usuarios.map(u => (
-                <div key={u.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'10px 0', borderBottom:'1px solid #21262d', flexWrap:'wrap', gap:8 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <div style={{ width:34, height:34, borderRadius:'50%', background:'#1a3451',
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      fontSize:12, fontWeight:700, color:'#58a6ff', flexShrink:0 }}>
-                      {(u.nome||'?')[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <div style={{ fontSize:13, fontWeight:600, color:'#e6edf3' }}>{u.nome || '—'}</div>
-                      <div style={{ fontSize:11, color:'#8b949e' }}>
-                        {u.codigo_acesso ? `Código: ${u.codigo_acesso} · ` : ''}{u.condominios?.nome || ''}
-                      </div>
-                    </div>
+            <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:16 }}>
+              <Btn onClick={()=>setModalNovaConta(true)}>+ Novo usuário</Btn>
+            </div>
+            {['admin','equipe','conselheiro','morador'].map(papel => {
+              const grupo = usuarios.filter(u=>u.papel===papel)
+              if (!grupo.length) return null
+              return (
+                <div key={papel} style={{ marginBottom:20 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:5,
+                      background:'#21262d', color:PAPEL_COR[papel]||C.muted, textTransform:'uppercase' }}>
+                      {PAPEL_LABEL[papel]}
+                    </span>
+                    <span style={{ fontSize:12, color:C.muted }}>{grupo.length} conta{grupo.length!==1?'s':''}</span>
                   </div>
-                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:5,
-                    background:'#21262d', color: PAPEL_COR[u.papel] || '#8b949e' }}>
-                    {u.papel}
-                  </span>
+                  {grupo.map(u=>(
+                    <div key={u.id} style={{ background:C.surface, border:`1px solid ${C.border2}`,
+                      borderRadius:9, padding:'12px 14px', marginBottom:8,
+                      display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                      <div style={{ width:36, height:36, borderRadius:'50%', background:'#1a3451',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:13, fontWeight:700, color:C.blue, flexShrink:0 }}>
+                        {(u.nome||'?')[0].toUpperCase()}
+                      </div>
+                      <div style={{ flex:1, minWidth:140 }}>
+                        <div style={{ fontSize:14, fontWeight:600, color:C.text, display:'flex', alignItems:'center', gap:8 }}>
+                          {u.nome||'—'}
+                          {u.primeiro_acesso===true && (
+                            <span style={{ fontSize:10, background:'#2d1a00', color:C.amber,
+                              padding:'1px 6px', borderRadius:4, fontWeight:700 }}>1º acesso</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>
+                          {u.codigo_acesso ? `Código: ${u.codigo_acesso}` : ''}
+                          {u.condominios?.nome ? ` · ${u.condominios.nome}` : ''}
+                        </div>
+                      </div>
+                      <Btn sm variant='ghost' onClick={()=>setModalUsuario({...u, novaSenha:''})}>Editar</Btn>
+                    </div>
+                  ))}
                 </div>
-              ))
-            }
+              )
+            })}
+            {usuarios.length===0 && <div style={{ textAlign:'center', color:C.muted, padding:32 }}>Nenhum usuário cadastrado.</div>}
           </div>
         )}
 
-        {/* Chamados */}
+        {/* ── CHAMADOS ── */}
         {!loading && aba==='chamados' && (
           <div>
-            {chamados.length === 0
-              ? <p style={{ color:'#8b949e', fontSize:13 }}>Nenhum chamado registrado.</p>
-              : chamados.map(s => (
-                <div key={s.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'10px 0', borderBottom:'1px solid #21262d', flexWrap:'wrap', gap:8 }}>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:600, color:'#e6edf3' }}>{s.categoria}</div>
-                    <div style={{ fontSize:11, color:'#8b949e' }}>
-                      {s.condominios?.nome} · {new Date(s.criado_em).toLocaleDateString('pt-BR')}
+            <div style={{ marginBottom:12, fontSize:13, color:C.muted }}>{chamados.length} chamado{chamados.length!==1?'s':''} no total</div>
+            {chamados.length===0
+              ? <div style={{ textAlign:'center', color:C.muted, padding:32 }}>Nenhum chamado registrado.</div>
+              : chamados.map(s=>(
+                <div key={s.id} style={{ background:C.surface, border:`1px solid ${C.border2}`,
+                  borderRadius:9, padding:'11px 14px', marginBottom:8,
+                  display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{s.categoria}</div>
+                    <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>
+                      {s.condominios?.nome} {s.nome_solicitante ? `· ${s.nome_solicitante}` : ''}
+                      {' · '}{new Date(s.criado_em).toLocaleDateString('pt-BR')}
                     </div>
                   </div>
-                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:5,
-                    background:'#21262d', color: STATUS_COR[s.status] || '#8b949e' }}>
+                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:5,
+                    background:'#21262d', color:STATUS_CHAM[s.status]||C.muted }}>
                     {s.status}
                   </span>
                 </div>
@@ -712,6 +633,130 @@ function EmpresaDetalhe({ empresa, onClose, onToast }) {
             }
           </div>
         )}
+      </div>
+
+      {/* Modal editar usuário */}
+      {modalUsuario && (
+        <Modal title="Editar usuário" onClose={()=>setModalUsuario(null)} maxWidth={440}>
+          <Fld label="Nome"><DI value={modalUsuario.nome||''} onChange={v=>setModalUsuario(m=>({...m,nome:v}))} /></Fld>
+          <G2>
+            <Fld label="Código de acesso">
+              <DI value={modalUsuario.codigo_acesso||''} onChange={v=>setModalUsuario(m=>({...m,codigo_acesso:v.toUpperCase()}))} />
+            </Fld>
+            <Fld label="Papel">
+              <DS value={modalUsuario.papel} onChange={v=>setModalUsuario(m=>({...m,papel:v}))}>
+                {PAPEIS.map(p=><option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}
+              </DS>
+            </Fld>
+          </G2>
+          {['morador','conselheiro'].includes(modalUsuario.papel) && (
+            <Fld label="Condomínio">
+              <DS value={modalUsuario.condominio_id||''} onChange={v=>setModalUsuario(m=>({...m,condominio_id:v}))}>
+                <option value="">Sem condomínio</option>
+                {condominios.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+              </DS>
+            </Fld>
+          )}
+          <Btn onClick={salvarUsuario} style={{ width:'100%', marginBottom:16 }}>Salvar dados</Btn>
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16 }}>
+            <Lbl>Resetar senha</Lbl>
+            <div style={{ display:'flex', gap:8, marginTop:6 }}>
+              <DI value={modalUsuario.novaSenha||''} onChange={v=>setModalUsuario(m=>({...m,novaSenha:v}))} placeholder="Nova senha" />
+              <Btn sm onClick={()=>resetarSenha(modalUsuario.id, modalUsuario.novaSenha)}>Resetar</Btn>
+            </div>
+          </div>
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16, marginTop:16 }}>
+            <Btn variant='danger' onClick={()=>excluirUsuario(modalUsuario.id)} style={{ width:'100%' }}>
+              Excluir conta permanentemente
+            </Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal nova conta */}
+      {modalNovaConta && (
+        <Modal title="Novo usuário" onClose={()=>setModalNovaConta(false)} maxWidth={440}>
+          <Fld label="Nome *"><DI value={novaConta.nome} onChange={v=>setNovaConta(x=>({...x,nome:v}))} /></Fld>
+          <Fld label="E-mail *"><DI value={novaConta.email} onChange={v=>setNovaConta(x=>({...x,email:v}))} type="email"/></Fld>
+          <G2>
+            <Fld label="Código de acesso *"><DI value={novaConta.codigo} onChange={v=>setNovaConta(x=>({...x,codigo:v.toUpperCase()}))} /></Fld>
+            <Fld label="Senha inicial"><DI value={novaConta.senha} onChange={v=>setNovaConta(x=>({...x,senha:v}))} /></Fld>
+          </G2>
+          <Fld label="Papel">
+            <DS value={novaConta.papel} onChange={v=>setNovaConta(x=>({...x,papel:v}))}>
+              {PAPEIS.map(p=><option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}
+            </DS>
+          </Fld>
+          {['morador','conselheiro'].includes(novaConta.papel) && (
+            <Fld label="Condomínio">
+              <DS value={novaConta.condominio_id} onChange={v=>setNovaConta(x=>({...x,condominio_id:v}))}>
+                <option value="">Selecione...</option>
+                {condominios.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+              </DS>
+            </Fld>
+          )}
+          <Btn onClick={criarConta} disabled={salvando} style={{ width:'100%', marginTop:4 }}>
+            {salvando?'Criando...':'Criar usuário'}
+          </Btn>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Plano Card editável ─────────────────────────────────────
+function PlanoCard({ plano, onToast, onSaved }) {
+  const [editando, setEditando] = useState(false)
+  const [form, setForm] = useState({...plano})
+  const [salvando, setSalvando] = useState(false)
+
+  const salvar = async () => {
+    setSalvando(true)
+    const { error } = await supabase.from('planos').update({
+      nome_exibicao:form.nome_exibicao,
+      max_condominios:Number(form.max_condominios),
+      max_usuarios:Number(form.max_usuarios),
+      valor_mensal:Number(form.valor_mensal),
+      descricao:form.descricao,
+    }).eq('id', plano.id)
+    setSalvando(false)
+    if (error) { onToast('Erro: '+error.message); return }
+    onToast('Plano atualizado.'); setEditando(false); onSaved()
+  }
+
+  if (!editando) return (
+    <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'18px 16px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+        <Badge label={plano.nome} map={PLANO_COR} />
+        <Btn sm variant='ghost' onClick={()=>setEditando(true)}>Editar</Btn>
+      </div>
+      <div style={{ fontFamily:'var(--font-display)', fontSize:24, fontWeight:800, color:C.text, margin:'8px 0 4px' }}>
+        {plano.valor_mensal===0?'Grátis':`R$ ${Number(plano.valor_mensal).toLocaleString('pt-BR')}/mês`}
+      </div>
+      <div style={{ fontSize:13, fontWeight:600, color:C.text, marginBottom:6 }}>{plano.nome_exibicao}</div>
+      <div style={{ fontSize:12, color:C.muted, lineHeight:1.7 }}>
+        Até {plano.max_condominios>=999?'∞':plano.max_condominios} condomínios<br/>
+        Até {plano.max_usuarios>=9999?'∞':plano.max_usuarios} usuários<br/>
+        {plano.descricao}
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={{ background:C.surface, border:`2px solid ${C.purple}`, borderRadius:12, padding:'18px 16px' }}>
+      <div style={{ fontSize:11, color:C.violet, fontWeight:700, textTransform:'uppercase', marginBottom:12 }}>
+        Editando: {plano.nome}
+      </div>
+      <Fld label="Nome de exibição"><DI value={form.nome_exibicao} onChange={v=>setForm(f=>({...f,nome_exibicao:v}))} /></Fld>
+      <G2>
+        <Fld label="Valor (R$/mês)"><DI value={form.valor_mensal} onChange={v=>setForm(f=>({...f,valor_mensal:v}))} type="number"/></Fld>
+        <Fld label="Máx. condomínios"><DI value={form.max_condominios} onChange={v=>setForm(f=>({...f,max_condominios:v}))} type="number"/></Fld>
+      </G2>
+      <Fld label="Máx. usuários"><DI value={form.max_usuarios} onChange={v=>setForm(f=>({...f,max_usuarios:v}))} type="number"/></Fld>
+      <Fld label="Descrição"><DI value={form.descricao||''} onChange={v=>setForm(f=>({...f,descricao:v}))} /></Fld>
+      <div style={{ display:'flex', gap:8 }}>
+        <Btn onClick={salvar} disabled={salvando} style={{ flex:1 }}>{salvando?'Salvando...':'Salvar'}</Btn>
+        <Btn variant='ghost' onClick={()=>{ setEditando(false); setForm({...plano}) }}>Cancelar</Btn>
       </div>
     </div>
   )
