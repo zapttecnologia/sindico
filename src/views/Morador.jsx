@@ -67,6 +67,21 @@ export default function Morador({ onToast }) {
   const [extraDescricao, setExtraDescricao] = useState('')
   const [extraAnonimo, setExtraAnonimo] = useState(false)
 
+  const [arquivosSel, setArquivosSel] = useState([])
+  const MAX_MB = 10
+  const MAX_BYTES = MAX_MB * 1024 * 1024
+
+  const handleSelecionarArquivos = (e) => {
+    const files = Array.from(e.target.files || [])
+    const invalidos = files.filter(f => f.size > MAX_BYTES)
+    if (invalidos.length) onToast(`Ignorados (acima de ${MAX_MB}MB): ${invalidos.map(f=>f.name).join(', ')}`)
+    const validos = files.filter(f => f.size <= MAX_BYTES)
+    setArquivosSel(prev => [...prev, ...validos])
+    e.target.value = ''
+  }
+
+  const removerArquivo = (idx) => setArquivosSel(prev => prev.filter((_,i) => i !== idx))
+
   const carregar = async () => {
     const [{ data: t }, { data: c }] = await Promise.all([
       supabase.from('solicitacoes').select('*').eq('autor_id', session.user.id).order('criado_em', { ascending:false }),
@@ -97,10 +112,18 @@ export default function Morador({ onToast }) {
       bloco: perfil.bloco,
       apartamento: perfil.apartamento,
     }).select().single()
+    if (error) { setLoading(false); onToast('Erro: ' + error.message); return }
+
+    // Upload dos arquivos selecionados
+    for (const file of arquivosSel) {
+      const nomeSeguro = `${Date.now()}_${file.name}`.replace(/[^a-zA-Z0-9._-]/g, '_')
+      await supabase.storage.from('anexos-solicitacoes').upload(`${data.id}/${nomeSeguro}`, file)
+    }
+
     setLoading(false)
-    if (error) { onToast('Erro: ' + error.message); return }
     setTicketCriado(data)
     setDescricao('')
+    setArquivosSel([])
     await carregar()
   }
 
@@ -215,18 +238,61 @@ export default function Morador({ onToast }) {
                 value={descricao} onChange={e => setDescricao(e.target.value)} />
             </div>
 
-            {/* Aviso de anexo — disponível após envio */}
-            <div style={{ padding:'12px 14px', background:'#e8eeff', borderRadius:'var(--r-md)',
-              fontSize:13, color:'#2843ad', marginBottom:16, display:'flex', alignItems:'center', gap:8 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21.44 11.05L12.25 20.24a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-              </svg>
-              Apos enviar voce podera anexar fotos e arquivos (max. 10MB cada).
+            {/* Área de anexo */}
+            <div className="field">
+              <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21.44 11.05L12.25 20.24a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                </svg>
+                Fotos e arquivos (opcional, máx. {MAX_MB}MB cada)
+              </label>
+
+              {/* Lista de arquivos selecionados */}
+              {arquivosSel.length > 0 && (
+                <div style={{ marginBottom:10 }}>
+                  {arquivosSel.map((f, i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 10px',
+                      background:'var(--mint)', borderRadius:'var(--r-md)', marginBottom:6, fontSize:13 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" strokeWidth="2">
+                        <path d="M21.44 11.05L12.25 20.24a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                      <span style={{ flex:1, color:'var(--gray-800)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {f.name}
+                      </span>
+                      <span style={{ fontSize:11, color:'var(--gray-400)', flexShrink:0 }}>
+                        {(f.size/1024/1024).toFixed(1)}MB
+                      </span>
+                      <button onClick={() => removerArquivo(i)}
+                        style={{ background:'none', border:'none', color:'var(--rust)', cursor:'pointer', fontSize:16, padding:0, flexShrink:0 }}>
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Botão de adicionar arquivo */}
+              <label style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'10px 16px',
+                background:'#fff', border:'1.5px dashed var(--gray-300)', borderRadius:'var(--r-md)',
+                fontSize:13, fontWeight:600, color:'var(--gray-600)', cursor:'pointer', width:'100%',
+                justifyContent:'center', transition:'border-color .15s' }}
+                onMouseEnter={e => e.currentTarget.style.borderColor='var(--emerald)'}
+                onMouseLeave={e => e.currentTarget.style.borderColor='var(--gray-300)'}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                {arquivosSel.length > 0 ? `${arquivosSel.length} arquivo(s) — adicionar mais` : 'Clique para anexar fotos ou arquivos'}
+                <input type="file" multiple style={{ display:'none' }} onChange={handleSelecionarArquivos} />
+              </label>
             </div>
 
             <button className="btn btn-primary btn-block" style={{ fontSize:15, padding:'13px' }}
               onClick={enviarChamado} disabled={loading || !descricao.trim()}>
-              {loading ? 'Enviando...' : 'Enviar solicitacao'}
+              {loading
+                ? (arquivosSel.length > 0 ? `Enviando chamado e ${arquivosSel.length} arquivo(s)...` : 'Enviando...')
+                : `Enviar solicitacao${arquivosSel.length > 0 ? ` + ${arquivosSel.length} arquivo(s)` : ''}`}
             </button>
           </div>
         ) : (
