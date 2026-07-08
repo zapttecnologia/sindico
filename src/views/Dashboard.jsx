@@ -179,7 +179,7 @@ export default function Dashboard({ onToast }) {
         {base.length === 0
           ? <div className="empty-state" style={{ padding:24 }}>Nenhum chamado para exibir.</div>
           : (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={240}>
               <LineChart data={ultimos6} margin={{ top:5, right:20, left:0, bottom:5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize:12, fill:'#888' }} />
@@ -195,7 +195,7 @@ export default function Dashboard({ onToast }) {
       </div>
 
       {/* Chamados por condomínio + por status */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginTop:4 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(340px,1fr))', gap:16, marginTop:4 }}>
         {/* Por condomínio */}
         <div>
           <SectionTitle>🏢 Chamados por condominio</SectionTitle>
@@ -203,7 +203,7 @@ export default function Dashboard({ onToast }) {
             {porCondo.length === 0
               ? <div className="empty-state" style={{ padding:24 }}>Sem dados.</div>
               : (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={porCondo} margin={{ top:0, right:8, left:-16, bottom:0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                     <XAxis dataKey="nome" tick={{ fontSize:11, fill:'#888' }} />
@@ -226,15 +226,16 @@ export default function Dashboard({ onToast }) {
             {porStatus.length === 0
               ? <div className="empty-state" style={{ padding:24 }}>Sem dados.</div>
               : (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
-                    <Pie data={porStatus} cx="50%" cy="50%" innerRadius={55} outerRadius={90}
+                    <Pie data={porStatus} cx="50%" cy="50%" innerRadius={65} outerRadius={105}
                       dataKey="value" nameKey="name" paddingAngle={3}
-                      label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${(percent*100).toFixed(0)}%`}
                       labelLine={false}>
                       {porStatus.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
                     <Tooltip formatter={(v, n) => [v, n]} />
+                    <Legend wrapperStyle={{ fontSize:13 }} />
                   </PieChart>
                 </ResponsiveContainer>
               )
@@ -245,15 +246,15 @@ export default function Dashboard({ onToast }) {
 
       {/* Por categoria */}
       <SectionTitle>🏷️ Chamados por categoria</SectionTitle>
-      <div style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', padding:'20px 8px 12px', boxShadow:'var(--shadow-sm)' }}>
+      <div style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', padding:'20px 16px 12px', boxShadow:'var(--shadow-sm)' }}>
         {porCategoria.length === 0
           ? <div className="empty-state" style={{ padding:24 }}>Sem dados.</div>
           : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={porCategoria} layout="vertical" margin={{ top:0, right:32, left:80, bottom:0 }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={porCategoria} layout="vertical" margin={{ top:0, right:32, left:110, bottom:0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize:11, fill:'#888' }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize:12, fill:'#555' }} width={80} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize:12, fill:'#555' }} width={110} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="value" name="Chamados" radius={[0,4,4,0]}>
                   {porCategoria.map((_, i) => <Cell key={i} fill={COLORS_CAT[i % COLORS_CAT.length]} />)}
@@ -265,7 +266,7 @@ export default function Dashboard({ onToast }) {
       </div>
 
       {/* Rankings lado a lado */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginTop:4 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px,1fr))', gap:16, marginTop:4 }}>
         {/* Ranking condomínios */}
         <div>
           <SectionTitle>🔥 Top condominios com chamados abertos</SectionTitle>
@@ -285,7 +286,7 @@ export default function Dashboard({ onToast }) {
                     <div style={{ fontSize:13, fontWeight:600, color:'var(--gray-800)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.nomeCompleto}</div>
                     <div style={{ fontSize:11, color:'var(--gray-400)' }}>{c.Total} total</div>
                   </div>
-                  <div style={{ fontSize:20, fontWeight:800, color:'#f4a340', fontFamily:'var(--font-display)' }}>{c.Abertos}</div>
+                  <div style={{ fontSize:22, fontWeight:800, color:'#f4a340', fontFamily:'var(--font-display)' }}>{c.Abertos}</div>
                 </div>
               ))
             }
