@@ -1,12 +1,14 @@
 import { useAuth } from '../context/AuthContext'
 
 const ICONS = {
-  home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
-  list: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 9h8M8 13h5"/></svg>,
-  condo: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/></svg>,
-  vote: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>,
-  user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
-  logout: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  home:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
+  list:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 9h8M8 13h5"/></svg>,
+  condo:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/></svg>,
+  vote:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>,
+  user:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
+  plus:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+  clock:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
+  logout:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
 }
 
 function initials(name) {
@@ -22,22 +24,22 @@ export default function Navigation({ activeView, onNavigate }) {
   const navItems = () => {
     if (!perfil) return []
     if (perfil.papel === 'morador') return [
-      { id:'chamados', label:'Meus chamados', icon:ICONS.list },
+      { id:'painel',        label:'Painel',        icon:ICONS.home },
+      { id:'novo-chamado',  label:'Novo chamado',  icon:ICONS.plus },
+      { id:'meus-chamados', label:'Meus chamados', icon:ICONS.list },
+      { id:'historico',     label:'Historico',     icon:ICONS.clock },
     ]
     if (perfil.papel === 'conselheiro') return [
-      { id:'votacao', label:'Votacao', icon:ICONS.vote },
+      { id:'painel',        label:'Painel',        icon:ICONS.home },
+      { id:'aprovacoes',    label:'Aprovacoes',    icon:ICONS.vote },
+      { id:'chamados',      label:'Chamados',      icon:ICONS.list },
+      { id:'novo-chamado',  label:'Novo chamado',  icon:ICONS.plus },
     ]
-    if (perfil.papel === 'equipe') return [
-      { id:'dashboard', label:'Painel', icon:ICONS.home },
-      { id:'chamados', label:'Chamados', icon:ICONS.list },
-      { id:'admin', label:'Condominios', icon:ICONS.condo },
-      { id:'perfil', label:'Minha empresa', icon:ICONS.user },
-    ]
-    if (perfil.papel === 'admin') return [
-      { id:'dashboard', label:'Painel', icon:ICONS.home },
-      { id:'chamados', label:'Chamados', icon:ICONS.list },
-      { id:'admin', label:'Condominios', icon:ICONS.condo },
-      { id:'perfil', label:'Minha empresa', icon:ICONS.user },
+    if (perfil.papel === 'equipe' || perfil.papel === 'admin') return [
+      { id:'dashboard',  label:'Painel',        icon:ICONS.home },
+      { id:'chamados',   label:'Chamados',      icon:ICONS.list },
+      { id:'admin',      label:'Condominios',   icon:ICONS.condo },
+      { id:'perfil',     label:'Minha empresa', icon:ICONS.user },
     ]
     return []
   }
