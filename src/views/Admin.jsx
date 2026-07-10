@@ -3,8 +3,14 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { gerarCodigo } from '../lib/constants'
 
-const PAPEL_LABEL = { morador:'Morador', equipe:'Sindico', admin:'Admin', conselheiro:'Conselheiro' }
-const PAPEIS = ['morador','conselheiro','equipe','admin']
+const PAPEL_LABEL = {
+  morador:'Morador', equipe:'Sindico', admin:'Admin', conselheiro:'Conselheiro',
+  manutencao:'Manutenção', limpeza:'Limpeza', administradora:'Administradora',
+  portaria:'Portaria', seguranca:'Segurança', zeladoria:'Zeladoria', terceiros:'Terceiros',
+}
+const PAPEIS = ['morador','conselheiro','equipe','admin','manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros']
+const PAPEIS_MORADORES = ['morador','conselheiro']
+const PAPEIS_DEPARTAMENTO = ['manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros']
 const SENHA_PADRAO = 'mudar123'
 function initials(n){ return (n||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase() }
 
@@ -521,27 +527,40 @@ export default function Admin({ onToast }) {
             <div className="field"><label>Nome *</label><input className="input" value={novaConta.nome} onChange={e=>setNovaConta(x=>({...x,nome:e.target.value}))}/></div>
             <div className="field"><label>E-mail *</label><input className="input" type="email" value={novaConta.email} onChange={e=>setNovaConta(x=>({...x,email:e.target.value}))}/></div>
             <div className="field"><label>Papel</label>
-              <div className="chip-row">
-                {['morador','conselheiro'].map(p=>(
-                  <button key={p} className={`chip${novaConta.papel===p?' selected':''}`} onClick={()=>setNovaConta(x=>({...x,papel:p}))}>{PAPEL_LABEL[p]}</button>
-                ))}
+              <div style={{ marginBottom:6 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', marginBottom:6 }}>Residentes</div>
+                <div className="chip-row">
+                  {PAPEIS_MORADORES.map(p=>(
+                    <button key={p} className={`chip${novaConta.papel===p?' selected':''}`} onClick={()=>setNovaConta(x=>({...x,papel:p}))}>{PAPEL_LABEL[p]}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', marginBottom:6 }}>Departamentos operacionais</div>
+                <div className="chip-row">
+                  {PAPEIS_DEPARTAMENTO.map(p=>(
+                    <button key={p} className={`chip${novaConta.papel===p?' selected':''}`} onClick={()=>setNovaConta(x=>({...x,papel:p}))}>{PAPEL_LABEL[p]}</button>
+                  ))}
+                </div>
               </div>
             </div>
-            {/* Bloco e Apartamento com auto-código */}
-            <div className="row2">
-              <div className="field">
-                <label>Bloco</label>
-                {blocosDoCondo(modalNovaConta).length > 0 ? (
-                  <select className="input" value={novaConta.bloco} onChange={e=>setNovaConta(x=>({...x,bloco:e.target.value}))}>
-                    <option value="">Selecione...</option>
-                    {blocosDoCondo(modalNovaConta).map(b=><option key={b.id} value={b.nome}>{b.nome} ({b.total_apartamentos} un.)</option>)}
-                  </select>
-                ) : (
-                  <input className="input" value={novaConta.bloco} onChange={e=>setNovaConta(x=>({...x,bloco:e.target.value}))} placeholder="Ex.: Bloco A"/>
-                )}
+            {/* Bloco e Apartamento — só para moradores e conselheiros */}
+            {PAPEIS_MORADORES.includes(novaConta.papel) && (
+              <div className="row2">
+                <div className="field">
+                  <label>Bloco</label>
+                  {blocosDoCondo(modalNovaConta).length > 0 ? (
+                    <select className="input" value={novaConta.bloco} onChange={e=>setNovaConta(x=>({...x,bloco:e.target.value}))}>
+                      <option value="">Selecione...</option>
+                      {blocosDoCondo(modalNovaConta).map(b=><option key={b.id} value={b.nome}>{b.nome} ({b.total_apartamentos} un.)</option>)}
+                    </select>
+                  ) : (
+                    <input className="input" value={novaConta.bloco} onChange={e=>setNovaConta(x=>({...x,bloco:e.target.value}))} placeholder="Ex.: Bloco A"/>
+                  )}
+                </div>
+                <div className="field"><label>Apartamento</label><input className="input" value={novaConta.apto} onChange={e=>setNovaConta(x=>({...x,apto:e.target.value}))} placeholder="Ex.: 302"/></div>
               </div>
-              <div className="field"><label>Apartamento</label><input className="input" value={novaConta.apto} onChange={e=>setNovaConta(x=>({...x,apto:e.target.value}))} placeholder="Ex.: 302"/></div>
-            </div>
+            )}
             <div className="field">
               <label>Codigo de acesso {novaConta.codigo && <span style={{ fontSize:11, color:'var(--emerald)', fontWeight:600 }}>gerado automaticamente</span>}</label>
               <input className="input" value={novaConta.codigo} onChange={e=>setNovaConta(x=>({...x,codigo:e.target.value.toUpperCase()}))}
