@@ -59,3 +59,16 @@ export function gerarCodigo(nomeCondominio, bloco, apartamento) {
   const a = (apartamento || '').replace(/\s/g, '').toUpperCase().slice(0, 5)
   return (ini + b + a).slice(0, 12) // máximo 12 chars
 }
+
+// Departamentos operacionais
+export const DEPARTAMENTOS = {
+  manutencao:     'Manutenção',
+  limpeza:        'Limpeza',
+  administradora: 'Administradora',
+  portaria:       'Portaria',
+  seguranca:      'Segurança',
+  zeladoria:      'Zeladoria',
+  terceiros:      'Terceiros',
+}
+export const PAPEIS_DEPARTAMENTO = Object.keys(DEPARTAMENTOS)
+export const PAPEIS_EQUIPE = ['equipe','admin','conselheiro','morador']
