@@ -41,7 +41,7 @@ export default function Admin({ onToast }) {
   const [blocoNovoMap, setBlocoNovoMap] = useState({})
   const [modalUsuario, setModalUsuario] = useState(null)
   const [modalNovaConta, setModalNovaConta] = useState(null) // condominio_id
-  const [novaConta, setNovaConta] = useState({ nome:'', email:'', codigo:'', senha:SENHA_PADRAO, papel:'morador', bloco:'', apto:'' })
+  const [novaConta, setNovaConta] = useState({ nome:'', email:'', codigo:'', senha:SENHA_PADRAO, papel:'morador', bloco:'', apto:'', tipo_ocupacao:'proprietario' })
   const [salvando, setSalvando] = useState(false)
 
   // Form cadastrar novo condomínio
@@ -180,10 +180,11 @@ export default function Admin({ onToast }) {
     try {
       await api({ action:'create_user', email:novaConta.email, password:novaConta.senha,
         nome:novaConta.nome, papel:novaConta.papel, codigo_acesso:novaConta.codigo.toUpperCase(),
-        condominio_id: modalNovaConta, bloco:novaConta.bloco, apartamento:novaConta.apto })
+        condominio_id: modalNovaConta, bloco:novaConta.bloco, apartamento:novaConta.apto,
+        tipo_ocupacao: novaConta.papel === 'morador' ? novaConta.tipo_ocupacao : null })
       onToast('Usuario criado! Codigo: '+novaConta.codigo.toUpperCase())
       setModalNovaConta(null)
-      setNovaConta({ nome:'', email:'', codigo:'', senha:SENHA_PADRAO, papel:'morador', bloco:'', apto:'' })
+      setNovaConta({ nome:'', email:'', codigo:'', senha:SENHA_PADRAO, papel:'morador', bloco:'', apto:'', tipo_ocupacao:'proprietario' })
       carregarUsuariosCondo(modalNovaConta)
     } catch(e) { onToast('Erro: '+e.message) }
     setSalvando(false)
@@ -327,6 +328,7 @@ export default function Admin({ onToast }) {
                                     {u.codigo_acesso?`Cod: ${u.codigo_acesso}`:''}
                                     {u.bloco?` · Bl. ${u.bloco}`:''}
                                     {u.apartamento?` Ap. ${u.apartamento}`:''}
+                                    {u.tipo_ocupacao ? ` · ${u.tipo_ocupacao==='inquilino'?'🔑 Inquilino':'🏠 Proprietário'}` : ''}
                                   </div>
                                 </div>
                                 <button className="btn btn-ghost btn-sm" onClick={()=>setModalUsuario({...u,novaSenha:'',condominio_id:c.id})}>Editar</button>
@@ -566,7 +568,21 @@ export default function Admin({ onToast }) {
               <input className="input" value={novaConta.codigo} onChange={e=>setNovaConta(x=>({...x,codigo:e.target.value.toUpperCase()}))}
                 style={novaConta.codigo?{borderColor:'var(--emerald)',fontWeight:700,letterSpacing:1}:{}}/>
             </div>
-            <button className="btn btn-primary btn-block" onClick={criarConta} disabled={salvando}>{salvando?'Criando...':'Criar usuario'}</button>
+            {novaConta.papel === 'morador' && (
+              <div className="field">
+                <label>Tipo de ocupação</label>
+                <div className="chip-row">
+                  <button className={`chip${novaConta.tipo_ocupacao==='proprietario'?' selected':''}`}
+                    onClick={()=>setNovaConta(x=>({...x,tipo_ocupacao:'proprietario'}))}>
+                    🏠 Proprietário
+                  </button>
+                  <button className={`chip${novaConta.tipo_ocupacao==='inquilino'?' selected':''}`}
+                    onClick={()=>setNovaConta(x=>({...x,tipo_ocupacao:'inquilino'}))}>
+                    🔑 Inquilino
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
