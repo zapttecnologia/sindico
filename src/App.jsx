@@ -14,12 +14,19 @@ import { Toast, useToast } from './components/Toast'
 function AppNormal() {
   const { perfil } = useAuth()
   const { msg, show, toast } = useToast()
-  const defaultView = { morador:'chamados', conselheiro:'votacao', equipe:'dashboard', admin:'dashboard' }[perfil?.papel] || 'chamados'
+
+  const defaultView = {
+    morador:     'painel',
+    conselheiro: 'painel',
+    equipe:      'dashboard',
+    admin:       'dashboard',
+  }[perfil?.papel] || 'painel'
+
   const [activeView, setActiveView] = useState(defaultView)
 
   const renderView = () => {
-    if (perfil?.papel === 'morador') return <Morador onToast={toast} />
-    if (perfil?.papel === 'conselheiro') return <Conselheiro onToast={toast} />
+    if (perfil?.papel === 'morador') return <Morador view={activeView} onToast={toast} />
+    if (perfil?.papel === 'conselheiro') return <Conselheiro view={activeView} onToast={toast} />
     if (perfil?.papel === 'equipe' || perfil?.papel === 'admin') {
       if (activeView === 'admin') return <Admin onToast={toast} />
       if (activeView === 'perfil') return <Perfil onToast={toast} />
