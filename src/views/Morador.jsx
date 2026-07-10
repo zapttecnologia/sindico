@@ -61,6 +61,7 @@ export default function Morador({ view, onToast }) {
   const [ticketCriado, setTicketCriado] = useState(null)
   const [arquivosSel, setArquivosSel] = useState([])
   const [ticketDetalhe, setTicketDetalhe] = useState(null)
+  const [subTela, setSubTela] = useState(null) // 'regulamento' | 'convencao'
   const MAX_BYTES = 10 * 1024 * 1024
 
   const carregar = async () => {
@@ -75,7 +76,7 @@ export default function Morador({ view, onToast }) {
   useEffect(() => { carregar() }, [])
 
   // Resetar seleção ao mudar de view
-  useEffect(() => { setCatSel(null); setTicketCriado(null); setDescricao(''); setArquivosSel([]) }, [view])
+  useEffect(() => { setCatSel(null); setTicketCriado(null); setDescricao(''); setArquivosSel([]); setSubTela(null) }, [view])
 
   const kpis = {
     total:    tickets.length,
@@ -118,7 +119,89 @@ export default function Morador({ view, onToast }) {
 
   const local = [perfil?.bloco?`Bloco ${perfil.bloco}`:'', perfil?.apartamento?`Ap. ${perfil.apartamento}`:''].filter(Boolean).join(', ')
 
-  // ── Detalhe do chamado ─────────────────────────────────────
+  // ── TELA: REGULAMENTO ───────────────────────────────────────
+  if (subTela === 'regulamento') return (
+    <div>
+      <button onClick={()=>setSubTela(null)} style={{ background:'var(--gray-100)', border:'none',
+        borderRadius:'var(--r-md)', padding:'8px 14px', fontSize:13, fontWeight:600,
+        color:'var(--gray-600)', cursor:'pointer', marginBottom:20 }}>← Voltar</button>
+      <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:24 }}>
+        <div className="icon-btn-icon" style={{ background:'#e0edff', color:'#1a47a0', width:52, height:52, borderRadius:'var(--r-lg)' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <h2 style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:800, color:'var(--navy)', margin:0 }}>
+          Regulamento Interno
+        </h2>
+      </div>
+      <div className="card" style={{ textAlign:'center', padding:'40px 28px' }}>
+        {condoInfo?.regulamento_pdf_url ? (
+          <>
+            <div style={{ fontSize:48, marginBottom:12 }}>📄</div>
+            <h3 style={{ fontFamily:'var(--font-display)', color:'var(--navy)', margin:'0 0 8px' }}>Regulamento Interno</h3>
+            <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 24px' }}>{condoInfo.nome}</p>
+            <a href={condoInfo.regulamento_pdf_url} target="_blank" rel="noopener noreferrer"
+              className="btn btn-primary" style={{ display:'inline-flex', gap:8, textDecoration:'none' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Visualizar / Baixar PDF
+            </a>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize:48, marginBottom:12, opacity:.3 }}>📄</div>
+            <p style={{ color:'var(--gray-400)', fontSize:14 }}>
+              O regulamento interno ainda não foi disponibilizado.<br/>
+              Entre em contato com a administração.
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  )
+
+  // ── TELA: CONVENÇÃO ──────────────────────────────────────────
+  if (subTela === 'convencao') return (
+    <div>
+      <button onClick={()=>setSubTela(null)} style={{ background:'var(--gray-100)', border:'none',
+        borderRadius:'var(--r-md)', padding:'8px 14px', fontSize:13, fontWeight:600,
+        color:'var(--gray-600)', cursor:'pointer', marginBottom:20 }}>← Voltar</button>
+      <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:24 }}>
+        <div className="icon-btn-icon" style={{ background:'#e8f3f0', color:'#1a6e5c', width:52, height:52, borderRadius:'var(--r-lg)' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+        </div>
+        <h2 style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:800, color:'var(--navy)', margin:0 }}>
+          Convenção do Condomínio
+        </h2>
+      </div>
+      <div className="card" style={{ textAlign:'center', padding:'40px 28px' }}>
+        {condoInfo?.convencao_pdf_url ? (
+          <>
+            <div style={{ fontSize:48, marginBottom:12 }}>📋</div>
+            <h3 style={{ fontFamily:'var(--font-display)', color:'var(--navy)', margin:'0 0 8px' }}>Convenção do Condomínio</h3>
+            <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 24px' }}>{condoInfo.nome}</p>
+            <a href={condoInfo.convencao_pdf_url} target="_blank" rel="noopener noreferrer"
+              className="btn btn-primary" style={{ display:'inline-flex', gap:8, textDecoration:'none' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Visualizar / Baixar PDF
+            </a>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize:48, marginBottom:12, opacity:.3 }}>📋</div>
+            <p style={{ color:'var(--gray-400)', fontSize:14 }}>
+              A convenção ainda não foi disponibilizada.<br/>
+              Entre em contato com a administração.
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  )
+
+  // ── TELA: DETALHE DO CHAMADO ────────────────────────────────
   if (ticketDetalhe) {
     const st = statusMorador(ticketDetalhe)
     return (
@@ -290,6 +373,25 @@ export default function Morador({ view, onToast }) {
           </div>
         </div>
       )}
+
+      {/* Documentos */}
+      <div className="section-group">
+        <div className="section-group-title">Documentos</div>
+        <div className="icon-grid">
+          <button className="icon-btn" onClick={()=>setSubTela('regulamento')}>
+            <div className="icon-btn-icon" style={{ background:'#e0edff', color:'#1a47a0' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <span className="icon-btn-label" style={{ fontSize:11 }}>Regulamento Interno</span>
+          </button>
+          <button className="icon-btn" onClick={()=>setSubTela('convencao')}>
+            <div className="icon-btn-icon" style={{ background:'#e8f3f0', color:'#1a6e5c' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+            </div>
+            <span className="icon-btn-label" style={{ fontSize:11 }}>Convenção</span>
+          </button>
+        </div>
+      </div>
 
       {/* Últimos chamados */}
       <div className="card">
