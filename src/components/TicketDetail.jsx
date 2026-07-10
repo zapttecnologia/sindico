@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { ticketNumber, fmtDate, STATUS_LABEL, STATUS_ORDER, APROVACAO_LABEL, statusClass, aprovClass } from '../lib/constants'
+import { ticketNumber, fmtDate, STATUS_LABEL, STATUS_ORDER, APROVACAO_LABEL, statusClass, aprovClass, DEPARTAMENTOS, PAPEIS_DEPARTAMENTO } from '../lib/constants'
 import ChatPanel from './ChatPanel'
 import AnexosPanel from './AnexosPanel'
 import VotePanel from './VotePanel'
@@ -13,6 +13,17 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
   const [salvando, setSalvando] = useState(false)
   const [showEnviarConselheiros, setShowEnviarConselheiros] = useState(false)
   const [msgConselheiros, setMsgConselheiros] = useState('')
+  const [orcamentos, setOrcamentos] = useState([
+    { numero:1, fornecedor:'', valor:'', tipo:'servico', materiais:'', data_proposta:'', data_validade:'' },
+  ])
+  const [addOrcamento, setAddOrcamento] = useState(false)
+
+  const addOrc = () => {
+    if (orcamentos.length >= 3) return
+    setOrcamentos(prev => [...prev, { numero:prev.length+1, fornecedor:'', valor:'', tipo:'servico', materiais:'', data_proposta:'', data_validade:'' }])
+  }
+  const removeOrc = (idx) => setOrcamentos(prev => prev.filter((_,i)=>i!==idx).map((o,i)=>({...o,numero:i+1})))
+  const setOrcField = (idx, field, value) => setOrcamentos(prev => prev.map((o,i)=>i===idx?{...o,[field]:value}:o))
 
   const recarregar = async () => {
     const { data } = await supabase.from('solicitacoes')
@@ -32,20 +43,72 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
 
   const enviarParaConselheiros = async () => {
     if (!msgConselheiros.trim()) { onToast('Escreva uma mensagem para os conselheiros.'); return }
+    const orcsValidos = orcamentos.filter(o => o.fornecedor.trim())
     setSalvando(true)
-    // Insere a mensagem como nota interna para o contexto
+    // Insere a mensagem como nota interna
     await supabase.from('notas_internas').insert({
       solicitacao_id: ticket.id, autor_id: perfil.id,
       autor_tipo: 'equipe', autor_nome: perfil.nome,
       texto: '[Para conselheiros] ' + msgConselheiros.trim(),
     })
-    // Muda o status de aprovação
+    // Salva orçamentos
+    if (orcsValidos.length > 0) {
+      await supabase.from('orcamentos').delete().eq('solicitacao_id', ticket.id)
+      await supabase.from('orcamentos').insert(
+        orcsValidos.map(o => ({
+          solicitacao_id: ticket.id,
+          numero: o.numero,
+          fornecedor: o.fornecedor.trim(),
+          valor: o.valor ? Number(o.valor) : null,
+          tipo: o.tipo || 'servico',
+          materiais: o.materiais.trim() || null,
+          data_proposta: o.data_proposta || null,
+          data_validade: o.data_validade || null,
+        }))
+      )
+    }
+    // Muda status de aprovação
     const { error } = await supabase.from('solicitacoes')
       .update({ aprovacao_status: 'aguardando', atualizado_em: new Date().toISOString() }).eq('id', ticket.id)
     setSalvando(false)
     if (error) { onToast('Erro: ' + error.message); return }
     onToast('Enviado para os conselheiros!')
     setShowEnviarConselheiros(false); setMsgConselheiros('')
+    await recarregar()
+  }
+
+  const [showAtribuir, setShowAtribuir] = useState(false)
+  const [deptSel, setDeptSel] = useState('')
+  const [usuariosDept, setUsuariosDept] = useState([])
+  const [usuarioSel, setUsuarioSel] = useState('')
+  const [msgDept, setMsgDept] = useState('')
+
+  useEffect(() => {
+    if (!deptSel) return
+    supabase.from('perfis').select('id,nome').eq('papel', deptSel).eq('empresa_id', perfil?.empresa_id)
+      .then(({ data }) => setUsuariosDept(data || []))
+  }, [deptSel])
+
+  const atribuirDepartamento = async () => {
+    if (!deptSel) { onToast('Selecione o departamento.'); return }
+    setSalvando(true)
+    const { error } = await supabase.from('solicitacoes').update({
+      departamento: deptSel,
+      atribuido_para: usuarioSel || null,
+      atribuido_em: new Date().toISOString(),
+      atribuido_por: perfil?.id,
+    }).eq('id', ticket.id)
+    if (!error && msgDept.trim()) {
+      await supabase.from('notas_internas').insert({
+        solicitacao_id: ticket.id, autor_id: perfil.id,
+        autor_tipo: 'equipe', autor_nome: perfil.nome,
+        texto: `[Atribuído para ${DEPARTAMENTOS[deptSel]}] ${msgDept.trim()}`,
+      })
+    }
+    setSalvando(false)
+    if (error) { onToast('Erro: '+error.message); return }
+    onToast(`Chamado enviado para ${DEPARTAMENTOS[deptSel]}!`)
+    setShowAtribuir(false); setDeptSel(''); setUsuarioSel(''); setMsgDept('')
     await recarregar()
   }
 
@@ -131,6 +194,10 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
                 Enviar para conselheiros
               </button>
             )}
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowAtribuir(!showAtribuir)}
+              style={{ borderColor:'#5b21b6', color:'#5b21b6' }}>
+              {ticket.departamento ? `Dept: ${DEPARTAMENTOS[ticket.departamento]||ticket.departamento}` : 'Enviar para departamento'}
+            </button>
             {ticket.aprovacao_status === 'aguardando' && (
               <>
                 <button className="btn btn-primary btn-sm" onClick={() => decidirAprovacao('aprovado')}>Aprovar</button>
@@ -140,14 +207,118 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
             )}
           </div>
 
+          {/* Atribuição a departamento */}
+          {showAtribuir && (
+            <div style={{ marginTop:14, paddingTop:14, borderTop:'1px solid var(--gray-200)' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#5b21b6', marginBottom:12 }}>
+                Enviar para departamento
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+                <div className="field" style={{ margin:0 }}>
+                  <label style={{ fontSize:11 }}>Departamento *</label>
+                  <select className="input" style={{ fontSize:13 }} value={deptSel} onChange={e=>setDeptSel(e.target.value)}>
+                    <option value="">Selecione...</option>
+                    {Object.entries(DEPARTAMENTOS).map(([k,v])=>(
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+                {deptSel && usuariosDept.length > 0 && (
+                  <div className="field" style={{ margin:0 }}>
+                    <label style={{ fontSize:11 }}>Responsável (opcional)</label>
+                    <select className="input" style={{ fontSize:13 }} value={usuarioSel} onChange={e=>setUsuarioSel(e.target.value)}>
+                      <option value="">Qualquer um do departamento</option>
+                      {usuariosDept.map(u=><option key={u.id} value={u.id}>{u.nome}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="field" style={{ margin:'0 0 10px' }}>
+                <label style={{ fontSize:11 }}>Instrução (opcional)</label>
+                <textarea className="input" style={{ fontSize:13 }} rows={2} value={msgDept}
+                  onChange={e=>setMsgDept(e.target.value)} placeholder="Descreva o que precisa ser feito..." />
+              </div>
+              <div style={{ display:'flex', gap:8 }}>
+                <button className="btn btn-sm" style={{ background:'#5b21b6', color:'#fff', border:'none', borderRadius:'var(--r-md)', padding:'7px 14px', fontWeight:600, cursor:'pointer' }}
+                  disabled={salvando||!deptSel} onClick={atribuirDepartamento}>
+                  {salvando ? 'Enviando...' : 'Enviar'}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setShowAtribuir(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
           {showEnviarConselheiros && (
             <div style={{ marginTop:14, paddingTop:14, borderTop:'1px solid var(--gray-200)' }}>
               <div style={{ fontSize:13, fontWeight:600, color:'var(--gray-800)', marginBottom:8 }}>
-                Mensagem para os conselheiros (explique o contexto da votacao):
-              </div>
-              <textarea className="input" rows={3} value={msgConselheiros}
+                Mensagem para os conselheiros:              </div>
+              <textarea className="input" rows={2} value={msgConselheiros}
                 onChange={e => setMsgConselheiros(e.target.value)}
-                placeholder="Ex.: Este chamado requer aprovacao do conselho pois envolve obra acima de R$ 5.000..." />
+                placeholder="Descreva o contexto e o que precisa ser votado..." />
+
+              {/* Orçamentos */}
+              <div style={{ marginTop:16 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-600)', textTransform:'uppercase',
+                  letterSpacing:'.05em', marginBottom:10 }}>
+                  Orçamentos (opcional — até 3)
+                </div>
+                {orcamentos.map((orc, idx) => (
+                  <div key={idx} style={{ border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
+                    padding:'14px 16px', marginBottom:10, background:'var(--gray-50)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                      <span style={{ fontSize:13, fontWeight:700, color:'var(--emerald)' }}>Orçamento {orc.numero}</span>
+                      {orcamentos.length > 1 && (
+                        <button onClick={()=>removeOrc(idx)} style={{ background:'none', border:'none', color:'var(--rust)', cursor:'pointer', fontSize:13 }}>
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:8 }}>
+                      <div className="field" style={{ margin:0 }}>
+                        <label style={{ fontSize:11 }}>Fornecedor *</label>
+                        <input className="input" style={{ fontSize:13 }} value={orc.fornecedor}
+                          onChange={e=>setOrcField(idx,'fornecedor',e.target.value)} placeholder="Nome da empresa" />
+                      </div>
+                      <div className="field" style={{ margin:0 }}>
+                        <label style={{ fontSize:11 }}>Valor (R$)</label>
+                        <input className="input" style={{ fontSize:13 }} type="number" value={orc.valor}
+                          onChange={e=>setOrcField(idx,'valor',e.target.value)} placeholder="0,00" />
+                      </div>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:8 }}>
+                      <div className="field" style={{ margin:0 }}>
+                        <label style={{ fontSize:11 }}>Tipo</label>
+                        <select className="input" style={{ fontSize:13 }} value={orc.tipo} onChange={e=>setOrcField(idx,'tipo',e.target.value)}>
+                          <option value="servico">Prestação de serviço</option>
+                          <option value="produto">Produto</option>
+                        </select>
+                      </div>
+                      <div className="field" style={{ margin:0 }}>
+                        <label style={{ fontSize:11 }}>Materiais inclusos</label>
+                        <input className="input" style={{ fontSize:13 }} value={orc.materiais}
+                          onChange={e=>setOrcField(idx,'materiais',e.target.value)} placeholder="Descreva (opcional)" />
+                      </div>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                      <div className="field" style={{ margin:0 }}>
+                        <label style={{ fontSize:11 }}>Data da proposta</label>
+                        <input className="input" style={{ fontSize:13 }} type="date" value={orc.data_proposta}
+                          onChange={e=>setOrcField(idx,'data_proposta',e.target.value)} />
+                      </div>
+                      <div className="field" style={{ margin:0 }}>
+                        <label style={{ fontSize:11 }}>Validade da proposta</label>
+                        <input className="input" style={{ fontSize:13 }} type="date" value={orc.data_validade}
+                          onChange={e=>setOrcField(idx,'data_validade',e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {orcamentos.length < 3 && (
+                  <button onClick={addOrc} className="btn btn-ghost btn-sm" style={{ width:'100%', marginBottom:12 }}>
+                    + Adicionar orçamento {orcamentos.length + 1}
+                  </button>
+                )}
+              </div>
+
               <div style={{ display:'flex', gap:8, marginTop:10 }}>
                 <button className="btn btn-primary btn-sm" disabled={salvando} onClick={enviarParaConselheiros}>
                   {salvando ? 'Enviando...' : 'Enviar para conselheiros'}
@@ -184,6 +355,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
                 ['Categoria', cat],
                 ['Status', STATUS_LABEL[ticket.status]],
                 ['Aprovacao', ticket.aprovacao_status ? APROVACAO_LABEL[ticket.aprovacao_status] : 'Nao enviado'],
+                ['Departamento', ticket.departamento ? DEPARTAMENTOS[ticket.departamento]||ticket.departamento : 'Nao atribuido'],
                 ['Condominio', ticket.condominios?.nome || '-'],
                 ['Bloco', ticket.bloco || '-'],
                 ['Apartamento', ticket.apartamento || '-'],

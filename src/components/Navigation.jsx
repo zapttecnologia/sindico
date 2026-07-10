@@ -16,7 +16,11 @@ function initials(name) {
   return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
 }
 
-const ROLE_LABEL = { morador:'Morador', equipe:'Sindico', admin:'Administrador', conselheiro:'Conselheiro' }
+const ROLE_LABEL = {
+  morador:'Morador', equipe:'Sindico', admin:'Administrador', conselheiro:'Conselheiro',
+  manutencao:'Manutenção', limpeza:'Limpeza', administradora:'Administradora',
+  portaria:'Portaria', seguranca:'Segurança', zeladoria:'Zeladoria', terceiros:'Terceiros',
+}
 
 export default function Navigation({ activeView, onNavigate }) {
   const { perfil, logout } = useAuth()
@@ -35,10 +39,16 @@ export default function Navigation({ activeView, onNavigate }) {
       { id:'chamados',      label:'Chamados',      icon:ICONS.list },
       { id:'novo-chamado',  label:'Novo chamado',  icon:ICONS.plus },
     ]
+    // Papéis departamentais
+    const isPaperDept = ['manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros'].includes(perfil.papel)
+    if (isPaperDept) return [
+      { id:'meus-chamados', label:'Meus chamados', icon:ICONS.list },
+    ]
     if (perfil.papel === 'equipe' || perfil.papel === 'admin') return [
       { id:'dashboard',  label:'Painel',        icon:ICONS.home },
       { id:'chamados',   label:'Chamados',      icon:ICONS.list },
-      { id:'admin',      label:'Condominios',   icon:ICONS.condo },
+      { id:'admin',      label:'Condomínios',   icon:ICONS.condo },
+      { id:'relatorio',  label:'Relatório',     icon:ICONS.clock },
       { id:'perfil',     label:'Minha empresa', icon:ICONS.user },
     ]
     return []
