@@ -8,7 +8,8 @@ import Morador from './views/Morador'
 import Equipe from './views/Equipe'
 import Conselheiro from './views/Conselheiro'
 import Admin from './views/Admin'
-import Perfil from './views/Perfil'
+import Relatorio from './views/Relatorio'
+import Departamento from './views/Departamento'
 import { Toast, useToast } from './components/Toast'
 
 function AppNormal() {
@@ -25,11 +26,16 @@ function AppNormal() {
   const [activeView, setActiveView] = useState(defaultView)
 
   const renderView = () => {
+    // Departamentos operacionais
+    const DEPT = ['manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros']
+    if (DEPT.includes(perfil?.papel)) return <Departamento onToast={toast} />
+
     if (perfil?.papel === 'morador') return <Morador view={activeView} onToast={toast} />
     if (perfil?.papel === 'conselheiro') return <Conselheiro view={activeView} onToast={toast} />
     if (perfil?.papel === 'equipe' || perfil?.papel === 'admin') {
-      if (activeView === 'admin') return <Admin onToast={toast} />
-      if (activeView === 'perfil') return <Perfil onToast={toast} />
+      if (activeView === 'admin')     return <Admin onToast={toast} />
+      if (activeView === 'perfil')    return <Perfil onToast={toast} />
+      if (activeView === 'relatorio') return <Relatorio onToast={toast} />
       return <Equipe view={activeView} onToast={toast} />
     }
     return <div style={{ padding:40 }}>Papel nao reconhecido: {perfil?.papel}</div>
