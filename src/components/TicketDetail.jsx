@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { ticketNumber, fmtDate, STATUS_LABEL, STATUS_ORDER, APROVACAO_LABEL, statusClass, aprovClass, DEPARTAMENTOS, PAPEIS_DEPARTAMENTO } from '../lib/constants'
+import { ticketNumber, fmtDate, STATUS_LABEL, STATUS_ORDER, APROVACAO_LABEL, statusClass, aprovClass, DEPARTAMENTOS, PAPEIS_DEPARTAMENTO, PRIORIDADES, STATUS_DEPT } from '../lib/constants'
 import ChatPanel from './ChatPanel'
 import AnexosPanel from './AnexosPanel'
 import VotePanel from './VotePanel'
@@ -161,7 +161,62 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
         </div>
       </div>
 
-      {/* Acoes rapidas */}
+      {/* Prioridade */}
+      {ehEquipe && (
+        <div className="card" style={{ marginBottom:16, padding:'14px 20px' }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
+            Nível de prioridade
+          </div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {Object.entries(PRIORIDADES).map(([k,p])=>(
+              <button key={k}
+                onClick={async()=>{
+                  await supabase.from('solicitacoes').update({ prioridade:k }).eq('id',ticket.id)
+                  onToast(`Prioridade: ${p.label}`)
+                  await recarregar()
+                }}
+                style={{ padding:'7px 12px', borderRadius:'var(--r-md)', fontWeight:700, fontSize:12, cursor:'pointer',
+                  border: ticket.prioridade===k ? `2px solid ${p.cor}` : '2px solid var(--gray-200)',
+                  background: ticket.prioridade===k ? p.bg : '#fff',
+                  color: ticket.prioridade===k ? p.cor : 'var(--gray-500)' }}>
+                {p.icon} {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Status do departamento (se atribuído) */}
+      {ticket.departamento && (
+        <div className="card" style={{ marginBottom:16, padding:'14px 20px' }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 }}>
+            Status no departamento: {DEPARTAMENTOS[ticket.departamento]||ticket.departamento}
+          </div>
+          {ticket.status_departamento ? (
+            <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              <span style={{ fontSize:13, fontWeight:700, padding:'4px 10px', borderRadius:5,
+                background: STATUS_DEPT[ticket.status_departamento]?.bg,
+                color: STATUS_DEPT[ticket.status_departamento]?.cor }}>
+                {STATUS_DEPT[ticket.status_departamento]?.label}
+              </span>
+              {ticket.status_dept_obs && (
+                <span style={{ fontSize:13, color:'var(--gray-500)', fontStyle:'italic' }}>
+                  "{ticket.status_dept_obs}"
+                </span>
+              )}
+              {ticket.status_dept_atualizado_em && (
+                <span style={{ fontSize:11, color:'var(--gray-400)' }}>
+                  · {new Date(ticket.status_dept_atualizado_em).toLocaleDateString('pt-BR')}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span style={{ fontSize:13, color:'var(--gray-400)' }}>Aguardando início pelo departamento</span>
+          )}
+        </div>
+      )}
+
+      {/* Ações rápidas */}
       {ehEquipe && (
         <div className="card" style={{ marginBottom:16, padding:'16px 20px' }}>
           <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
