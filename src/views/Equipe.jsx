@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { CATEGORIAS, STATUS_LABEL, fmtDate, statusClass, aprovClass, APROVACAO_LABEL } from '../lib/constants'
+import { CATEGORIAS, STATUS_LABEL, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES } from '../lib/constants'
 import TicketDetail from '../components/TicketDetail'
 import Dashboard from './Dashboard'
 
@@ -175,6 +175,12 @@ export default function Equipe({ view, onToast }) {
                   <div style={{ flex:1 }}>
                     <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
                       <span className="badge badge-cat">{t.categoria_personalizada||t.categoria}</span>
+                      {t.prioridade && t.prioridade !== 'rotina' && (
+                        <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:5,
+                          background: PRIORIDADES[t.prioridade]?.bg, color: PRIORIDADES[t.prioridade]?.cor }}>
+                          {PRIORIDADES[t.prioridade]?.icon} {PRIORIDADES[t.prioridade]?.label}
+                        </span>
+                      )}
                       {t.aprovacao_status && <span className={`status-badge ${aprovClass(t.aprovacao_status)}`}>{APROVACAO_LABEL[t.aprovacao_status]}</span>}
                     </div>
                     <div style={{ fontWeight:700, fontSize:14, color:'var(--gray-800)' }}>
