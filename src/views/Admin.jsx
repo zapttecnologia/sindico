@@ -518,7 +518,7 @@ export default function Admin({ onToast }) {
       {/* Modal novo usuario no condomínio */}
       {modalNovaConta && (
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalNovaConta(null)}>
-          <div className="modal">
+          <div className="modal" style={{ maxHeight:'90vh', overflowY:'auto' }}>
             <div className="modal-header">
               <h3 className="modal-title">Novo usuario</h3>
               <button className="modal-close" onClick={()=>setModalNovaConta(null)}>X</button>
@@ -583,6 +583,9 @@ export default function Admin({ onToast }) {
                 </div>
               </div>
             )}
+            <button className="btn btn-primary btn-block" onClick={criarConta} disabled={salvando}>
+              {salvando ? 'Criando...' : 'Criar usuário'}
+            </button>
           </div>
         </div>
       )}
