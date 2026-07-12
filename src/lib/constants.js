@@ -72,3 +72,20 @@ export const DEPARTAMENTOS = {
 }
 export const PAPEIS_DEPARTAMENTO = Object.keys(DEPARTAMENTOS)
 export const PAPEIS_EQUIPE = ['equipe','admin','conselheiro','morador']
+
+// Prioridade dos chamados
+export const PRIORIDADES = {
+  emergencia:  { label:'Emergência/Crítico',    cor:'#dc2626', bg:'#fee2e2', icon:'🔴', ordem:1 },
+  urgente:     { label:'Urgente',               cor:'#ea580c', bg:'#ffedd5', icon:'🟠', ordem:2 },
+  prioritario: { label:'Prioritário',           cor:'#ca8a04', bg:'#fef9c3', icon:'🟡', ordem:3 },
+  rotina:      { label:'Rotina/Administrativo', cor:'#2563eb', bg:'#dbeafe', icon:'🔵', ordem:4 },
+}
+
+// Status do departamento
+export const STATUS_DEPT = {
+  aguardando:    { label:'Aguardando início', cor:'#6b7280', bg:'#f3f4f6' },
+  em_andamento:  { label:'Em andamento',      cor:'#2563eb', bg:'#dbeafe' },
+  em_aprovacao:  { label:'Em aprovação',      cor:'#d97706', bg:'#fef3c7' },
+  pausado:       { label:'Pausado',           cor:'#dc2626', bg:'#fee2e2' },
+  concluido:     { label:'Concluído',         cor:'#16a34a', bg:'#dcfce7' },
+}
