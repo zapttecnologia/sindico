@@ -18,23 +18,25 @@ export default function Perfil({ onToast }) {
   const carregar = async () => {
     setLoading(true)
     try {
-      // Tenta buscar empresa_id do perfil
       const empresaId = perfil?.empresa_id
+      console.log('Perfil:', perfil)
+      console.log('empresa_id:', empresaId)
 
       if (!empresaId) {
-        // Tenta descobrir via condomínio
+        console.log('empresa_id nulo, saindo')
         setLoading(false)
         return
       }
 
-      const [{ data: emp }, { data: users }] = await Promise.all([
-        supabase.from('empresas').select('*').eq('id', empresaId).single(),
-        supabase.from('perfis')
-          .select('id,nome,email,papel,codigo_acesso,primeiro_acesso')
-          .eq('empresa_id', empresaId)
-          .in('papel', ['admin','equipe'])
-          .order('criado_em', { ascending:false }),
-      ])
+      const { data: emp, error: empErr } = await supabase.from('empresas').select('*').eq('id', empresaId).single()
+      console.log('empresa:', emp, 'erro:', empErr)
+
+      const { data: users, error: usersErr } = await supabase.from('perfis')
+        .select('id,nome,email,papel,codigo_acesso,primeiro_acesso')
+        .eq('empresa_id', empresaId)
+        .in('papel', ['admin','equipe'])
+        .order('criado_em', { ascending:false })
+      console.log('usuarios:', users, 'erro:', usersErr)
 
       if (emp) {
         setEmpresa(emp)
