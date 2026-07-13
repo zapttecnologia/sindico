@@ -16,6 +16,10 @@ const PAPEL_COR = {
 }
 const PAPEIS_RESIDENTES = ['morador','conselheiro']
 const PAPEIS_DEPT = ['manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros']
+const SIGLAS_DEPT = {
+  manutencao:'MAN', limpeza:'LIM', administradora:'ADM',
+  portaria:'POR', seguranca:'SEG', zeladoria:'ZEL', terceiros:'TER',
+}
 
 function BlocoRow({ bloco, totalUsuarios, onSave, onDelete }) {
   const [editando, setEditando] = useState(false)
@@ -82,6 +86,24 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
   const [modalEditar, setModalEditar] = useState(null)
   const [modalImportar, setModalImportar] = useState(false)
   const [novoConta, setNovoConta] = useState({ nome:'', email:'', codigo:'', senha:SENHA_PADRAO, papel:'morador', bloco:'', apto:'', tipo_ocupacao:'proprietario' })
+
+  // Auto-geração de código de acesso
+  useEffect(() => {
+    const ini = condominio.nome.split(' ').filter(w=>w.length>2).map(w=>w[0]).join('').toUpperCase().slice(0,3)
+
+    if (PAPEIS_DEPT.includes(novoConta.papel)) {
+      // Departamento: iniciais do condomínio + sigla do dept + número aleatório
+      const sigla = SIGLAS_DEPT[novoConta.papel] || novoConta.papel.slice(0,3).toUpperCase()
+      const num = String(Math.floor(Math.random() * 900) + 100)
+      setNovoConta(x => ({ ...x, codigo: ini + sigla + num }))
+    } else if (PAPEIS_RESIDENTES.includes(novoConta.papel) && (novoConta.bloco || novoConta.apto)) {
+      // Morador/conselheiro: iniciais do condomínio + bloco + apto
+      const b = (novoConta.bloco||'').replace(/\s/g,'').toUpperCase().slice(0,3)
+      const a = (novoConta.apto||'').replace(/\s/g,'').toUpperCase().slice(0,4)
+      const auto = (ini+b+a).slice(0,12)
+      if (auto) setNovoConta(x => ({ ...x, codigo: auto }))
+    }
+  }, [novoConta.papel, novoConta.bloco, novoConta.apto])
   const [novoBloco, setNovoBloco] = useState('')
   const [condoEdit, setCondoEdit] = useState({ ...condominio })
   const [salvando, setSalvando] = useState(false)

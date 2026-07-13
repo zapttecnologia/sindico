@@ -14,7 +14,10 @@ const PAPEL_LABEL = {
 }
 const PAPEIS = ['morador','conselheiro','equipe','admin','manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros']
 const PAPEIS_MORADORES = ['morador','conselheiro']
-const PAPEIS_DEPARTAMENTO = ['manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros']
+const SIGLAS_DEPT = {
+  manutencao:'MAN', limpeza:'LIM', administradora:'ADM',
+  portaria:'POR', seguranca:'SEG', zeladoria:'ZEL', terceiros:'TER',
+}
 const SENHA_PADRAO = 'mudar123'
 function initials(n){ return (n||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase() }
 
@@ -83,14 +86,26 @@ export default function Admin({ onToast }) {
 
   useEffect(() => { carregarCondos(); carregarBlocos() }, [])
 
-  // Auto-código
+  // Auto-código baseado no papel selecionado
   useEffect(() => {
     const condo = condominios.find(c => c.id === modalNovaConta)
+    const papel = novaConta.papel
+    const ini = condo ? condo.nome.split(' ').filter(w=>w.length>2).map(w=>w[0]).join('').toUpperCase().slice(0,3) : ''
+
+    // Departamentos: iniciais do condomínio + sigla do dept + número aleatório
+    if (PAPEIS_DEPARTAMENTO.includes(papel)) {
+      const sigla = SIGLAS_DEPT[papel] || papel.slice(0,3).toUpperCase()
+      const num = String(Math.floor(Math.random() * 900) + 100)
+      setNovaConta(x => ({ ...x, codigo: ini + sigla + num }))
+      return
+    }
+
+    // Morador/conselheiro: iniciais do condomínio + bloco + apto
     if (condo && (novaConta.bloco || novaConta.apto)) {
       const auto = gerarCodigo(condo.nome, novaConta.bloco, novaConta.apto)
       if (auto) setNovaConta(x => ({ ...x, codigo: auto }))
     }
-  }, [novaConta.bloco, novaConta.apto, modalNovaConta, condominios])
+  }, [novaConta.bloco, novaConta.apto, novaConta.papel, modalNovaConta, condominios])
 
   const blocosDoCondo = (condoId) => blocos.filter(b => b.condominio_id === condoId)
 
