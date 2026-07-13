@@ -597,17 +597,13 @@ export default function Admin({ onToast }) {
 
       {/* Modal importar moradores */}
       {modalImportar && (
-        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalImportar(null)}>
-          <div className="modal" style={{ maxWidth:700, maxHeight:'90vh', overflowY:'auto' }}>
-            <ImportarMoradores
-              condominioId={modalImportar}
-              empresaId={perfil?.empresa_id}
-              onToast={onToast}
-              onClose={()=>setModalImportar(null)}
-              onSuccess={()=>carregarUsuariosCondo(modalImportar)}
-            />
-          </div>
-        </div>
+        <ImportarMoradores
+          condominioId={modalImportar}
+          empresaId={perfil?.empresa_id}
+          onToast={onToast}
+          onClose={()=>setModalImportar(null)}
+          onSuccess={()=>{ const id = modalImportar; carregarUsuariosCondo(id) }}
+        />
       )}
     </div>
   )
