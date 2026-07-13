@@ -17,7 +17,7 @@ const CAT_ICONS = {
 }
 const CAT_LABEL = {
   'Manutencao':'Manutenção','Reclamacao':'Reclamação','Elevador':'Elevador',
-  'Limpeza':'Limpeza','Portaria':'Portaria','Interfone/Antena':'Interfone/Antena',
+  'Limpeza':'Limpeza','Portaria':'Portaria','Interfone/Antena':'Interfone',
   'Outros':'Outros','Denuncia':'Denúncia','Sugestao':'Sugestões',
 }
 const CATEGORIAS_CHAMADO = ['Manutencao','Reclamacao','Elevador','Limpeza','Portaria','Interfone/Antena','Outros']
@@ -51,7 +51,7 @@ function TicketRow({ ticket, onClick }) {
 }
 
 export default function Morador({ view, onToast }) {
-  const { perfil, session } = useAuth()
+  const { perfil, session, logout } = useAuth()
   const [tickets, setTickets] = useState([])
   const [condoInfo, setCondoInfo] = useState(null)
   const [catSel, setCatSel] = useState(null)
@@ -67,7 +67,9 @@ export default function Morador({ view, onToast }) {
   const carregar = async () => {
     const [{ data:t }, { data:c }] = await Promise.all([
       supabase.from('solicitacoes').select('*').eq('autor_id', session.user.id).order('criado_em', { ascending:false }),
-      supabase.from('condominios').select('id,nome,regulamento_pdf_url,convencao_pdf_url').eq('id', perfil.condominio_id).single(),
+      perfil.condominio_id
+        ? supabase.from('condominios').select('id,nome,regulamento_pdf_url,convencao_pdf_url').eq('id', perfil.condominio_id).single()
+        : Promise.resolve({ data: null }),
     ])
     if (t) setTickets(t)
     if (c) setCondoInfo(c)
@@ -336,10 +338,19 @@ export default function Morador({ view, onToast }) {
           <path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/>
         </svg>
       </div>
-      <div>
-        <div className="condo-header-name">{condoInfo?.nome||'Meu Condominio'}</div>
+      <div style={{ flex:1 }}>
+        <div className="condo-header-name">{condoInfo?.nome || perfil?.condominio_nome || 'Meu Condomínio'}</div>
         <div className="condo-header-sub">{perfil?.nome}{local?` · ${local}`:''}</div>
       </div>
+      <button onClick={logout} style={{ background:'none', border:'1px solid var(--gray-200)',
+        borderRadius:'var(--r-md)', padding:'6px 12px', fontSize:12, fontWeight:600,
+        color:'var(--gray-500)', cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+          <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Sair
+      </button>
     </div>
   )
 
