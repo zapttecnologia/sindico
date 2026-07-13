@@ -148,17 +148,33 @@ export default function Conselheiro({ view, onToast }) {
   const registrarVoto = async () => {
     if (!opcaoVoto || !ticketVotando) return
     setSalvandoVoto(true)
-    const { error } = await supabase.from('votos_conselheiros').upsert({
+
+    const payload = {
       solicitacao_id: ticketVotando.id,
       conselheiro_id: perfil.id,
       voto: opcaoVoto,
       orcamento_id: orcSel || null,
       observacao: obsVoto.trim() || null,
       votado_em: new Date().toISOString(),
-    }, { onConflict: 'solicitacao_id,conselheiro_id' })
+    }
+
+    // Tenta upsert primeiro
+    let { error } = await supabase.from('votos_conselheiros')
+      .upsert(payload, { onConflict: 'solicitacao_id,conselheiro_id' })
+
+    // Se falhar, tenta deletar o voto antigo e inserir novo
+    if (error) {
+      await supabase.from('votos_conselheiros')
+        .delete()
+        .eq('solicitacao_id', ticketVotando.id)
+        .eq('conselheiro_id', perfil.id)
+      const res2 = await supabase.from('votos_conselheiros').insert(payload)
+      error = res2.error
+    }
+
     setSalvandoVoto(false)
-    if (error) { onToast('Erro ao votar: '+error.message); return }
-    onToast('✅ Voto registrado com sucesso!')
+    if (error) { onToast('Erro ao votar: ' + error.message); return }
+    onToast('✅ Voto registrado!')
     await abrirVotacao(ticketVotando)
     await carregar()
   }
