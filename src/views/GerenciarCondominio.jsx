@@ -17,6 +17,59 @@ const PAPEL_COR = {
 const PAPEIS_RESIDENTES = ['morador','conselheiro']
 const PAPEIS_DEPT = ['manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros']
 
+function BlocoRow({ bloco, totalUsuarios, onSave, onDelete }) {
+  const [editando, setEditando] = useState(false)
+  const [nome, setNome] = useState(bloco.nome)
+  const [total, setTotal] = useState(bloco.total_apartamentos || 0)
+
+  const salvar = async () => {
+    await onSave(nome, total)
+    setEditando(false)
+  }
+
+  return (
+    <div style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-md)', marginBottom:8, overflow:'hidden' }}>
+      {!editando ? (
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px' }}>
+          <span style={{ fontSize:20 }}>🏢</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:600, color:'var(--navy)' }}>{bloco.nome}</div>
+            <div style={{ fontSize:12, color:'var(--gray-400)', marginTop:2 }}>
+              {bloco.total_apartamentos > 0 ? `${bloco.total_apartamentos} unidade${bloco.total_apartamentos!==1?'s':''}` : 'Unidades não informadas'}
+              {' · '}
+              {totalUsuarios} usuário{totalUsuarios!==1?'s':''}
+            </div>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setEditando(true)}>Editar</button>
+          <button onClick={onDelete}
+            style={{ background:'none', border:'none', color:'var(--rust)', fontSize:13, cursor:'pointer', fontWeight:600 }}>
+            Excluir
+          </button>
+        </div>
+      ) : (
+        <div style={{ padding:'14px 16px', background:'var(--gray-50)' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 180px', gap:10, marginBottom:10 }}>
+            <div className="field" style={{ margin:0 }}>
+              <label style={{ fontSize:11 }}>Nome do bloco</label>
+              <input className="input" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Ex.: Bloco A"/>
+            </div>
+            <div className="field" style={{ margin:0 }}>
+              <label style={{ fontSize:11 }}>Qtd. de unidades</label>
+              <input className="input" type="number" value={total} onChange={e=>setTotal(e.target.value)} placeholder="Ex.: 20" min="0"/>
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="btn btn-primary btn-sm" onClick={salvar}>💾 Salvar</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{ setEditando(false); setNome(bloco.nome); setTotal(bloco.total_apartamentos||0) }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
   const { perfil } = useAuth()
   const [aba, setAba] = useState('usuarios')
@@ -272,20 +325,15 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
         <div>
           {blocos.length === 0 && <div className="empty-state">Nenhum bloco cadastrado.</div>}
           {blocos.map(b => (
-            <div key={b.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px',
-              background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-md)', marginBottom:8 }}>
-              <span style={{ fontSize:20 }}>🏢</span>
-              <div style={{ flex:1 }}>
-                <div style={{ fontWeight:600, color:'var(--navy)' }}>{b.nome}</div>
-                <div style={{ fontSize:12, color:'var(--gray-400)' }}>
-                  {usuarios.filter(u=>u.bloco===b.nome).length} usuário{usuarios.filter(u=>u.bloco===b.nome).length!==1?'s':''}
-                </div>
-              </div>
-              <button onClick={async()=>{ if(window.confirm('Excluir bloco?')){ await supabase.from('blocos').delete().eq('id',b.id); await carregar() }}}
-                style={{ background:'none', border:'none', color:'var(--rust)', fontSize:13, cursor:'pointer', fontWeight:600 }}>
-                Excluir
-              </button>
-            </div>
+            <BlocoRow key={b.id} bloco={b} totalUsuarios={usuarios.filter(u=>u.bloco===b.nome).length}
+              onSave={async(nome,total)=>{
+                await supabase.from('blocos').update({ nome, total_apartamentos:Number(total)||0 }).eq('id',b.id)
+                onToast('Bloco salvo.'); await carregar()
+              }}
+              onDelete={async()=>{
+                if(window.confirm('Excluir bloco?')){ await supabase.from('blocos').delete().eq('id',b.id); await carregar() }
+              }}
+            />
           ))}
           <div style={{ display:'flex', gap:10, marginTop:12 }}>
             <input className="input" placeholder="Nome do bloco (ex: Bloco A)" value={novoBloco} onChange={e=>setNovoBloco(e.target.value)}
