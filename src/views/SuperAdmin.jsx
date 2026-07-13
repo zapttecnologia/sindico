@@ -16,6 +16,7 @@ function useTema() {
 const TEMAS = {
   dark: {
     bg:      '#070b11',
+    shadow:  'none',
     sidebar: '#0d1117',
     surface: '#111827',
     card:    '#161b22',
@@ -31,6 +32,7 @@ const TEMAS = {
     sidebar: '#ffffff',
     surface: '#ffffff',
     card:    '#f8fafc',
+    shadow:  '0 1px 4px rgba(0,0,0,.08)',
     border:  'rgba(0,0,0,.08)',
     border2: 'rgba(0,0,0,.04)',
     text:    '#0f172a',
@@ -110,7 +112,7 @@ function G2({ children }) {
   return <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>{children}</div>
 }
 function Btn({ children, onClick, variant='primary', sm, disabled, style={} }) {
-  const { C } = useTema()
+  const { tema, C } = useTema()
   const bg = variant==='primary'?C.purple:variant==='danger'?'transparent':tema==='light'?'rgba(0,0,0,.06)':'rgba(255,255,255,.06)'
   const border = variant==='danger'?`1px solid ${C.red}`:`1px solid ${C.border}`
   const color = variant==='danger'?C.red:C.text
@@ -299,7 +301,7 @@ export default function SuperAdmin({ onToast }) {
                 </svg>
               </div>
               <div>
-                <div style={{ fontFamily:'var(--font-display)', fontWeight:800, fontSize:13, color:'#fff', lineHeight:1 }}>
+                <div style={{ fontFamily:'var(--font-display)', fontWeight:800, fontSize:13, color:C.text, lineHeight:1 }}>
                   {branding.nomePlataforma || 'Portal de Chamados'}
                 </div>
                 <div style={{ fontSize:9, color:corPrimaria, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', marginTop:2 }}>
@@ -346,7 +348,7 @@ export default function SuperAdmin({ onToast }) {
                         fontWeight: subMenu===s.id ? 600 : 400, transition:'all .15s' }}>
                       <span>{s.label}</span>
                       <span style={{ fontSize:11, fontWeight:700, color:s.cor||C.muted,
-                        background:'rgba(255,255,255,.06)', padding:'1px 7px', borderRadius:10 }}>
+                        background:tema==='dark'?'rgba(255,255,255,.06)':'rgba(0,0,0,.05)', padding:'1px 7px', borderRadius:10 }}>
                         {s.badge}
                       </span>
                     </button>
@@ -438,7 +440,7 @@ export default function SuperAdmin({ onToast }) {
                 {empresas.slice(0,5).map((e,i)=>(
                   <div key={e.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 20px',
                     borderBottom:i<4?`1px solid ${C.border2}`:'', transition:'background .1s' }}
-                    onMouseEnter={el=>el.currentTarget.style.background='rgba(255,255,255,.02)'}
+                    onMouseEnter={el=>el.currentTarget.style.background=tema==='dark'?'rgba(255,255,255,.02)':'rgba(0,0,0,.03)'}
                     onMouseLeave={el=>el.currentTarget.style.background='transparent'}>
                     <div style={{ width:36, height:36, borderRadius:9, background:`${corPrimaria}20`,
                       display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:800, color:corPrimaria, flexShrink:0 }}>
@@ -492,7 +494,7 @@ export default function SuperAdmin({ onToast }) {
                 <div style={{ fontSize:13, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:16 }}>
                   Preview da sidebar
                 </div>
-                <div style={{ background:'#0d1117', borderRadius:10, padding:16, border:`1px solid ${C.border}`, maxWidth:200 }}>
+                <div style={{ background:C.sidebar, borderRadius:10, padding:16, border:`1px solid ${C.border}`, maxWidth:200 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
                     <div style={{ width:28, height:28, borderRadius:7, background:`linear-gradient(135deg,${corPrimaria},${corPrimaria}aa)`,
                       display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -535,7 +537,7 @@ export default function SuperAdmin({ onToast }) {
               <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                   <thead>
-                    <tr style={{ background:'rgba(255,255,255,.02)', borderBottom:`1px solid ${C.border}` }}>
+                    <tr style={{ background:tema==='dark'?'rgba(255,255,255,.02)':'rgba(0,0,0,.02)', borderBottom:`1px solid ${C.border}` }}>
                       {['Empresa','Plano','Status','Condos','Usuários','Abertos','Vencimento','Ações'].map(h=>(
                         <th key={h} style={{ padding:'11px 14px', textAlign:'left', fontSize:11, fontWeight:700,
                           color:C.muted, textTransform:'uppercase', letterSpacing:'.05em', whiteSpace:'nowrap' }}>{h}</th>
@@ -552,7 +554,7 @@ export default function SuperAdmin({ onToast }) {
                       const vencEm = e.plano_vencimento ? Math.ceil((new Date(e.plano_vencimento)-new Date())/86400000) : null
                       return (
                         <tr key={e.id} style={{ borderBottom:`1px solid ${C.border2}`, transition:'background .1s' }}
-                          onMouseEnter={el=>el.currentTarget.style.background='rgba(255,255,255,.02)'}
+                          onMouseEnter={el=>el.currentTarget.style.background=tema==='dark'?'rgba(255,255,255,.02)':'rgba(0,0,0,.03)'}
                           onMouseLeave={el=>el.currentTarget.style.background='transparent'}>
                           <td style={{ padding:'12px 14px' }}>
                             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -734,13 +736,13 @@ function PlanoCardEdicao({ plano, onToast, onSaved }) {
   }
   if (!editando) return <button onClick={()=>setEditando(true)} style={{ background:'none', border:`1px solid ${C.border}`, borderRadius:6, color:C.muted, padding:'3px 10px', fontSize:11, cursor:'pointer' }}>Editar</button>
   return (
-    <div style={{ position:'absolute', right:20, top:16, background:'#1a1f2e', border:`1px solid #7c3aed`, borderRadius:10, padding:14, zIndex:10, minWidth:260 }}>
+    <div style={{ position:'absolute', right:20, top:16, background:C.surface, border:`1px solid #7c3aed`, borderRadius:10, padding:14, zIndex:10, minWidth:260 }}>
       <div style={{ fontSize:11, color:'#a855f7', fontWeight:700, marginBottom:10 }}>Editando plano</div>
       {[['nome_exibicao','Nome'],['valor_mensal','Valor/mês'],['max_condominios','Máx. condos'],['max_unidades','Máx. unidades'],['max_usuarios','Máx. usuários']].map(([k,l])=>(
         <div key={k} style={{ marginBottom:8 }}>
           <label style={{ fontSize:10, color:C.muted, display:'block', marginBottom:3 }}>{l}</label>
           <input value={form[k]||''} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
-            style={{ width:'100%', background:'#0d1117', border:`1px solid ${C.border}`, borderRadius:6, padding:'6px 9px', color:C.text, fontSize:12, outline:'none', boxSizing:'border-box' }}/>
+            style={{ width:'100%', background:C.sidebar, border:`1px solid ${C.border}`, borderRadius:6, padding:'6px 9px', color:C.text, fontSize:12, outline:'none', boxSizing:'border-box' }}/>
         </div>
       ))}
       <div style={{ display:'flex', gap:8, marginTop:10 }}>
@@ -808,7 +810,7 @@ function PainelAdmins({ empresas, onToast }) {
       <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>
         <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
           <thead>
-            <tr style={{ background:'rgba(255,255,255,.02)', borderBottom:`1px solid ${C.border}` }}>
+            <tr style={{ background:tema==='dark'?'rgba(255,255,255,.02)':'rgba(0,0,0,.02)', borderBottom:`1px solid ${C.border}` }}>
               {['Usuário','Papel','Empresa','Código','Status',''].map(h=>(
                 <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.04em' }}>{h}</th>
               ))}
@@ -825,7 +827,7 @@ function PainelAdmins({ empresas, onToast }) {
                 </td>
                 <td style={{ padding:'11px 14px' }}>
                   <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:5,
-                    background:'rgba(255,255,255,.06)', color:a.papel==='admin'?C.amber:C.green, textTransform:'uppercase' }}>
+                    background:tema==='dark'?'rgba(255,255,255,.06)':'rgba(0,0,0,.05)', color:a.papel==='admin'?C.amber:C.green, textTransform:'uppercase' }}>
                     {a.papel}
                   </span>
                 </td>
@@ -914,7 +916,7 @@ function AdminCodigoEditor({ empresaId, onToast }) {
           </div>
           <div style={{ display:'flex', gap:8 }}>
             <input value={editando[u.id]??''} onChange={e=>setEditando(ev=>({...ev,[u.id]:e.target.value.toUpperCase()}))}
-              placeholder="Novo código" style={{ flex:1, background:'rgba(255,255,255,.04)', border:`1px solid ${C.border}`, borderRadius:7, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
+              placeholder="Novo código" style={{ flex:1, background:tema==='dark'?'rgba(255,255,255,.04)':'rgba(0,0,0,.03)', border:`1px solid ${C.border}`, borderRadius:7, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
             <button onClick={()=>salvar(u)} disabled={salvando[u.id]} style={{ padding:'7px 12px', background:C.purple, border:'none', borderRadius:6, color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer' }}>
               {salvando[u.id]?'...':'Salvar'}
             </button>
@@ -926,16 +928,16 @@ function AdminCodigoEditor({ empresaId, onToast }) {
         ? <button onClick={()=>setShowCriar(true)} style={{ fontSize:12, color:'#a855f7', background:'none', border:`1px solid ${C.purple}`, borderRadius:6, padding:'5px 12px', cursor:'pointer', fontWeight:600 }}>
             + Criar admin
           </button>
-        : <div style={{ background:'rgba(255,255,255,.03)', border:`1px solid ${C.border}`, borderRadius:10, padding:14, marginTop:8 }}>
+        : <div style={{ background:tema==='dark'?'rgba(255,255,255,.03)':'rgba(0,0,0,.02)', border:`1px solid ${C.border}`, borderRadius:10, padding:14, marginTop:8 }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
               <input value={novoAdmin.nome} onChange={e=>setNovoAdmin(x=>({...x,nome:e.target.value}))} placeholder="Nome *"
-                style={{ background:'rgba(255,255,255,.04)', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
+                style={{ background:tema==='dark'?'rgba(255,255,255,.04)':'rgba(0,0,0,.03)', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
               <input value={novoAdmin.email} onChange={e=>setNovoAdmin(x=>({...x,email:e.target.value}))} placeholder="E-mail *" type="email"
-                style={{ background:'rgba(255,255,255,.04)', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
+                style={{ background:tema==='dark'?'rgba(255,255,255,.04)':'rgba(0,0,0,.03)', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
               <input value={novoAdmin.codigo} onChange={e=>setNovoAdmin(x=>({...x,codigo:e.target.value.toUpperCase()}))} placeholder="Código *"
-                style={{ background:'rgba(255,255,255,.04)', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
+                style={{ background:tema==='dark'?'rgba(255,255,255,.04)':'rgba(0,0,0,.03)', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
               <input value={novoAdmin.senha} onChange={e=>setNovoAdmin(x=>({...x,senha:e.target.value}))} placeholder="Senha"
-                style={{ background:'rgba(255,255,255,.04)', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
+                style={{ background:tema==='dark'?'rgba(255,255,255,.04)':'rgba(0,0,0,.03)', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:12, outline:'none' }}/>
             </div>
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={criarAdmin} disabled={criando} style={{ padding:'7px 14px', background:C.purple, border:'none', borderRadius:6, color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer' }}>
@@ -1022,7 +1024,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
     <div style={{ minHeight:'100vh', background:C.bg, color:C.text, fontFamily:'var(--font-body)' }}>
       <div style={{ background:C.sidebar, borderBottom:`1px solid ${C.border}`, padding:'0 28px',
         display:'flex', alignItems:'center', gap:14, height:52 }}>
-        <button onClick={onBack} style={{ background:'rgba(255,255,255,.06)', border:`1px solid ${C.border}`, borderRadius:7, color:C.muted, padding:'5px 12px', fontSize:12, cursor:'pointer' }}>← Voltar</button>
+        <button onClick={onBack} style={{ background:tema==='dark'?'rgba(255,255,255,.06)':'rgba(0,0,0,.05)', border:`1px solid ${C.border}`, borderRadius:7, color:C.muted, padding:'5px 12px', fontSize:12, cursor:'pointer' }}>← Voltar</button>
         <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:'#fff' }}>{empresa.nome}</span>
         <Badge label={empresa.plano_nome} map={PLANO_COR}/>
         <Badge label={empresa.status} map={STATUS_COR}/>
@@ -1051,7 +1053,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
                         <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{u.nome||'—'}</div>
                         <div style={{ fontSize:11, color:C.muted }}>{u.codigo_acesso?`Código: ${u.codigo_acesso}`:''}</div>
                       </div>
-                      <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:4, background:'rgba(255,255,255,.06)', color:PAPEL_COR_L[u.papel]||C.muted, textTransform:'uppercase' }}>{u.papel}</span>
+                      <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:4, background:tema==='dark'?'rgba(255,255,255,.06)':'rgba(0,0,0,.05)', color:PAPEL_COR_L[u.papel]||C.muted, textTransform:'uppercase' }}>{u.papel}</span>
                     </div>
                   ))}
                 </div>
@@ -1075,7 +1077,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
                     <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{s.categoria}</div>
                     <div style={{ fontSize:12, color:C.muted }}>{s.condominios?.nome} · {new Date(s.criado_em).toLocaleDateString('pt-BR')}</div>
                   </div>
-                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:5, background:'rgba(255,255,255,.06)', color:s.status==='concluido'?C.green:s.status==='andamento'?C.blue:C.amber }}>{s.status}</span>
+                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:5, background:tema==='dark'?'rgba(255,255,255,.06)':'rgba(0,0,0,.05)', color:s.status==='concluido'?C.green:s.status==='andamento'?C.blue:C.amber }}>{s.status}</span>
                 </div>
               ))
             }
@@ -1195,12 +1197,12 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
               if (!grupo.length) return null
               return (
                 <div key={papel} style={{ marginBottom:10 }}>
-                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:4, background:'rgba(255,255,255,.06)', color:C.muted, textTransform:'uppercase', letterSpacing:'.04em', display:'inline-block', marginBottom:6 }}>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:4, background:tema==='dark'?'rgba(255,255,255,.06)':'rgba(0,0,0,.05)', color:C.muted, textTransform:'uppercase', letterSpacing:'.04em', display:'inline-block', marginBottom:6 }}>
                     {PAPEL_LABEL[papel]}
                   </span>
                   {grupo.map(u=>(
                     <div key={u.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:`1px solid ${C.border2}` }}>
-                      <div style={{ width:30, height:30, borderRadius:'50%', background:'rgba(255,255,255,.06)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:C.muted, flexShrink:0 }}>{(u.nome||'?')[0].toUpperCase()}</div>
+                      <div style={{ width:30, height:30, borderRadius:'50%', background:tema==='dark'?'rgba(255,255,255,.06)':'rgba(0,0,0,.05)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:C.muted, flexShrink:0 }}>{(u.nome||'?')[0].toUpperCase()}</div>
                       <div style={{ flex:1 }}>
                         <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{u.nome||'—'}</div>
                         <div style={{ fontSize:11, color:C.muted }}>{u.codigo_acesso?`Cod: ${u.codigo_acesso}`:''}</div>
