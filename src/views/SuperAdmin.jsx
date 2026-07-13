@@ -249,8 +249,12 @@ export default function SuperAdmin({ onToast }) {
   const corPrimaria = branding.corPrimaria || '#7c3aed'
 
   // Se empresa selecionada → vai para EmpresaPanel
-  if (empresaSel) return <EmpresaPanel empresa={empresaSel} planos={planos}
-    onBack={()=>{ setEmpresaSel(null); carregar() }} onToast={onToast} />
+  if (empresaSel) return (
+    <TemaCtx.Provider value={tema}>
+      <EmpresaPanel empresa={empresaSel} planos={planos}
+        onBack={()=>{ setEmpresaSel(null); carregar() }} onToast={onToast} />
+    </TemaCtx.Provider>
+  )
 
   const MENU_ITEMS = [
     { id:'dashboard',    label:'Dashboard',      icon:'📊', section:null },
@@ -502,7 +506,7 @@ export default function SuperAdmin({ onToast }) {
                         <path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/>
                       </svg>
                     </div>
-                    <div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{branding.nomePlataforma||'Portal de Chamados'}</div>
+                    <div style={{ fontSize:12, fontWeight:800, color:tema==='dark'?'#fff':'#1e293b' }}>{branding.nomePlataforma||'Portal de Chamados'}</div>
                   </div>
                   {['Dashboard','Clientes','Usuários','Financeiro'].map((item,i)=>(
                     <div key={item} style={{ padding:'6px 10px', borderRadius:6, marginBottom:4, fontSize:12,
@@ -1025,7 +1029,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
       <div style={{ background:C.sidebar, borderBottom:`1px solid ${C.border}`, padding:'0 28px',
         display:'flex', alignItems:'center', gap:14, height:52 }}>
         <button onClick={onBack} style={{ background:tema==='dark'?'rgba(255,255,255,.06)':'rgba(0,0,0,.05)', border:`1px solid ${C.border}`, borderRadius:7, color:C.muted, padding:'5px 12px', fontSize:12, cursor:'pointer' }}>← Voltar</button>
-        <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:'#fff' }}>{empresa.nome}</span>
+        <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:C.text }}>{empresa.nome}</span>
         <Badge label={empresa.plano_nome} map={PLANO_COR}/>
         <Badge label={empresa.status} map={STATUS_COR}/>
         <div style={{ flex:1 }}/>
@@ -1034,7 +1038,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
       <div style={{ maxWidth:1100, margin:'0 auto', padding:'24px 28px' }}>
         <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24 }}>
           {[['condominios','🏢 Condomínios'],['chamados','📋 Chamados']].map(([id,label])=>(
-            <button key={id} onClick={()=>setAba(id)} style={{ padding:'9px 18px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600, color:aba===id?'#fff':C.muted, borderBottom:aba===id?'2px solid #7c3aed':'2px solid transparent', marginBottom:-1 }}>{label}</button>
+            <button key={id} onClick={()=>setAba(id)} style={{ padding:'9px 18px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600, color:aba===id?C.text:C.muted, borderBottom:aba===id?'2px solid #7c3aed':'2px solid transparent', marginBottom:-1 }}>{label}</button>
           ))}
         </div>
         {loading&&<div style={{ textAlign:'center', color:C.muted, padding:40 }}>Carregando...</div>}
@@ -1072,7 +1076,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
           <div>
             {chamados.length===0?<div style={{ textAlign:'center', color:C.muted, padding:32 }}>Nenhum chamado.</div>
               :chamados.map(s=>(
-                <div key={s.id} style={{ background:C.surface, border:`1px solid ${C.border2}`, borderRadius:9, padding:'11px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                <div key={s.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:9, padding:'11px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{s.categoria}</div>
                     <div style={{ fontSize:12, color:C.muted }}>{s.condominios?.nome} · {new Date(s.criado_em).toLocaleDateString('pt-BR')}</div>
@@ -1173,7 +1177,7 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
 
   return (
     <>
-      <div style={{ background:C.surface, border:`1px solid ${expandido?C.purple:C.border}`, borderRadius:12, marginBottom:10, overflow:'hidden', transition:'border-color .15s' }}>
+      <div style={{ background:C.surface, border:`2px solid ${expandido?C.purple:C.border}`, borderRadius:12, marginBottom:10, overflow:'hidden', transition:'border-color .15s' }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', flexWrap:'wrap' }}>
           <div style={{ width:36, height:36, borderRadius:8, background:'rgba(88,166,255,.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:800, color:C.blue, flexShrink:0 }}>{condo.nome[0]}</div>
           <input value={nomeEdit} onChange={e=>setNomeEdit(e.target.value)} style={{ flex:1, background:'transparent', border:'none', color:C.text, fontSize:15, fontWeight:600, outline:'none', minWidth:120 }}/>
