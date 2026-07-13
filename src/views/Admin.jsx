@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { gerarCodigo } from '../lib/constants'
+import ImportarMoradores from '../components/ImportarMoradores'
 
 const PAPEL_LABEL = {
   morador:'Morador', equipe:'Sindico', admin:'Admin', conselheiro:'Conselheiro',
@@ -41,6 +42,7 @@ export default function Admin({ onToast }) {
   const [blocoNovoMap, setBlocoNovoMap] = useState({})
   const [modalUsuario, setModalUsuario] = useState(null)
   const [modalNovaConta, setModalNovaConta] = useState(null) // condominio_id
+  const [modalImportar, setModalImportar] = useState(null) // condominio_id para importar
   const [novaConta, setNovaConta] = useState({ nome:'', email:'', codigo:'', senha:SENHA_PADRAO, papel:'morador', bloco:'', apto:'', tipo_ocupacao:'proprietario' })
   const [salvando, setSalvando] = useState(false)
 
@@ -301,6 +303,9 @@ export default function Admin({ onToast }) {
                         <SecTitle>Moradores e conselheiros</SecTitle>
                         <button className="btn btn-primary btn-sm" onClick={()=>{ setModalNovaConta(c.id); setNovaConta({nome:'',email:'',codigo:'',senha:SENHA_PADRAO,papel:'morador',bloco:'',apto:''}) }}>
                           + Novo usuario
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={()=>setModalImportar(c.id)} style={{ display:'flex', alignItems:'center', gap:4 }}>
+                          📊 Importar Excel
                         </button>
                       </div>
 
@@ -586,6 +591,21 @@ export default function Admin({ onToast }) {
             <button className="btn btn-primary btn-block" onClick={criarConta} disabled={salvando}>
               {salvando ? 'Criando...' : 'Criar usuário'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal importar moradores */}
+      {modalImportar && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalImportar(null)}>
+          <div className="modal" style={{ maxWidth:700, maxHeight:'90vh', overflowY:'auto' }}>
+            <ImportarMoradores
+              condominioId={modalImportar}
+              empresaId={perfil?.empresa_id}
+              onToast={onToast}
+              onClose={()=>setModalImportar(null)}
+              onSuccess={()=>carregarUsuariosCondo(modalImportar)}
+            />
           </div>
         </div>
       )}

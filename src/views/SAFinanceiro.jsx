@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 const C = {
   bg:'#0a0d14', surface:'#111827', border:'rgba(255,255,255,.07)',
@@ -102,11 +104,104 @@ export default function SAFinanceiro({ empresas, planos }) {
     }
   })
 
+  const [gerandoPDF, setGerandoPDF] = useState(false)
+
+  const gerarRelatorio = async () => {
+    setGerandoPDF(true)
+    try {
+      const doc = new jsPDF()
+      const W = doc.internal.pageSize.getWidth()
+      const hoje = new Date()
+
+      // Header
+      doc.setFillColor(40,67,173)
+      doc.rect(0,0,W,36,'F')
+      doc.setTextColor(255,255,255)
+      doc.setFontSize(16); doc.setFont('helvetica','bold')
+      doc.text('Relatório Financeiro', 14, 14)
+      doc.setFontSize(10); doc.setFont('helvetica','normal')
+      doc.text('Portal de Chamados — Central de Administração', 14, 22)
+      doc.text(`Gerado em ${hoje.toLocaleDateString('pt-BR')} às ${hoje.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`, W-14, 22, {align:'right'})
+
+      // KPIs
+      let y = 46
+      doc.setTextColor(30,30,30)
+      doc.setFontSize(11); doc.setFont('helvetica','bold')
+      doc.text('Resumo financeiro', 14, y); y += 6
+      autoTable(doc, {
+        startY:y, margin:{left:14,right:14},
+        head:[['Métrica','Valor']],
+        body:[
+          ['MRR (Receita Mensal Recorrente)', `R$ ${mrr.toLocaleString('pt-BR',{minimumFractionDigits:2})}`],
+          ['ARR (Receita Anual Recorrente)', `R$ ${arr.toLocaleString('pt-BR',{minimumFractionDigits:2})}`],
+          ['Ticket médio por cliente', `R$ ${ticketMedio.toLocaleString('pt-BR',{minimumFractionDigits:2})}`],
+          ['Churn rate', `${churnRate}%`],
+          ['Clientes ativos', String(empresasAtivas.length)],
+          ['Inadimplentes', String(totalInadimplentes)],
+          ['A receber (faturas)', `R$ ${totalPendente.toLocaleString('pt-BR',{minimumFractionDigits:2})}`],
+          ['Recebido (faturas pagas)', `R$ ${totalRecebido.toLocaleString('pt-BR',{minimumFractionDigits:2})}`],
+        ],
+        headStyles:{fillColor:[40,67,173],textColor:255,fontStyle:'bold',fontSize:9},
+        bodyStyles:{fontSize:9},
+        columnStyles:{1:{halign:'right'}},
+        theme:'striped',
+      })
+
+      // Receita por plano
+      y = doc.lastAutoTable.finalY + 10
+      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(40,67,173)
+      doc.text('Receita por plano', 14, y); y += 4
+      autoTable(doc, {
+        startY:y, margin:{left:14,right:14},
+        head:[['Plano','Clientes','Valor/mês','Receita mensal','% do MRR']],
+        body: planos.map(p=>{
+          const cli = empresasAtivas.filter(e=>e.plano_nome===p.nome).length
+          const rec = cli * Number(p.valor_mensal)
+          return [p.nome_exibicao, String(cli), `R$ ${Number(p.valor_mensal).toLocaleString('pt-BR',{minimumFractionDigits:2})}`, `R$ ${rec.toLocaleString('pt-BR',{minimumFractionDigits:2})}`, mrr>0?`${(rec/mrr*100).toFixed(1)}%`:'0%']
+        }),
+        headStyles:{fillColor:[40,67,173],textColor:255,fontStyle:'bold',fontSize:9},
+        bodyStyles:{fontSize:9},
+        theme:'striped',
+      })
+
+      // Cobranças
+      if (faturas.length > 0) {
+        y = doc.lastAutoTable.finalY + 10
+        doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(40,67,173)
+        doc.text('Cobranças', 14, y); y += 4
+        autoTable(doc, {
+          startY:y, margin:{left:14,right:14},
+          head:[['Cliente','Descrição','Referência','Valor','Vencimento','Status']],
+          body: faturas.map(f=>[
+            f.empresas?.nome||'—', f.descricao, f.referencia||'—',
+            `R$ ${Number(f.valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}`,
+            new Date(f.vencimento).toLocaleDateString('pt-BR'),
+            f.status,
+          ]),
+          headStyles:{fillColor:[40,67,173],textColor:255,fontStyle:'bold',fontSize:9},
+          bodyStyles:{fontSize:9},
+          theme:'striped',
+        })
+      }
+
+      // Rodapé
+      const pages = doc.internal.getNumberOfPages()
+      for (let i=1;i<=pages;i++) {
+        doc.setPage(i)
+        doc.setFontSize(8); doc.setTextColor(150)
+        doc.text(`Portal de Chamados · Relatório Financeiro · Página ${i} de ${pages}`, W/2, 291, {align:'center'})
+      }
+
+      doc.save(`relatorio_financeiro_${hoje.toLocaleDateString('pt-BR').replace(/\//g,'-')}.pdf`)
+    } catch(e) { console.error(e) }
+    setGerandoPDF(false)
+  }
+
   const criarFatura = async () => {
     if (!form.empresa_id || !form.valor || !form.vencimento) { return }
     setSalvando(true)
-    // Checar se está atrasada
-    const status = new Date(form.vencimento) < hoje ? 'atrasado' : 'pendente'
+    const hoje2 = new Date()
+    const status = new Date(form.vencimento) < hoje2 ? 'atrasado' : 'pendente'
     await supabase.from('faturas').insert({ ...form, valor:Number(form.valor), status })
     setSalvando(false)
     setModalNova(false)
@@ -128,9 +223,23 @@ export default function SAFinanceiro({ empresas, planos }) {
 
   return (
     <div>
-      <div style={{ marginBottom:24 }}>
-        <h2 style={{ margin:0, fontSize:20, fontWeight:800, color:C.text }}>Financeiro</h2>
-        <p style={{ margin:'4px 0 0', fontSize:13, color:C.muted }}>Gestão de receitas, cobranças e previsão financeira</p>
+      <div style={{ marginBottom:24, display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12 }}>
+        <div>
+          <h2 style={{ margin:0, fontSize:20, fontWeight:800, color:C.text }}>Financeiro</h2>
+          <p style={{ margin:'4px 0 0', fontSize:13, color:C.muted }}>Gestão de receitas, cobranças e previsão financeira</p>
+        </div>
+        <button onClick={gerarRelatorio} disabled={gerandoPDF}
+          style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 16px',
+            background:'#22c55e', border:'none', borderRadius:8, color:'#fff',
+            fontSize:13, fontWeight:700, cursor:'pointer', opacity:gerandoPDF?.6:1 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <polyline points="9 15 12 18 15 15"/>
+          </svg>
+          {gerandoPDF ? 'Gerando...' : '⬇ Relatório PDF'}
+        </button>
       </div>
 
       {/* Sub-nav */}
