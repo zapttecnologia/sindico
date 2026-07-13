@@ -139,6 +139,7 @@ export default function Perfil({ onToast }) {
 
   const ec = emailConfig
   const setEc = (field, val) => setEmailConfig(prev => ({ ...prev, [field]: val }))
+  const PAPEL_LABEL = { equipe:'Síndico', admin:'Admin' }
   const PAPEL_COR   = { equipe:'var(--emerald)', admin:'var(--amber)' }
 
   if (loading) return (
