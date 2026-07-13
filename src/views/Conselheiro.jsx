@@ -121,20 +121,228 @@ export default function Conselheiro({ view, onToast }) {
   )
 
   // ── APROVAÇÕES ─────────────────────────────────────────────
-  if (view === 'aprovacoes') return (
-    <div>
-      {header}
-      <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 16px' }}>
-        Votacao do conselho
-      </h2>
-      {tickets.filter(t=>t.aprovacao_status==='aguardando').length === 0
-        ? <div className="empty-state">Nenhum chamado aguardando seu voto.</div>
-        : tickets.filter(t=>t.aprovacao_status==='aguardando').map(t=>
-            <TicketCard key={t.id} ticket={t} onUpdate={carregar} onToast={onToast} />
-          )
-      }
-    </div>
-  )
+  const [ticketVotando, setTicketVotando] = useState(null)
+  const [orcamentos, setOrcamentos] = useState([])
+  const [votosExistentes, setVotosExistentes] = useState([])
+  const [opcaoVoto, setOpcaoVoto] = useState(null)
+  const [orcSel, setOrcSel] = useState(null)
+  const [obsVoto, setObsVoto] = useState('')
+  const [salvandoVoto, setSalvandoVoto] = useState(false)
+  const [meuVoto, setMeuVoto] = useState(null)
+
+  const abrirVotacao = async (ticket) => {
+    setTicketVotando(ticket)
+    setOpcaoVoto(null); setOrcSel(null); setObsVoto('')
+    const [{ data:orcs }, { data:votos }] = await Promise.all([
+      supabase.from('orcamentos').select('*').eq('solicitacao_id', ticket.id).order('numero'),
+      supabase.from('votos_conselheiros')
+        .select('*, perfis(nome)')
+        .eq('solicitacao_id', ticket.id),
+    ])
+    setOrcamentos(orcs||[])
+    setVotosExistentes(votos||[])
+    const meu = (votos||[]).find(v => v.conselheiro_id === perfil?.id)
+    setMeuVoto(meu||null)
+    if (meu) setOpcaoVoto(meu.voto)
+  }
+
+  const registrarVoto = async () => {
+    if (!opcaoVoto || !ticketVotando) return
+    setSalvandoVoto(true)
+    const { error } = await supabase.from('votos_conselheiros').upsert({
+      solicitacao_id: ticketVotando.id,
+      conselheiro_id: perfil.id,
+      voto: opcaoVoto,
+      orcamento_id: orcSel || null,
+      observacao: obsVoto.trim() || null,
+      votado_em: new Date().toISOString(),
+    }, { onConflict: 'solicitacao_id,conselheiro_id' })
+    setSalvandoVoto(false)
+    if (error) { onToast('Erro ao votar: '+error.message); return }
+    onToast('✅ Voto registrado com sucesso!')
+    await abrirVotacao(ticketVotando)
+    await carregar()
+  }
+
+  const OPCOES = [
+    { v:'deferido',          l:'Deferido',               cor:'#16a34a', bg:'#dcfce7', icon:'✅' },
+    { v:'deferido_ressalva', l:'Deferido com ressalva',  cor:'#d97706', bg:'#fef3c7', icon:'⚠️' },
+    { v:'indeferido',        l:'Indeferido',             cor:'#dc2626', bg:'#fee2e2', icon:'❌' },
+  ]
+
+  if (view === 'aprovacoes') {
+    const pendentes = tickets.filter(t => t.aprovacao_status === 'aguardando')
+
+    // Tela de votação aberta
+    if (ticketVotando) return (
+      <div>
+        {header}
+        <button onClick={()=>setTicketVotando(null)}
+          style={{ background:'var(--gray-100)', border:'none', borderRadius:'var(--r-md)',
+            padding:'8px 14px', fontSize:13, fontWeight:600, color:'var(--gray-600)',
+            cursor:'pointer', marginBottom:20 }}>← Voltar</button>
+
+        <div className="card">
+          {/* Cabeçalho do chamado */}
+          <div style={{ marginBottom:16 }}>
+            <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
+              background:'var(--gray-100)', color:'var(--gray-600)' }}>
+              {ticketVotando.categoria}
+            </span>
+            <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'10px 0 4px' }}>
+              {ticketVotando.condominios?.nome}
+            </h2>
+            <p style={{ fontSize:13, color:'var(--gray-500)', margin:'0 0 4px' }}>{ticketVotando.descricao}</p>
+            <div style={{ fontSize:11, color:'var(--gray-400)' }}>{ticketVotando.nome_solicitante} · {fmtDate(ticketVotando.criado_em)}</div>
+          </div>
+
+          {/* Orçamentos */}
+          {orcamentos.length > 0 && (
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-500)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>
+                Orçamentos apresentados
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:10 }}>
+                {orcamentos.map(o => (
+                  <div key={o.id} onClick={()=>!meuVoto&&setOrcSel(orcSel===o.id?null:o.id)}
+                    style={{ padding:'12px 14px', borderRadius:'var(--r-md)',
+                      border:`2px solid ${orcSel===o.id?'var(--emerald)':'var(--gray-200)'}`,
+                      background:orcSel===o.id?'var(--mint)':'#fff',
+                      cursor:meuVoto?'default':'pointer', transition:'all .15s' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', marginBottom:4 }}>Orçamento {o.numero}</div>
+                    <div style={{ fontWeight:700, color:'var(--navy)', marginBottom:4 }}>{o.fornecedor}</div>
+                    {o.valor && <div style={{ fontSize:15, fontWeight:800, color:'var(--emerald)' }}>R$ {Number(o.valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>}
+                    <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:4 }}>
+                      {o.tipo==='servico'?'Prestação de serviço':'Produto'}
+                      {o.materiais?` · ${o.materiais}`:''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Meu voto */}
+          {meuVoto ? (
+            <div style={{ padding:'14px 16px', borderRadius:'var(--r-lg)', marginBottom:20,
+              background: OPCOES.find(o=>o.v===meuVoto.voto)?.bg,
+              border:`2px solid ${OPCOES.find(o=>o.v===meuVoto.voto)?.cor}` }}>
+              <div style={{ fontSize:14, fontWeight:700, color:OPCOES.find(o=>o.v===meuVoto.voto)?.cor, marginBottom:4 }}>
+                {OPCOES.find(o=>o.v===meuVoto.voto)?.icon} Você votou: {OPCOES.find(o=>o.v===meuVoto.voto)?.l}
+              </div>
+              {meuVoto.observacao && <div style={{ fontSize:13, color:'var(--gray-600)', fontStyle:'italic' }}>"{meuVoto.observacao}"</div>}
+              <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:4 }}>
+                {new Date(meuVoto.votado_em).toLocaleString('pt-BR')}
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-500)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
+                Registrar meu voto
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10, marginBottom:14 }}>
+                {OPCOES.map(op => (
+                  <button key={op.v} onClick={()=>setOpcaoVoto(opcaoVoto===op.v?null:op.v)}
+                    style={{ padding:'14px 10px', borderRadius:'var(--r-md)', fontWeight:700, fontSize:13,
+                      cursor:'pointer', transition:'all .15s', textAlign:'center',
+                      border:`2px solid ${opcaoVoto===op.v?op.cor:'var(--gray-200)'}`,
+                      background:opcaoVoto===op.v?op.bg:'#fff',
+                      color:opcaoVoto===op.v?op.cor:'var(--gray-500)' }}>
+                    <div style={{ fontSize:20, marginBottom:4 }}>{op.icon}</div>
+                    {op.l}
+                  </button>
+                ))}
+              </div>
+              <div className="field" style={{ marginBottom:14 }}>
+                <label>Observação (opcional)</label>
+                <textarea className="input" rows={2} value={obsVoto} onChange={e=>setObsVoto(e.target.value)}
+                  placeholder="Adicione uma justificativa ou ressalva..."/>
+              </div>
+              <button className="btn btn-primary btn-block" onClick={registrarVoto}
+                disabled={!opcaoVoto||salvandoVoto} style={{ fontSize:15, padding:'13px' }}>
+                {salvandoVoto?'Registrando...':`Confirmar: ${OPCOES.find(o=>o.v===opcaoVoto)?.l||'selecione uma opção'}`}
+              </button>
+            </div>
+          )}
+
+          {/* Placar de votos */}
+          {votosExistentes.length > 0 && (
+            <div style={{ borderTop:'1px solid var(--gray-100)', paddingTop:16 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-500)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
+                Placar — {votosExistentes.length} voto{votosExistentes.length!==1?'s':''}
+              </div>
+              {votosExistentes.map((v,i) => {
+                const op = OPCOES.find(o=>o.v===v.voto)
+                return (
+                  <div key={v.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0',
+                    borderBottom:i<votosExistentes.length-1?'1px solid var(--gray-100)':'' }}>
+                    <div style={{ width:36, height:36, borderRadius:'50%', background:op?.bg,
+                      display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>
+                      {op?.icon}
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:'var(--gray-800)' }}>
+                        {v.perfis?.nome||'Conselheiro'}
+                      </div>
+                      <div style={{ fontSize:12, fontWeight:700, color:op?.cor }}>{op?.l}</div>
+                      {v.observacao && <div style={{ fontSize:12, color:'var(--gray-400)', fontStyle:'italic' }}>"{v.observacao}"</div>}
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--gray-400)', textAlign:'right', flexShrink:0 }}>
+                      {v.votado_em ? new Date(v.votado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+
+    // Lista de pendentes
+    return (
+      <div>
+        {header}
+        <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 16px' }}>
+          Votação do conselho
+        </h2>
+        {pendentes.length === 0
+          ? <div className="empty-state">✅ Nenhum chamado aguardando seu voto.</div>
+          : pendentes.map(t => (
+            <div key={t.id} onClick={()=>abrirVotacao(t)}
+              style={{ background:'#fff', border:'1px solid var(--gray-200)', borderLeft:'3px solid var(--amber)',
+                borderRadius:'var(--r-lg)', padding:'16px 18px', marginBottom:10, cursor:'pointer',
+                transition:'all .15s', boxShadow:'var(--shadow-sm)' }}
+              onMouseEnter={e=>{e.currentTarget.style.boxShadow='var(--shadow-md)';e.currentTarget.style.transform='translateY(-1px)'}}
+              onMouseLeave={e=>{e.currentTarget.style.boxShadow='var(--shadow-sm)';e.currentTarget.style.transform='translateY(0)'}}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8 }}>
+                <div>
+                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
+                    background:'var(--amber-bg)', color:'#92400e' }}>
+                    ⏳ Aguardando voto
+                  </span>
+                  <div style={{ fontFamily:'var(--font-display)', fontSize:16, fontWeight:700, color:'var(--navy)', margin:'8px 0 4px' }}>
+                    {t.condominios?.nome}
+                  </div>
+                  <div style={{ fontSize:13, color:'var(--gray-500)' }}>{t.categoria} · {t.nome_solicitante}</div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:12, color:'var(--gray-400)' }}>{fmtDate(t.criado_em)}</div>
+                  <div style={{ fontSize:12, color:'var(--blue)', fontWeight:600, marginTop:4 }}>Votar →</div>
+                </div>
+              </div>
+              {t.descricao && (
+                <p style={{ fontSize:13, color:'var(--gray-500)', margin:'8px 0 0', lineHeight:1.5,
+                  display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+                  {t.descricao}
+                </p>
+              )}
+            </div>
+          ))
+        }
+      </div>
+    )
+  }
 
   // ── CHAMADOS ───────────────────────────────────────────────
   if (view === 'chamados') return (
