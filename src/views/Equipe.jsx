@@ -167,36 +167,79 @@ export default function Equipe({ view, onToast }) {
 
           {ticketsFiltrados.length === 0
             ? <div className="empty-state">Nenhum chamado encontrado com esses filtros.</div>
-            : ticketsFiltrados.map(t => (
-              <div key={t.id} onClick={() => setTicketSel(t)} className="ticket-card" style={{ cursor:'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow='var(--shadow-md)'}
-                onMouseLeave={e => e.currentTarget.style.boxShadow='var(--shadow-sm)'}>
-                <div className="ticket-header">
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
-                      <span className="badge badge-cat">{t.categoria_personalizada||t.categoria}</span>
-                      {t.prioridade && t.prioridade !== 'rotina' && (
-                        <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:5,
-                          background: PRIORIDADES[t.prioridade]?.bg, color: PRIORIDADES[t.prioridade]?.cor }}>
-                          {PRIORIDADES[t.prioridade]?.icon} {PRIORIDADES[t.prioridade]?.label}
+            : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {ticketsFiltrados.map(t => {
+                const prio = t.prioridade && t.prioridade !== 'rotina' ? PRIORIDADES[t.prioridade] : null
+                const accentColor = prio?.cor || (t.status==='concluido' ? 'var(--emerald)' : t.aprovacao_status==='aguardando' ? 'var(--amber)' : 'var(--blue)')
+                return (
+                  <div key={t.id} onClick={() => setTicketSel(t)}
+                    style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
+                      borderLeft:`3px solid ${accentColor}`,
+                      padding:'14px 18px', cursor:'pointer', transition:'all .15s', boxShadow:'var(--shadow-sm)' }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow='var(--shadow-md)'; e.currentTarget.style.transform='translateY(-1px)' }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow='var(--shadow-sm)'; e.currentTarget.style.transform='translateY(0)' }}>
+
+                    {/* Linha 1: categoria + badges + status + data */}
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+                      <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
+                        background:'var(--gray-100)', color:'var(--gray-600)' }}>
+                        {t.categoria_personalizada || t.categoria}
+                      </span>
+                      {prio && (
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:'var(--r-full)',
+                          background:prio.bg, color:prio.cor }}>
+                          {prio.icon} {prio.label}
                         </span>
                       )}
-                      {t.aprovacao_status && <span className={`status-badge ${aprovClass(t.aprovacao_status)}`}>{APROVACAO_LABEL[t.aprovacao_status]}</span>}
+                      {t.aprovacao_status === 'aguardando' && (
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:'var(--r-full)',
+                          background:'var(--amber-bg)', color:'#92400e' }}>
+                          ⏳ Ag. conselheiros
+                        </span>
+                      )}
+                      {t.departamento && (
+                        <span style={{ fontSize:10, fontWeight:600, padding:'3px 8px', borderRadius:'var(--r-full)',
+                          background:'#f5f3ff', color:'#6d28d9' }}>
+                          ⚙ {t.departamento}
+                        </span>
+                      )}
+                      <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:10 }}>
+                        <span className={`status-badge ${statusClass(t.status)}`}>{STATUS_LABEL[t.status]}</span>
+                        <span style={{ fontSize:11, color:'var(--gray-400)', fontFamily:'var(--font-mono)', whiteSpace:'nowrap' }}>
+                          {fmtDate(t.criado_em)}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ fontWeight:700, fontSize:14, color:'var(--gray-800)' }}>
-                      {t.condominios?.nome}{t.bloco?` · Bloco ${t.bloco}`:''}{t.apartamento?` · Ap. ${t.apartamento}`:''}
+
+                    {/* Linha 2: título + solicitante */}
+                    <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12 }}>
+                      <div>
+                        <div style={{ fontSize:14, fontWeight:700, color:'var(--navy)', marginBottom:2 }}>
+                          {t.condominios?.nome}
+                          {t.bloco ? ` · Bloco ${t.bloco}` : ''}
+                          {t.apartamento ? ` · Ap. ${t.apartamento}` : ''}
+                        </div>
+                        {t.nome_solicitante && (
+                          <div style={{ fontSize:12, color:'var(--gray-400)', display:'flex', alignItems:'center', gap:4 }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                            </svg>
+                            {t.nome_solicitante}
+                          </div>
+                        )}
+                      </div>
+                      {t.descricao && (
+                        <p style={{ fontSize:13, color:'var(--gray-500)', margin:0, maxWidth:'55%',
+                          overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2,
+                          WebkitBoxOrient:'vertical', textAlign:'right', lineHeight:1.4 }}>
+                          {t.descricao}
+                        </p>
+                      )}
                     </div>
-                    {t.nome_solicitante && <div style={{ fontSize:13, color:'var(--gray-400)' }}>{t.nome_solicitante}</div>}
                   </div>
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6 }}>
-                    <span className={`status-badge ${statusClass(t.status)}`}>{STATUS_LABEL[t.status]}</span>
-                    <span style={{ fontSize:11, color:'var(--gray-400)', fontFamily:'var(--font-mono)' }}>{fmtDate(t.criado_em)}</span>
-                  </div>
-                </div>
-                <p className="ticket-desc">{t.descricao}</p>
-                <div style={{ fontSize:11, color:'var(--emerald)', marginTop:6, fontWeight:600 }}>Clique para abrir →</div>
-              </div>
-            ))
+                )
+              })}
+            </div>
           }
         </div>
       )}
@@ -205,22 +248,40 @@ export default function Equipe({ view, onToast }) {
       {subTela === 'aprovacao' && (
         <div>
           {tickets.filter(t => t.aprovacao_status === 'aguardando').length === 0
-            ? <div className="empty-state">Nenhum chamado aguardando aprovacao dos conselheiros.</div>
-            : tickets.filter(t => t.aprovacao_status === 'aguardando').map(t => (
-              <div key={t.id} onClick={() => setTicketSel(t)} className="ticket-card" style={{ cursor:'pointer' }}>
-                <div className="ticket-header">
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', gap:8, marginBottom:6 }}>
-                      <span className="badge badge-cat">{t.categoria_personalizada||t.categoria}</span>
-                      <span className="status-badge aprov-aguardando">Pendente aprovacao</span>
+            ? <div className="empty-state">Nenhum chamado aguardando aprovação dos conselheiros.</div>
+            : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {tickets.filter(t => t.aprovacao_status === 'aguardando').map(t => (
+                <div key={t.id} onClick={() => setTicketSel(t)}
+                  style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
+                    borderLeft:'3px solid var(--amber)', padding:'14px 18px', cursor:'pointer',
+                    transition:'all .15s', boxShadow:'var(--shadow-sm)' }}
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow='var(--shadow-md)'; e.currentTarget.style.transform='translateY(-1px)' }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow='var(--shadow-sm)'; e.currentTarget.style.transform='translateY(0)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
+                      background:'var(--gray-100)', color:'var(--gray-600)' }}>
+                      {t.categoria_personalizada || t.categoria}
+                    </span>
+                    <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:'var(--r-full)',
+                      background:'var(--amber-bg)', color:'#92400e' }}>
+                      ⏳ Aguardando votação
+                    </span>
+                    <div style={{ marginLeft:'auto' }}>
+                      <span style={{ fontSize:11, color:'var(--gray-400)', fontFamily:'var(--font-mono)' }}>{fmtDate(t.criado_em)}</span>
                     </div>
-                    <div style={{ fontWeight:700, fontSize:14 }}>{t.condominios?.nome}</div>
                   </div>
-                  <span className={`status-badge ${statusClass(t.status)}`}>{STATUS_LABEL[t.status]}</span>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--navy)', marginBottom:4 }}>
+                    {t.condominios?.nome}{t.bloco?` · Bloco ${t.bloco}`:''}
+                  </div>
+                  {t.descricao && (
+                    <p style={{ fontSize:13, color:'var(--gray-500)', margin:0, lineHeight:1.5,
+                      display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+                      {t.descricao}
+                    </p>
+                  )}
                 </div>
-                <p className="ticket-desc">{t.descricao}</p>
-              </div>
-            ))
+              ))}
+            </div>
           }
         </div>
       )}
