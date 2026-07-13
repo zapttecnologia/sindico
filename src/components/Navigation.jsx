@@ -29,20 +29,20 @@ export default function Navigation({ activeView, onNavigate }) {
     if (!perfil) return []
     if (perfil.papel === 'morador') return [
       { id:'painel',        label:'Painel',        icon:ICONS.home },
-      { id:'novo-chamado',  label:'Novo chamado',  icon:ICONS.plus },
-      { id:'meus-chamados', label:'Meus chamados', icon:ICONS.list },
-      { id:'historico',     label:'Historico',     icon:ICONS.clock },
+      { id:'novo-chamado',  label:'Novo Chamado',  icon:ICONS.plus },
+      { id:'meus-chamados', label:'Meus Chamados', icon:ICONS.list },
+      { id:'historico',     label:'Histórico',     icon:ICONS.clock },
     ]
     if (perfil.papel === 'conselheiro') return [
       { id:'painel',        label:'Painel',        icon:ICONS.home },
-      { id:'aprovacoes',    label:'Aprovacoes',    icon:ICONS.vote },
+      { id:'aprovacoes',    label:'Aprovações',    icon:ICONS.vote },
       { id:'chamados',      label:'Chamados',      icon:ICONS.list },
-      { id:'novo-chamado',  label:'Novo chamado',  icon:ICONS.plus },
+      { id:'novo-chamado',  label:'Novo Chamado',  icon:ICONS.plus },
     ]
     // Papéis departamentais
     const isPaperDept = ['manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros'].includes(perfil.papel)
     if (isPaperDept) return [
-      { id:'meus-chamados', label:'Meus chamados', icon:ICONS.list },
+      { id:'meus-chamados', label:'Meus Chamados', icon:ICONS.list },
     ]
     if (perfil.papel === 'equipe' || perfil.papel === 'admin') return [
       { id:'dashboard',  label:'Painel',        icon:ICONS.home },
