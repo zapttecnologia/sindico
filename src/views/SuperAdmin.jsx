@@ -394,8 +394,11 @@ export default function SuperAdmin({ onToast }) {
 function PainelAdmins({ empresas, onToast }) {
   const [admins, setAdmins] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editando, setEditando] = useState(null) // perfil sendo editado
+  const [editando, setEditando] = useState(null)
   const [salvando, setSalvando] = useState(false)
+  const [busca, setBusca] = useState('')
+  const [filtroEmpresa, setFiltroEmpresa] = useState('todas')
+  const [filtroPapel, setFiltroPapel] = useState('todos')
 
   const carregar = async () => {
     setLoading(true)
@@ -408,6 +411,15 @@ function PainelAdmins({ empresas, onToast }) {
   }
 
   useEffect(() => { carregar() }, [])
+
+  const adminsFiltrados = admins.filter(a => {
+    if (busca && !a.nome?.toLowerCase().includes(busca.toLowerCase()) &&
+        !a.email?.toLowerCase().includes(busca.toLowerCase()) &&
+        !a.codigo_acesso?.toLowerCase().includes(busca.toLowerCase())) return false
+    if (filtroEmpresa !== 'todas' && a.empresa_id !== filtroEmpresa) return false
+    if (filtroPapel !== 'todos' && a.papel !== filtroPapel) return false
+    return true
+  })
 
   const salvar = async () => {
     if (!editando) return
@@ -429,8 +441,37 @@ function PainelAdmins({ empresas, onToast }) {
 
   return (
     <div>
-      <div style={{ marginBottom:16, fontSize:13, color:C.muted }}>
-        {admins.length} administrador{admins.length!==1?'es':''} e síndico{admins.length!==1?'s':''} cadastrado{admins.length!==1?'s':''}
+      {/* Filtros */}
+      <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
+        <input placeholder="Buscar por nome, e-mail ou código..."
+          value={busca} onChange={e=>setBusca(e.target.value)}
+          style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:8,
+            padding:'8px 12px', color:C.text, fontSize:13, width:260, outline:'none' }} />
+        <select value={filtroEmpresa} onChange={e=>setFiltroEmpresa(e.target.value)}
+          style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:8,
+            padding:'8px 12px', color:C.text, fontSize:13, outline:'none' }}>
+          <option value="todas">Todas as empresas</option>
+          {empresas.map(e=><option key={e.id} value={e.id}>{e.nome}</option>)}
+          <option value="">Sem empresa</option>
+        </select>
+        <select value={filtroPapel} onChange={e=>setFiltroPapel(e.target.value)}
+          style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:8,
+            padding:'8px 12px', color:C.text, fontSize:13, outline:'none' }}>
+          <option value="todos">Todos os papéis</option>
+          <option value="admin">Admin</option>
+          <option value="equipe">Equipe / Síndico</option>
+        </select>
+        {(busca||filtroEmpresa!=='todas'||filtroPapel!=='todos') && (
+          <button onClick={()=>{setBusca('');setFiltroEmpresa('todas');setFiltroPapel('todos')}}
+            style={{ background:'none', border:`1px solid ${C.border}`, borderRadius:8,
+              padding:'8px 12px', color:C.muted, fontSize:13, cursor:'pointer' }}>
+            Limpar filtros
+          </button>
+        )}
+      </div>
+
+      <div style={{ marginBottom:12, fontSize:13, color:C.muted }}>
+        {adminsFiltrados.length} de {admins.length} usuário{admins.length!==1?'s':''}
       </div>
 
       {loading && <div style={{ textAlign:'center', color:C.muted, padding:32 }}>Carregando...</div>}
@@ -447,7 +488,7 @@ function PainelAdmins({ empresas, onToast }) {
               </tr>
             </thead>
             <tbody>
-              {admins.map(a => (
+              {adminsFiltrados.map(a => (
                 <tr key={a.id} style={{ borderBottom:`1px solid ${C.border2}` }}>
                   <td style={{ padding:'11px 12px' }}>
                     <div style={{ fontWeight:600, color:C.text }}>{a.nome||'—'}</div>
@@ -459,7 +500,7 @@ function PainelAdmins({ empresas, onToast }) {
                       {a.papel}
                     </span>
                   </td>
-                  <td style={{ padding:'11px 12px', color: a.empresa_id ? C.text : C.muted }}>
+                  <td style={{ padding:'11px 12px', color: a.empresa_id ? C.text : C.red }}>
                     {a.empresa_id ? nomeEmpresa(a.empresa_id) : '⚠ Sem empresa'}
                   </td>
                   <td style={{ padding:'11px 12px', fontFamily:'monospace', color:C.violet, fontSize:12 }}>
@@ -468,16 +509,17 @@ function PainelAdmins({ empresas, onToast }) {
                   <td style={{ padding:'11px 12px' }}>
                     {a.primeiro_acesso===true
                       ? <span style={{ fontSize:10, background:'#2d1a00', color:C.amber, padding:'2px 6px', borderRadius:4, fontWeight:700 }}>1º acesso</span>
-                      : <span style={{ fontSize:10, color:C.green }}>✓ Ativo</span>
-                    }
+                      : <span style={{ fontSize:10, color:C.green }}>✓ Ativo</span>}
                   </td>
                   <td style={{ padding:'11px 12px' }}>
                     <Btn sm variant='ghost' onClick={()=>setEditando({...a})}>Editar</Btn>
                   </td>
                 </tr>
               ))}
-              {admins.length === 0 && (
-                <tr><td colSpan={6} style={{ padding:32, textAlign:'center', color:C.muted }}>Nenhum admin cadastrado.</td></tr>
+              {adminsFiltrados.length === 0 && (
+                <tr><td colSpan={6} style={{ padding:32, textAlign:'center', color:C.muted }}>
+                  Nenhum usuário encontrado com esses filtros.
+                </td></tr>
               )}
             </tbody>
           </table>
