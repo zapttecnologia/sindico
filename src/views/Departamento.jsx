@@ -75,16 +75,29 @@ export default function Departamento({ onToast }) {
       onToast('Informe o motivo da pausa.'); return
     }
     setSalvando(true)
-    const { error } = await supabase.from('solicitacoes').update({
+    const updates = {
       status_departamento: modalStatus.novoStatus,
       status_dept_obs: obs.trim() || null,
       status_dept_atualizado_em: new Date().toISOString(),
-      // Se concluiu, atualiza também o status geral
-      ...(modalStatus.novoStatus === 'concluido' ? { status:'concluido', atualizado_em:new Date().toISOString() } : {}),
-    }).eq('id', modalStatus.ticket.id)
+    }
+    if (modalStatus.novoStatus === 'concluido') {
+      updates.status = 'concluido'
+      updates.atualizado_em = new Date().toISOString()
+    }
+    if (modalStatus.novoStatus === 'em_andamento' && !modalStatus.ticket.status_departamento) {
+      updates.status = 'andamento'
+      updates.atualizado_em = new Date().toISOString()
+    }
+    const { error } = await supabase.from('solicitacoes')
+      .update(updates)
+      .eq('id', modalStatus.ticket.id)
     setSalvando(false)
-    if (error) { onToast('Erro: '+error.message); return }
-    onToast(`Status atualizado: ${STATUS_DEPT[modalStatus.novoStatus]?.label}`)
+    if (error) {
+      console.error('Erro ao atualizar:', error)
+      onToast('Erro: ' + error.message + ' (código: ' + error.code + ')')
+      return
+    }
+    onToast(`✅ ${STATUS_DEPT[modalStatus.novoStatus]?.label || modalStatus.novoStatus}`)
     setModalStatus(null); setObs('')
     await carregar()
   }
