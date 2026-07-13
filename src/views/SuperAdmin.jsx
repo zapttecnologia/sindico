@@ -5,6 +5,13 @@ import SAFinanceiro from './SAFinanceiro'
 
 const TemaCtx = createContext('dark')
 
+// Hook usado por todos os subcomponentes para obter C
+function useTema() {
+  const tema = useContext(TemaCtx)
+  const C = { ...TEMAS[tema], ...CF }
+  return { tema, C }
+}
+
 // ── Design tokens ──────────────────────────────────────────
 const TEMAS = {
   dark: {
@@ -59,6 +66,7 @@ const STATUS_COR = {
 }
 
 function Badge({ label, map }) {
+  const { C } = useTema()
   const c = (map||{})[label] || { bg:'rgba(255,255,255,.06)', color:C.muted }
   return (
     <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em',
@@ -68,6 +76,7 @@ function Badge({ label, map }) {
   )
 }
 function Fld({ label, children }) {
+  const { C } = useTema()
   return (
     <div style={{ marginBottom:14 }}>
       <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.muted,
@@ -101,7 +110,8 @@ function G2({ children }) {
   return <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>{children}</div>
 }
 function Btn({ children, onClick, variant='primary', sm, disabled, style={} }) {
-  const bg = variant==='primary'?C.purple:variant==='danger'?'transparent':'rgba(255,255,255,.06)'
+  const { C } = useTema()
+  const bg = variant==='primary'?C.purple:variant==='danger'?'transparent':tema==='light'?'rgba(0,0,0,.06)':'rgba(255,255,255,.06)'
   const border = variant==='danger'?`1px solid ${C.red}`:`1px solid ${C.border}`
   const color = variant==='danger'?C.red:C.text
   return (
@@ -114,10 +124,11 @@ function Btn({ children, onClick, variant='primary', sm, disabled, style={} }) {
   )
 }
 function Modal({ title, onClose, children, maxWidth=500 }) {
+  const { C } = useTema()
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:80,
       display:'flex', alignItems:'center', justifyContent:'center', padding:16, overflowY:'auto' }}>
-      <div style={{ background:'#161b22', border:`1px solid rgba(255,255,255,.1)`, borderRadius:16,
+      <div style={{ background:C.card||C.surface, border:`1px solid ${C.border}`, borderRadius:16,
         width:'100%', maxWidth, padding:'24px 22px', maxHeight:'92vh', overflowY:'auto' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
           <h3 style={{ margin:0, fontSize:17, fontWeight:700, color:C.text }}>{title}</h3>
@@ -707,6 +718,7 @@ export default function SuperAdmin({ onToast }) {
   )
 }
 function PlanoCardEdicao({ plano, onToast, onSaved }) {
+  const { C } = useTema()
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState({...plano})
   const salvar = async () => {
@@ -741,6 +753,7 @@ function PlanoCardEdicao({ plano, onToast, onSaved }) {
 
 // ── PainelAdmins ──────────────────────────────────────────
 function PainelAdmins({ empresas, onToast }) {
+  const { C } = useTema()
   const [admins, setAdmins] = useState([])
   const [loading, setLoading] = useState(true)
   const [editando, setEditando] = useState(null)
@@ -852,6 +865,7 @@ function PainelAdmins({ empresas, onToast }) {
 
 // ── AdminCodigoEditor ────────────────────────────────────
 function AdminCodigoEditor({ empresaId, onToast }) {
+  const { C } = useTema()
   const [admins, setAdmins] = useState([])
   const [editando, setEditando] = useState({})
   const [salvando, setSalvando] = useState({})
@@ -937,6 +951,7 @@ function AdminCodigoEditor({ empresaId, onToast }) {
 
 // ── EmpresaPanel ──────────────────────────────────────────
 function EmpresaPanel({ empresa, planos, onBack, onToast }) {
+  const { C } = useTema()
   const [aba, setAba] = useState('condominios')
   const [condominios, setCondominios] = useState([])
   const [usuarios, setUsuarios] = useState([])
@@ -1117,6 +1132,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
 
 // ── CondominioCard ────────────────────────────────────────
 function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToast, onRefresh, onEditCondo, onDeleteCondo, onSaveCondo }) {
+  const { C } = useTema()
   const [expandido, setExpandido] = useState(false)
   const [modalUsuario, setModalUsuario] = useState(null)
   const [modalNovaConta, setModalNovaConta] = useState(false)
