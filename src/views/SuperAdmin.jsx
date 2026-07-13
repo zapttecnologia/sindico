@@ -1,24 +1,48 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import SAFinanceiro from './SAFinanceiro'
 
+const TemaCtx = createContext('dark')
+
 // ── Design tokens ──────────────────────────────────────────
-const C = {
-  bg:      '#070b11',
-  sidebar: '#0d1117',
-  surface: '#111827',
-  border:  'rgba(255,255,255,.07)',
-  border2: 'rgba(255,255,255,.04)',
-  text:    '#f1f5f9',
-  muted:   '#64748b',
-  purple:  '#7c3aed',
-  violet:  '#a855f7',
-  green:   '#22c55e',
-  amber:   '#f59e0b',
-  red:     '#ef4444',
-  blue:    '#3b82f6',
+const TEMAS = {
+  dark: {
+    bg:      '#070b11',
+    sidebar: '#0d1117',
+    surface: '#111827',
+    card:    '#161b22',
+    border:  'rgba(255,255,255,.07)',
+    border2: 'rgba(255,255,255,.04)',
+    text:    '#f1f5f9',
+    muted:   '#64748b',
+    inputBg: '#1c2333',
+    selectScheme: 'dark',
+  },
+  light: {
+    bg:      '#f1f5f9',
+    sidebar: '#ffffff',
+    surface: '#ffffff',
+    card:    '#f8fafc',
+    border:  'rgba(0,0,0,.08)',
+    border2: 'rgba(0,0,0,.04)',
+    text:    '#0f172a',
+    muted:   '#64748b',
+    inputBg: '#ffffff',
+    selectScheme: 'light',
+  },
 }
+
+// Cores fixas independentes do tema
+const CF = {
+  purple: '#7c3aed',
+  violet: '#a855f7',
+  green:  '#22c55e',
+  amber:  '#f59e0b',
+  red:    '#ef4444',
+  blue:   '#3b82f6',
+}
+
 const SIDEBAR_W = 240
 
 const PLANO_COR = {
@@ -53,14 +77,23 @@ function Fld({ label, children }) {
   )
 }
 function DI({ value, onChange, type='text', placeholder='', style={} }) {
+  const tema = useContext(TemaCtx)
+  const bg = tema==='light' ? '#ffffff' : '#1c2333'
+  const brd = tema==='light' ? '1px solid rgba(0,0,0,.12)' : '1px solid rgba(255,255,255,.07)'
+  const clr = tema==='light' ? '#0f172a' : '#f1f5f9'
   return <input type={type} value={value||''} placeholder={placeholder} onChange={e=>onChange(e.target.value)}
-    style={{ width:'100%', background:'rgba(255,255,255,.04)', border:`1px solid ${C.border}`, borderRadius:8,
-      padding:'9px 12px', color:C.text, fontSize:13, outline:'none', boxSizing:'border-box', ...style }}/>
+    style={{ width:'100%', background:bg, border:brd, borderRadius:8,
+      padding:'9px 12px', color:clr, fontSize:13, outline:'none', boxSizing:'border-box', ...style }}/>
 }
 function DS({ value, onChange, children }) {
+  const tema = useContext(TemaCtx)
+  const bg = tema==='light' ? '#ffffff' : '#1c2333'
+  const brd = tema==='light' ? '1px solid rgba(0,0,0,.12)' : '1px solid rgba(255,255,255,.07)'
+  const clr = tema==='light' ? '#0f172a' : '#f1f5f9'
   return <select value={value||''} onChange={e=>onChange(e.target.value)}
-    style={{ width:'100%', background:'rgba(255,255,255,.04)', border:`1px solid ${C.border}`, borderRadius:8,
-      padding:'9px 12px', color:C.text, fontSize:13, outline:'none', boxSizing:'border-box' }}>
+    style={{ width:'100%', background:bg, border:brd, borderRadius:8,
+      padding:'9px 12px', color:clr, fontSize:13, outline:'none', boxSizing:'border-box',
+      colorScheme:tema }}>
     {children}
   </select>
 }
@@ -98,6 +131,14 @@ function Modal({ title, onClose, children, maxWidth=500 }) {
 
 export default function SuperAdmin({ onToast }) {
   const { logout } = useAuth()
+  const [tema, setTema] = useState(() => localStorage.getItem('sa_tema') || 'dark')
+  const C = { ...TEMAS[tema], ...CF }
+
+  const toggleTema = () => {
+    const novo = tema === 'dark' ? 'light' : 'dark'
+    setTema(novo)
+    localStorage.setItem('sa_tema', novo)
+  }
   const [empresas, setEmpresas] = useState([])
   const [planos, setPlanos] = useState([])
   const [branding, setBranding] = useState(() => {
@@ -226,6 +267,7 @@ export default function SuperAdmin({ onToast }) {
   }
 
   return (
+    <TemaCtx.Provider value={tema}>
     <div style={{ display:'flex', minHeight:'100vh', background:C.bg, color:C.text, fontFamily:'var(--font-body)' }}>
 
       {/* ── SIDEBAR ── */}
@@ -333,6 +375,13 @@ export default function SuperAdmin({ onToast }) {
           <div style={{ fontSize:12, color:C.muted }}>
             {new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'})}
           </div>
+          <button onClick={toggleTema}
+            title={tema==='dark'?'Mudar para tema claro':'Mudar para tema escuro'}
+            style={{ padding:'5px 12px', background:tema==='dark'?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)',
+              border:`1px solid ${C.border}`, borderRadius:8, color:C.muted,
+              fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontWeight:600 }}>
+            {tema==='dark' ? '☀️ Claro' : '🌙 Escuro'}
+          </button>
           <div style={{ padding:'3px 10px', background:`${corPrimaria}20`, border:`1px solid ${corPrimaria}40`,
             borderRadius:6, fontSize:11, color:corPrimaria, fontWeight:700, letterSpacing:'.08em' }}>
             SUPER ADMIN
@@ -654,10 +703,9 @@ export default function SuperAdmin({ onToast }) {
         </Modal>
       )}
     </div>
+    </TemaCtx.Provider>
   )
 }
-
-// ── PlanoCard editável inline ─────────────────────────────
 function PlanoCardEdicao({ plano, onToast, onSaved }) {
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState({...plano})
