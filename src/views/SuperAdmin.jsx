@@ -68,7 +68,7 @@ const STATUS_COR = {
 }
 
 function Badge({ label, map }) {
-  const { C } = useTema()
+  const { tema, C } = useTema()
   const c = (map||{})[label] || { bg:'rgba(255,255,255,.06)', color:C.muted }
   return (
     <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em',
@@ -78,7 +78,7 @@ function Badge({ label, map }) {
   )
 }
 function Fld({ label, children }) {
-  const { C } = useTema()
+  const { tema, C } = useTema()
   return (
     <div style={{ marginBottom:14 }}>
       <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.muted,
@@ -126,7 +126,7 @@ function Btn({ children, onClick, variant='primary', sm, disabled, style={} }) {
   )
 }
 function Modal({ title, onClose, children, maxWidth=500 }) {
-  const { C } = useTema()
+  const { tema, C } = useTema()
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:80,
       display:'flex', alignItems:'center', justifyContent:'center', padding:16, overflowY:'auto' }}>
@@ -724,7 +724,7 @@ export default function SuperAdmin({ onToast }) {
   )
 }
 function PlanoCardEdicao({ plano, onToast, onSaved }) {
-  const { C } = useTema()
+  const { tema, C } = useTema()
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState({...plano})
   const salvar = async () => {
@@ -759,7 +759,7 @@ function PlanoCardEdicao({ plano, onToast, onSaved }) {
 
 // ── PainelAdmins ──────────────────────────────────────────
 function PainelAdmins({ empresas, onToast }) {
-  const { C } = useTema()
+  const { tema, C } = useTema()
   const [admins, setAdmins] = useState([])
   const [loading, setLoading] = useState(true)
   const [editando, setEditando] = useState(null)
@@ -871,7 +871,7 @@ function PainelAdmins({ empresas, onToast }) {
 
 // ── AdminCodigoEditor ────────────────────────────────────
 function AdminCodigoEditor({ empresaId, onToast }) {
-  const { C } = useTema()
+  const { tema, C } = useTema()
   const [admins, setAdmins] = useState([])
   const [editando, setEditando] = useState({})
   const [salvando, setSalvando] = useState({})
@@ -957,7 +957,7 @@ function AdminCodigoEditor({ empresaId, onToast }) {
 
 // ── EmpresaPanel ──────────────────────────────────────────
 function EmpresaPanel({ empresa, planos, onBack, onToast }) {
-  const { C } = useTema()
+  const { tema, C } = useTema()
   const [aba, setAba] = useState('condominios')
   const [condominios, setCondominios] = useState([])
   const [usuarios, setUsuarios] = useState([])
@@ -1138,7 +1138,7 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
 
 // ── CondominioCard ────────────────────────────────────────
 function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToast, onRefresh, onEditCondo, onDeleteCondo, onSaveCondo }) {
-  const { C } = useTema()
+  const { tema, C } = useTema()
   const [expandido, setExpandido] = useState(false)
   const [modalUsuario, setModalUsuario] = useState(null)
   const [modalNovaConta, setModalNovaConta] = useState(false)
