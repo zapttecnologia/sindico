@@ -244,14 +244,41 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
               </button>
             )}
             {!ticket.aprovacao_status && (
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowEnviarConselheiros(!showEnviarConselheiros)}
-                style={{ borderColor:'var(--amber)', color:'var(--amber)' }}>
-                Enviar para conselheiros
+              <button
+                onClick={() => { setShowEnviarConselheiros(!showEnviarConselheiros); setShowAtribuir(false) }}
+                style={{
+                  display:'inline-flex', alignItems:'center', gap:6,
+                  padding:'7px 14px', borderRadius:'var(--r-md)', fontSize:13, fontWeight:600,
+                  cursor:'pointer', transition:'all .15s', border:'none',
+                  background: showEnviarConselheiros ? 'var(--amber)' : 'var(--amber-bg)',
+                  color: showEnviarConselheiros ? '#fff' : '#92400e',
+                  boxShadow: showEnviarConselheiros ? '0 0 0 3px rgba(245,158,11,.25)' : 'none',
+                }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 12l2 2 4-4"/><rect x="3" y="5" width="18" height="14" rx="2"/>
+                </svg>
+                {showEnviarConselheiros ? '▼ Conselheiros (aberto)' : 'Enviar para conselheiros'}
               </button>
             )}
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowAtribuir(!showAtribuir)}
-              style={{ borderColor:'#5b21b6', color:'#5b21b6' }}>
-              {ticket.departamento ? `Dept: ${DEPARTAMENTOS[ticket.departamento]||ticket.departamento}` : 'Enviar para departamento'}
+            <button
+              onClick={() => { setShowAtribuir(!showAtribuir); setShowEnviarConselheiros(false) }}
+              style={{
+                display:'inline-flex', alignItems:'center', gap:6,
+                padding:'7px 14px', borderRadius:'var(--r-md)', fontSize:13, fontWeight:600,
+                cursor:'pointer', transition:'all .15s', border:'none',
+                background: showAtribuir ? '#7c3aed' : ticket.departamento ? '#f5f3ff' : '#f5f3ff',
+                color: showAtribuir ? '#fff' : '#6d28d9',
+                boxShadow: showAtribuir ? '0 0 0 3px rgba(124,58,237,.2)' : 'none',
+              }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+              </svg>
+              {showAtribuir
+                ? '▼ Departamento (aberto)'
+                : ticket.departamento
+                  ? `✓ ${DEPARTAMENTOS[ticket.departamento]||ticket.departamento}`
+                  : 'Enviar para departamento'
+              }
             </button>
             {ticket.aprovacao_status === 'aguardando' && (
               <>
@@ -264,9 +291,16 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
 
           {/* Atribuição a departamento */}
           {showAtribuir && (
-            <div style={{ marginTop:14, paddingTop:14, borderTop:'1px solid var(--gray-200)' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#5b21b6', marginBottom:12 }}>
-                Enviar para departamento
+            <div style={{ marginTop:14, padding:'18px', background:'#faf5ff',
+              border:'2px solid #7c3aed', borderRadius:'var(--r-lg)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                <div style={{ width:28, height:28, borderRadius:'50%', background:'#7c3aed',
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+                    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                  </svg>
+                </div>
+                <span style={{ fontSize:14, fontWeight:700, color:'#5b21b6' }}>Enviar para departamento</span>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
                 <div className="field" style={{ margin:0 }}>
@@ -303,8 +337,18 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
             </div>
           )}
           {showEnviarConselheiros && (
-            <div style={{ marginTop:14, paddingTop:14, borderTop:'1px solid var(--gray-200)' }}>
-              <div style={{ fontSize:13, fontWeight:600, color:'var(--gray-800)', marginBottom:8 }}>
+            <div style={{ marginTop:14, padding:'18px', background:'#fffbeb',
+              border:'2px solid var(--amber)', borderRadius:'var(--r-lg)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--amber)',
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+                    <path d="M9 12l2 2 4-4"/><rect x="3" y="5" width="18" height="14" rx="2"/>
+                  </svg>
+                </div>
+                <span style={{ fontSize:14, fontWeight:700, color:'#92400e' }}>Enviar para conselheiros</span>
+              </div>
+              <div style={{ fontSize:13, fontWeight:600, color:'#92400e', marginBottom:8 }}>
                 Mensagem para os conselheiros:              </div>
               <textarea className="input" rows={2} value={msgConselheiros}
                 onChange={e => setMsgConselheiros(e.target.value)}
