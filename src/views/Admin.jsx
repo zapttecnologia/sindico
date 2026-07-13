@@ -14,6 +14,7 @@ const PAPEL_LABEL = {
 }
 const PAPEIS = ['morador','conselheiro','equipe','admin','manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros']
 const PAPEIS_MORADORES = ['morador','conselheiro']
+const PAPEIS_DEPARTAMENTO = ['manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros']
 const SIGLAS_DEPT = {
   manutencao:'MAN', limpeza:'LIM', administradora:'ADM',
   portaria:'POR', seguranca:'SEG', zeladoria:'ZEL', terceiros:'TER',
