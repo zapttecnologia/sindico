@@ -163,10 +163,14 @@ export default function Admin({ onToast }) {
   }
 
   const excluirCondo = async (id) => {
-    if (!window.confirm('Excluir este condominio?')) return
+    if (!window.confirm('Excluir este condomínio? Os usuários vinculados serão desassociados mas não excluídos.')) return
+    setSalvando(true)
+    await supabase.from('perfis').update({ condominio_id: null }).eq('condominio_id', id)
+    await supabase.from('blocos').delete().eq('condominio_id', id)
     const { error } = await supabase.from('condominios').delete().eq('id', id)
-    if (error) { onToast('Nao foi possivel excluir: '+error.message); return }
-    onToast('Excluido.'); carregarCondos()
+    setSalvando(false)
+    if (error) { onToast('Não foi possível excluir: '+error.message); return }
+    onToast('Condomínio excluído.'); carregarCondos()
   }
 
   // Blocos
