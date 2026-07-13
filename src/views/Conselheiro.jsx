@@ -140,7 +140,7 @@ export default function Conselheiro({ view, onToast }) {
     ])
     setOrcamentos(orcs||[])
     setVotosExistentes(votos||[])
-    const meu = (votos||[]).find(v => v.conselheiro_id === perfil?.id)
+    const meu = (votos||[]).find(v => v.conselheiro_id === session.user.id)
     setMeuVoto(meu||null)
     if (meu) setOpcaoVoto(meu.voto)
   }
@@ -151,7 +151,7 @@ export default function Conselheiro({ view, onToast }) {
 
     const payload = {
       solicitacao_id: ticketVotando.id,
-      conselheiro_id: perfil.id,
+      conselheiro_id: session.user.id,
       voto: opcaoVoto,
       orcamento_id: orcSel || null,
       observacao: obsVoto.trim() || null,
