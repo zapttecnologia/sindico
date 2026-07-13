@@ -193,110 +193,208 @@ export default function SuperAdmin({ onToast }) {
     />
   )
 
+  const alertas = empresas.filter(e => {
+    if (e.status === 'inadimplente') return true
+    if (e.plano_vencimento) {
+      const dias = Math.ceil((new Date(e.plano_vencimento) - new Date()) / 86400000)
+      if (dias <= 15 && dias >= 0) return true
+    }
+    return false
+  })
+
   return (
-    <div style={{ minHeight:'100vh', background:C.bg, color:C.text, fontFamily:'var(--font-body)' }}>
-      {/* Header */}
-      <div style={{ background:'#13111a', borderBottom:`1px solid #2d2438`,
-        padding:'0 24px', display:'flex', alignItems:'center', gap:12, height:52 }}>
-        <div style={{ width:26, height:26, borderRadius:7, background:C.purple,
-          display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-            <path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/>
-          </svg>
+    <div style={{ minHeight:'100vh', background:'#0a0d14', color:C.text, fontFamily:'var(--font-body)' }}>
+
+      {/* ── TOPBAR ERP ── */}
+      <div style={{ background:'linear-gradient(90deg,#13111a 0%,#1a1035 100%)',
+        borderBottom:'1px solid rgba(124,58,237,.25)', padding:'0 28px',
+        display:'flex', alignItems:'center', gap:16, height:56, position:'sticky', top:0, zIndex:50 }}>
+
+        {/* Logo */}
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:32, height:32, borderRadius:9, background:'linear-gradient(135deg,#7c3aed,#a855f7)',
+            display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+              <path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontFamily:'var(--font-display)', fontWeight:800, fontSize:14, color:'#fff', lineHeight:1 }}>
+              Portal de Chamados
+            </div>
+            <div style={{ fontSize:9, color:'#a855f7', fontWeight:700, letterSpacing:'.12em', textTransform:'uppercase' }}>
+              Central de Administração
+            </div>
+          </div>
         </div>
-        <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:14, color:'#fff' }}>
-          Central de Solicitações
-        </span>
-        <span style={{ fontSize:10, background:'#2d1a4e', color:C.violet,
-          padding:'2px 7px', borderRadius:4, fontWeight:700 }}>SUPER ADMIN</span>
-        <div style={{ flex:1 }}/>
-        <button onClick={logout} style={{ background:'none', border:'none', color:'rgba(255,255,255,.4)',
-          fontSize:13, cursor:'pointer' }}>Sair →</button>
+
+        <div style={{ width:1, height:28, background:'rgba(255,255,255,.1)', margin:'0 4px' }}/>
+
+        {/* Nav tabs integrada */}
+        <nav style={{ display:'flex', gap:2, flex:1 }}>
+          {[
+            { id:'empresas', label:'Clientes', icon:'🏢' },
+            { id:'admins',   label:'Usuários', icon:'👤' },
+            { id:'planos',   label:'Planos',   icon:'💳' },
+          ].map(t => (
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              padding:'6px 14px', borderRadius:7, border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
+              background: tab===t.id ? 'rgba(124,58,237,.3)' : 'transparent',
+              color: tab===t.id ? '#c084fc' : 'rgba(255,255,255,.5)',
+              transition:'all .15s',
+            }}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Info + sair */}
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          {alertas.length > 0 && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 10px',
+              background:'rgba(248,81,73,.15)', border:'1px solid rgba(248,81,73,.3)',
+              borderRadius:6, fontSize:12, color:'#f85149', fontWeight:600 }}>
+              ⚠ {alertas.length} alerta{alertas.length>1?'s':''}
+            </div>
+          )}
+          <div style={{ fontSize:11, color:'rgba(255,255,255,.35)' }}>
+            {new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})}
+          </div>
+          <button onClick={logout} style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)',
+            borderRadius:6, color:'rgba(255,255,255,.6)', padding:'5px 12px', fontSize:12, cursor:'pointer',
+            fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+              <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sair
+          </button>
+        </div>
       </div>
 
-      <div style={{ maxWidth:1200, margin:'0 auto', padding:'24px 20px' }}>
-        {/* KPIs */}
+      <div style={{ padding:'24px 28px', maxWidth:1400, margin:'0 auto' }}>
+
+        {/* ── ALERTAS ── */}
+        {alertas.length > 0 && (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:10, marginBottom:20 }}>
+            {alertas.map(e => {
+              const dias = e.plano_vencimento
+                ? Math.ceil((new Date(e.plano_vencimento)-new Date())/86400000)
+                : null
+              return (
+                <div key={e.id} style={{ background:'rgba(248,81,73,.08)', border:'1px solid rgba(248,81,73,.25)',
+                  borderRadius:10, padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
+                  <span style={{ fontSize:20, flexShrink:0 }}>{e.status==='inadimplente'?'💸':'⏰'}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:700, fontSize:13, color:'#f85149', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                      {e.nome}
+                    </div>
+                    <div style={{ fontSize:11, color:'rgba(255,255,255,.4)', marginTop:2 }}>
+                      {e.status==='inadimplente' ? 'Status: Inadimplente' : `Vence em ${dias} dia${dias!==1?'s':''}`}
+                    </div>
+                  </div>
+                  <Btn sm onClick={()=>setModalEditarEmpresa({...e})}>Ver</Btn>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── KPIs ── */}
         {metricas && (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:10, marginBottom:24 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:12, marginBottom:24 }}>
             {[
-              { l:'Clientes',        v:metricas.total,        c:C.text },
-              { l:'Ativos',          v:metricas.ativas,       c:C.green },
-              { l:'Trial',           v:metricas.trial,        c:C.amber },
-              { l:'Inadimplentes',   v:metricas.inadimplentes,c:C.red },
-              { l:'Condomínios',     v:metricas.condominios,  c:C.blue },
-              { l:'Usuários',        v:metricas.usuarios,     c:C.violet },
-              { l:'Chamados abertos',v:metricas.abertos,      c:C.amber },
+              { l:'Clientes',     v:metricas.total,        c:'#e6edf3', ic:'🏢', bg:'rgba(255,255,255,.04)' },
+              { l:'Ativos',       v:metricas.ativas,       c:'#3fb950', ic:'✅', bg:'rgba(63,185,80,.08)' },
+              { l:'Trial',        v:metricas.trial,        c:'#f59e0b', ic:'🔔', bg:'rgba(245,158,11,.08)' },
+              { l:'Inadimplentes',v:metricas.inadimplentes,c:'#f85149', ic:'⚠',  bg:'rgba(248,81,73,.08)' },
+              { l:'Condomínios',  v:metricas.condominios,  c:'#58a6ff', ic:'🏘',  bg:'rgba(88,166,255,.08)' },
+              { l:'Usuários',     v:metricas.usuarios,     c:'#a78bfa', ic:'👥', bg:'rgba(167,139,250,.08)' },
+              { l:'Em aberto',    v:metricas.abertos,      c:'#f59e0b', ic:'📋', bg:'rgba(245,158,11,.08)' },
             ].map(k=>(
-              <div key={k.l} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:10, padding:'12px 14px' }}>
-                <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:k.c, lineHeight:1 }}>{k.v}</div>
-                <div style={{ fontSize:10, color:C.muted, marginTop:4, fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>{k.l}</div>
+              <div key={k.l} style={{ background:k.bg, border:`1px solid rgba(255,255,255,.06)`,
+                borderRadius:12, padding:'16px 18px', transition:'all .15s', cursor:'default' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                  <span style={{ fontSize:20 }}>{k.ic}</span>
+                </div>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:30, fontWeight:800, color:k.c, lineHeight:1, marginBottom:4 }}>
+                  {k.v}
+                </div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.05em' }}>
+                  {k.l}
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Tabs */}
-        <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:20 }}>
-          {[['empresas','🏢 Clientes'],['admins','👤 Admins'],['planos','💳 Planos']].map(([id,label])=>(
-            <button key={id} onClick={()=>setTab(id)} style={{
-              padding:'9px 18px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
-              color:tab===id?'#fff':C.muted, borderBottom:tab===id?`2px solid ${C.purple}`:'2px solid transparent', marginBottom:-1 }}>
-              {label}
-            </button>
-          ))}
-        </div>
-
         {/* ── ABA CLIENTES ── */}
         {tab==='empresas' && (
           <div>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, gap:10, flexWrap:'wrap' }}>
-              <input placeholder="Buscar empresa..." value={busca} onChange={e=>setBusca(e.target.value)}
-                style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:8,
-                  padding:'8px 12px', color:C.text, fontSize:13, width:240, outline:'none' }} />
-              <Btn onClick={()=>setModalNova(true)}>+ Nova empresa</Btn>
+              <div>
+                <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:'#e6edf3' }}>Clientes</h2>
+                <p style={{ margin:'2px 0 0', fontSize:13, color:C.muted }}>{filtradas.length} empresa{filtradas.length!==1?'s':''} encontrada{filtradas.length!==1?'s':''}</p>
+              </div>
+              <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+                <input placeholder="Buscar empresa..." value={busca} onChange={e=>setBusca(e.target.value)}
+                  style={{ background:'rgba(255,255,255,.06)', border:`1px solid rgba(255,255,255,.1)`, borderRadius:8,
+                    padding:'8px 14px', color:C.text, fontSize:13, width:220, outline:'none' }} />
+                <Btn onClick={()=>setModalNova(true)}>+ Nova empresa</Btn>
+              </div>
             </div>
-            <div style={{ border:`1px solid ${C.border}`, borderRadius:10, overflow:'hidden' }}>
+            <div style={{ background:C.surface, border:`1px solid rgba(255,255,255,.06)`, borderRadius:12, overflow:'hidden' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead>
-                  <tr style={{ background:C.surface, borderBottom:`1px solid ${C.border}` }}>
-                    {['Empresa','Plano','Status','Condomínios','Usuários','Chamados abertos','Criada em',''].map(h=>(
-                      <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:11, fontWeight:700,
-                        color:C.muted, textTransform:'uppercase', letterSpacing:'.04em', whiteSpace:'nowrap' }}>{h}</th>
+                  <tr style={{ background:'rgba(255,255,255,.03)', borderBottom:`1px solid rgba(255,255,255,.06)` }}>
+                    {['Empresa','Plano','Status','Condomínios','Usuários','Em aberto','Criada em','Ações'].map(h=>(
+                      <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:700,
+                        color:'rgba(255,255,255,.35)', textTransform:'uppercase', letterSpacing:'.05em', whiteSpace:'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtradas.length===0 && (
-                    <tr><td colSpan={8} style={{ padding:32, textAlign:'center', color:C.muted }}>Nenhuma empresa cadastrada.</td></tr>
+                    <tr><td colSpan={8} style={{ padding:40, textAlign:'center', color:C.muted }}>Nenhuma empresa encontrada.</td></tr>
                   )}
-                  {filtradas.map(e=>(
-                    <tr key={e.id} style={{ borderBottom:`1px solid ${C.border2}` }}>
-                      <td style={{ padding:'11px 12px' }}>
-                        <div style={{ fontWeight:600, color:C.text }}>{e.nome}</div>
-                        <div style={{ fontSize:11, color:C.muted }}>{e.email_contato||'—'}</div>
-                      </td>
-                      <td style={{ padding:'11px 12px' }}><Badge label={e.plano_nome} map={PLANO_COR}/></td>
-                      <td style={{ padding:'11px 12px' }}><Badge label={e.status} map={STATUS_COR}/></td>
-                      <td style={{ padding:'11px 12px', textAlign:'center', color:C.blue, fontWeight:700 }}>{e.total_condominios}</td>
-                      <td style={{ padding:'11px 12px', textAlign:'center', color:C.violet, fontWeight:700 }}>{e.total_usuarios}</td>
-                      <td style={{ padding:'11px 12px', textAlign:'center', fontWeight:700,
-                        color:e.chamados_abertos>0?C.amber:C.muted }}>{e.chamados_abertos}</td>
-                      <td style={{ padding:'11px 12px', color:C.muted, fontSize:12 }}>
-                        {new Date(e.criado_em).toLocaleDateString('pt-BR')}
-                        {e.plano_vencimento && (
-                          <div style={{ color:new Date(e.plano_vencimento)<new Date()?C.red:C.muted, fontSize:11 }}>
-                            vence {new Date(e.plano_vencimento).toLocaleDateString('pt-BR')}
+                  {filtradas.map((e,i)=>{
+                    const venceEm = e.plano_vencimento
+                      ? Math.ceil((new Date(e.plano_vencimento)-new Date())/86400000)
+                      : null
+                    return (
+                      <tr key={e.id} style={{ borderBottom:`1px solid rgba(255,255,255,.04)`,
+                        background: i%2===0 ? 'transparent' : 'rgba(255,255,255,.015)',
+                        transition:'background .1s' }}
+                        onMouseEnter={el=>el.currentTarget.style.background='rgba(124,58,237,.07)'}
+                        onMouseLeave={el=>el.currentTarget.style.background=i%2===0?'transparent':'rgba(255,255,255,.015)'}>
+                        <td style={{ padding:'13px 14px' }}>
+                          <div style={{ fontWeight:700, color:'#e6edf3', fontSize:14 }}>{e.nome}</div>
+                          <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{e.email_contato||'—'}</div>
+                        </td>
+                        <td style={{ padding:'13px 14px' }}><Badge label={e.plano_nome} map={PLANO_COR}/></td>
+                        <td style={{ padding:'13px 14px' }}><Badge label={e.status} map={STATUS_COR}/></td>
+                        <td style={{ padding:'13px 14px', textAlign:'center', color:C.blue, fontWeight:800, fontSize:16 }}>{e.total_condominios}</td>
+                        <td style={{ padding:'13px 14px', textAlign:'center', color:C.violet, fontWeight:800, fontSize:16 }}>{e.total_usuarios}</td>
+                        <td style={{ padding:'13px 14px', textAlign:'center', fontWeight:800, fontSize:16,
+                          color:e.chamados_abertos>0?C.amber:C.muted }}>{e.chamados_abertos}</td>
+                        <td style={{ padding:'13px 14px' }}>
+                          <div style={{ fontSize:12, color:C.muted }}>{new Date(e.criado_em).toLocaleDateString('pt-BR')}</div>
+                          {venceEm !== null && (
+                            <div style={{ fontSize:11, marginTop:2, fontWeight:600,
+                              color: venceEm<=0?C.red:venceEm<=15?C.amber:'rgba(255,255,255,.3)' }}>
+                              {venceEm<=0?'Vencido':venceEm<=15?`⏰ ${venceEm}d`:``}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding:'13px 14px' }}>
+                          <div style={{ display:'flex', gap:6 }}>
+                            <Btn sm onClick={()=>setEmpresaSel(e)}>Gerenciar</Btn>
+                            <Btn sm variant='ghost' onClick={()=>setModalEditarEmpresa({...e})}>Editar</Btn>
                           </div>
-                        )}
-                      </td>
-                      <td style={{ padding:'11px 12px' }}>
-                        <div style={{ display:'flex', gap:6 }}>
-                          <Btn sm onClick={()=>setEmpresaSel(e)}>Gerenciar</Btn>
-                          <Btn sm variant='ghost' onClick={()=>setModalEditarEmpresa({...e})}>Editar</Btn>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
