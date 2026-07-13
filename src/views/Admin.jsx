@@ -216,6 +216,7 @@ export default function Admin({ onToast }) {
     try {
       await api({ action:'create_user', email:novaConta.email, password:novaConta.senha,
         nome:novaConta.nome, papel:novaConta.papel, codigo_acesso:novaConta.codigo.toUpperCase(),
+        empresa_id: perfil?.empresa_id,
         condominio_id: modalNovaConta, bloco:novaConta.bloco, apartamento:novaConta.apto,
         tipo_ocupacao: novaConta.papel === 'morador' ? novaConta.tipo_ocupacao : null })
       onToast('Usuario criado! Codigo: '+novaConta.codigo.toUpperCase())
