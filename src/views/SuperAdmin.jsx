@@ -383,7 +383,64 @@ export default function SuperAdmin({ onToast }) {
     </div>
   )
 }
+function AdminCodigoEditor({ empresaId, onToast }) {
+  const [admins, setAdmins] = useState([])
+  const [editando, setEditando] = useState({})
+  const [salvando, setSalvando] = useState({})
 
+  useEffect(() => {
+    supabase.from('perfis')
+      .select('id,nome,papel,codigo_acesso')
+      .eq('empresa_id', empresaId)
+      .in('papel', ['admin','equipe'])
+      .then(({ data }) => setAdmins(data || []))
+  }, [empresaId])
+
+  const salvar = async (user) => {
+    const novo = editando[user.id]
+    if (!novo?.trim()) { onToast('Informe o código.'); return }
+    setSalvando(s => ({...s, [user.id]:true}))
+    const { error } = await supabase.from('perfis')
+      .update({ codigo_acesso: novo.toUpperCase().trim() })
+      .eq('id', user.id)
+    setSalvando(s => ({...s, [user.id]:false}))
+    if (error) { onToast('Erro: '+error.message); return }
+    onToast('Código atualizado!')
+    setAdmins(prev => prev.map(u => u.id===user.id ? {...u, codigo_acesso:novo.toUpperCase()} : u))
+    setEditando(e => ({...e, [user.id]:''}))
+  }
+
+  if (!admins.length) return (
+    <p style={{ fontSize:13, color:'#8b949e' }}>Nenhum admin/síndico encontrado.</p>
+  )
+
+  return (
+    <div>
+      {admins.map(u => (
+        <div key={u.id} style={{ marginBottom:12 }}>
+          <div style={{ fontSize:12, color:'#8b949e', marginBottom:4 }}>
+            {u.nome} <span style={{ color: u.papel==='admin' ? '#f59e0b' : '#3fb950', fontWeight:700 }}>({u.papel})</span>
+            {u.codigo_acesso && <span style={{ marginLeft:8, color:'#a78bfa' }}>Atual: {u.codigo_acesso}</span>}
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <input
+              value={editando[u.id] ?? ''}
+              onChange={e => setEditando(ev => ({...ev, [u.id]:e.target.value.toUpperCase()}))}
+              placeholder={u.codigo_acesso || 'Novo código'}
+              style={{ flex:1, background:'#0d1117', border:'1px solid #30363d', borderRadius:7,
+                padding:'8px 11px', color:'#e6edf3', fontSize:13, outline:'none' }}
+            />
+            <button onClick={()=>salvar(u)} disabled={salvando[u.id]}
+              style={{ padding:'8px 14px', background:'#7c3aed', border:'none', borderRadius:7,
+                color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+              {salvando[u.id] ? '...' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 // ── Painel de gestão de uma empresa ────────────────────────
 function EmpresaPanel({ empresa, planos, onBack, onToast }) {
   const [aba, setAba] = useState('condominios')
