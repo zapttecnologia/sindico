@@ -197,6 +197,41 @@ export default function SAFinanceiro({ empresas, planos }) {
     setGerandoPDF(false)
   }
 
+  const [gerandoCobrancas, setGerandoCobrancas] = useState(false)
+
+  const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+  const gerarCobrancasMensais = async () => {
+    const hj = new Date()
+    const mesRef = `${MESES_PT[hj.getMonth()]}/${hj.getFullYear()}`
+    const vencimento = new Date(hj.getFullYear(), hj.getMonth()+1, 10).toISOString().split('T')[0]
+    const empAtivas = empresas.filter(e => e.status === 'ativa')
+    const paraGerar = empAtivas.filter(e => {
+      const pl = planos.find(p => p.nome === e.plano_nome)
+      return pl && Number(pl.valor_mensal) > 0
+    })
+    if (!paraGerar.length) { return }
+    const ok = window.confirm(`Gerar ${paraGerar.length} cobrança${paraGerar.length!==1?'s':''} referente a ${mesRef}?\nVencimento: dia 10 do próximo mês.`)
+    if (!ok) return
+    setGerandoCobrancas(true)
+    let criadas = 0, ignoradas = 0
+    for (const emp of paraGerar) {
+      const { data:exist } = await supabase.from('faturas').select('id').eq('empresa_id', emp.id).eq('referencia', mesRef).maybeSingle()
+      if (exist) { ignoradas++; continue }
+      const pl = planos.find(p => p.nome === emp.plano_nome)
+      await supabase.from('faturas').insert({
+        empresa_id: emp.id,
+        descricao: `Mensalidade ${pl.nome_exibicao}`,
+        valor: Number(pl.valor_mensal),
+        vencimento, referencia: mesRef, status: 'pendente',
+      })
+      criadas++
+    }
+    setGerandoCobrancas(false)
+    await carregar()
+    alert(`✅ ${criadas} cobrança${criadas!==1?'s':''} criada${criadas!==1?'s':''}${ignoradas>0?` · ${ignoradas} já existia${ignoradas!==1?'m':''}`:''}`)
+  }
+
   const criarFatura = async () => {
     if (!form.empresa_id || !form.valor || !form.vencimento) { return }
     setSalvando(true)
@@ -404,11 +439,19 @@ export default function SAFinanceiro({ empresas, planos }) {
                 </button>
               ))}
             </div>
-            <button onClick={()=>setModalNova(true)}
-              style={{ padding:'8px 16px', background:'#7c3aed', border:'none', borderRadius:8,
-                color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
-              + Nova cobrança
-            </button>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={gerarCobrancasMensais} disabled={gerandoCobrancas}
+                style={{ padding:'8px 14px', background:'rgba(34,197,94,.15)', border:'1px solid rgba(34,197,94,.3)',
+                  borderRadius:8, color:'#22c55e', fontSize:13, fontWeight:700, cursor:'pointer',
+                  opacity:gerandoCobrancas?.6:1, display:'flex', alignItems:'center', gap:6 }}>
+                ⚡ {gerandoCobrancas?'Gerando...':'Gerar cobranças do mês'}
+              </button>
+              <button onClick={()=>setModalNova(true)}
+                style={{ padding:'8px 16px', background:'#7c3aed', border:'none', borderRadius:8,
+                  color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                + Nova cobrança
+              </button>
+            </div>
           </div>
 
           <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>

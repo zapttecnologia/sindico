@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { gerarCodigo } from '../lib/constants'
 import ImportarMoradores from '../components/ImportarMoradores'
+import GerenciarCondominio from './GerenciarCondominio'
 
 const PAPEL_LABEL = {
   morador:'Morador', equipe:'Sindico', admin:'Admin', conselheiro:'Conselheiro',
@@ -33,6 +34,7 @@ function TabBar({ tabs, active, onChange }) {
 
 export default function Admin({ onToast }) {
   const { perfil, session } = useAuth()
+  const [condoGerenciando, setCondoGerenciando] = useState(null)
   const [secao, setSecao] = useState('condominios')
   const [condominios, setCondominios] = useState([])
   const [blocos, setBlocos] = useState([])
@@ -222,10 +224,19 @@ export default function Admin({ onToast }) {
     </div>
   )
 
+  // Tela dedicada de gerenciamento do condomínio
+  if (condoGerenciando) return (
+    <GerenciarCondominio
+      condominio={condoGerenciando}
+      onVoltar={() => setCondoGerenciando(null)}
+      onToast={onToast}
+    />
+  )
+
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Condominios</h1>
+        <h1 className="page-title">Condomínios</h1>
       </div>
 
       <TabBar
@@ -265,10 +276,10 @@ export default function Admin({ onToast }) {
                     </div>
                   </div>
                   <div style={{ display:'flex', gap:6 }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => { setCondoExpandido(aberto?null:c.id); if (!aberto) carregarUsuariosCondo(c.id) }}>
-                      {aberto ? '▲ Fechar' : '▼ Gerenciar'}
+                    <button className="btn btn-primary btn-sm" onClick={() => setCondoGerenciando(c)}>
+                      👥 Gerenciar usuários
                     </button>
-                    <button className="btn btn-primary btn-sm" onClick={() => setModalCondo({...c})}>Editar dados</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setModalCondo({...c})}>Editar dados</button>
                     <button className="btn btn-danger btn-sm" onClick={() => excluirCondo(c.id)}>Excluir</button>
                   </div>
                 </div>
