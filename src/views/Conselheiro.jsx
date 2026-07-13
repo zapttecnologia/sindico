@@ -134,13 +134,16 @@ export default function Conselheiro({ view, onToast }) {
     setOpcaoVoto(null); setOrcSel(null); setObsVoto('')
     const [{ data:orcs }, { data:votos }] = await Promise.all([
       supabase.from('orcamentos').select('*').eq('solicitacao_id', ticket.id).order('numero'),
-      supabase.from('votos_conselheiros')
-        .select('*, perfis(nome)')
-        .eq('solicitacao_id', ticket.id),
+      supabase.from('votos_conselheiros').select('*').eq('solicitacao_id', ticket.id),
     ])
+    // Buscar nomes dos conselheiros separadamente
+    const votosComNome = await Promise.all((votos||[]).map(async v => {
+      const { data:p } = await supabase.from('perfis').select('nome').eq('id', v.conselheiro_id).maybeSingle()
+      return { ...v, perfis: p || { nome: 'Conselheiro' } }
+    }))
     setOrcamentos(orcs||[])
-    setVotosExistentes(votos||[])
-    const meu = (votos||[]).find(v => v.conselheiro_id === session.user.id)
+    setVotosExistentes(votosComNome)
+    const meu = votosComNome.find(v => v.conselheiro_id === session.user.id)
     setMeuVoto(meu||null)
     if (meu) setOpcaoVoto(meu.voto)
   }
