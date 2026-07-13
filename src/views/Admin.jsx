@@ -32,6 +32,7 @@ function TabBar({ tabs, active, onChange }) {
 }
 
 export default function Admin({ onToast }) {
+  const { perfil, session } = useAuth()
   const [secao, setSecao] = useState('condominios')
   const [condominios, setCondominios] = useState([])
   const [blocos, setBlocos] = useState([])
