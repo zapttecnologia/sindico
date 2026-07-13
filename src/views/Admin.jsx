@@ -106,7 +106,7 @@ export default function Admin({ onToast }) {
     }
     // Campos de data: string vazia → null
     const CAMPOS_DATA = ['mandato_inicio','mandato_fim','gestao_inicio','seguro_vencimento','plano_vencimento']
-    const dados = { ...novoCondo }
+    const dados = { ...novoCondo, empresa_id: perfil?.empresa_id }
     CAMPOS_DATA.forEach(f => { if (dados[f] === '') dados[f] = null })
     dados.total_unidades = novoCondo.total_unidades ? Number(novoCondo.total_unidades) : null
     dados.ano_construcao = novoCondo.ano_construcao ? Number(novoCondo.ano_construcao) : null
