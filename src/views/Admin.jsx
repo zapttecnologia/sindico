@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import { gerarCodigo } from '../lib/constants'
 import ImportarMoradores from '../components/ImportarMoradores'
 import GerenciarCondominio from './GerenciarCondominio'
+import UsoPlanoBadge from '../components/UsoPlanoBadge'
+import { podeAdicionarCondominio } from '../lib/plano'
 
 const PAPEL_LABEL = {
   morador:'Morador', equipe:'Sindico', admin:'Admin', conselheiro:'Conselheiro',
@@ -94,8 +96,20 @@ export default function Admin({ onToast }) {
 
   // Cadastrar novo condomínio
   const cadastrarCondo = async () => {
-    if (!novoCondo.nome.trim()) { onToast('Informe o nome do condominio.'); return }
+    if (!novoCondo.nome.trim()) { onToast('Informe o nome do condomínio.'); return }
     setSalvando(true)
+    // Verificar limites do plano
+    if (perfil?.empresa_id) {
+      const { pode, motivo } = await podeAdicionarCondominio(
+        perfil.empresa_id,
+        Number(novoCondo.total_unidades) || 0
+      )
+      if (!pode) {
+        setSalvando(false)
+        onToast('❌ ' + motivo)
+        return
+      }
+    }
     const { error } = await supabase.from('condominios').insert({
       ...novoCondo,
       total_unidades: novoCondo.total_unidades ? Number(novoCondo.total_unidades) : null,
@@ -103,7 +117,7 @@ export default function Admin({ onToast }) {
     })
     setSalvando(false)
     if (error) { onToast('Erro: '+error.message); return }
-    onToast('Condominio cadastrado!'); setNovoCondo(CONDO_VAZIO); setSecao('condominios'); carregarCondos()
+    onToast('✅ Condomínio cadastrado!'); setNovoCondo(CONDO_VAZIO); setSecao('condominios'); carregarCondos()
   }
 
   const salvarCondoCompleto = async () => {
@@ -238,6 +252,8 @@ export default function Admin({ onToast }) {
       <div className="page-header">
         <h1 className="page-title">Condomínios</h1>
       </div>
+
+      <UsoPlanoBadge />
 
       <TabBar
         tabs={[{id:'condominios',label:'Condominios',icon:'🏢'},{id:'cadastrar',label:'Cadastrar novo',icon:'➕'}]}

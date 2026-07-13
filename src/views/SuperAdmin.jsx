@@ -561,6 +561,7 @@ export default function SuperAdmin({ onToast }) {
                         <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>
                           {clientes.length} cliente{clientes.length!==1?'s':''}
                           {' · '}Até {p.max_condominios>=999?'∞':p.max_condominios} condos
+                          {p.max_unidades && p.max_unidades < 999999 ? ` · ${p.max_unidades.toLocaleString('pt-BR')} unidades` : ''}
                         </div>
                       </div>
                       <div style={{ maxHeight:160, overflowY:'auto' }}>
@@ -661,14 +662,21 @@ function PlanoCardEdicao({ plano, onToast, onSaved }) {
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState({...plano})
   const salvar = async () => {
-    await supabase.from('planos').update({ nome_exibicao:form.nome_exibicao, max_condominios:Number(form.max_condominios), max_usuarios:Number(form.max_usuarios), valor_mensal:Number(form.valor_mensal), descricao:form.descricao }).eq('id',plano.id)
+    await supabase.from('planos').update({
+      nome_exibicao:form.nome_exibicao,
+      max_condominios:Number(form.max_condominios),
+      max_unidades:Number(form.max_unidades)||999999,
+      max_usuarios:Number(form.max_usuarios),
+      valor_mensal:Number(form.valor_mensal),
+      descricao:form.descricao
+    }).eq('id',plano.id)
     onToast('Plano atualizado.'); setEditando(false); onSaved()
   }
   if (!editando) return <button onClick={()=>setEditando(true)} style={{ background:'none', border:`1px solid ${C.border}`, borderRadius:6, color:C.muted, padding:'3px 10px', fontSize:11, cursor:'pointer' }}>Editar</button>
   return (
     <div style={{ position:'absolute', right:20, top:16, background:'#1a1f2e', border:`1px solid #7c3aed`, borderRadius:10, padding:14, zIndex:10, minWidth:260 }}>
       <div style={{ fontSize:11, color:'#a855f7', fontWeight:700, marginBottom:10 }}>Editando plano</div>
-      {[['nome_exibicao','Nome'],['valor_mensal','Valor/mês'],['max_condominios','Máx. condos'],['max_usuarios','Máx. usuários']].map(([k,l])=>(
+      {[['nome_exibicao','Nome'],['valor_mensal','Valor/mês'],['max_condominios','Máx. condos'],['max_unidades','Máx. unidades'],['max_usuarios','Máx. usuários']].map(([k,l])=>(
         <div key={k} style={{ marginBottom:8 }}>
           <label style={{ fontSize:10, color:C.muted, display:'block', marginBottom:3 }}>{l}</label>
           <input value={form[k]||''} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
