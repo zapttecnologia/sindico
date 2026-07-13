@@ -113,7 +113,7 @@ export default function SuperAdmin({ onToast }) {
   const [modalEditarEmpresa, setModalEditarEmpresa] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const VAZIO = { nome:'', cnpj:'', email_contato:'', telefone_contato:'',
-    plano_nome:'trial', plano_vencimento:'', obs:'', admin_nome:'', admin_email:'', admin_senha:'mudar123' }
+    plano_nome:'trial', plano_vencimento:'', obs:'', admin_nome:'', admin_email:'', admin_senha:'mudar123', admin_codigo:'' }
   const [nova, setNova] = useState(VAZIO)
 
   const carregar = async () => {
@@ -139,7 +139,7 @@ export default function SuperAdmin({ onToast }) {
   useEffect(() => { carregar() }, [])
 
   const criarEmpresa = async () => {
-    if (!nova.nome || !nova.admin_email || !nova.admin_nome) { onToast('Preencha os campos obrigatórios.'); return }
+    if (!nova.nome || !nova.admin_email || !nova.admin_nome || !nova.admin_codigo) { onToast('Preencha todos os campos obrigatórios incluindo o código de acesso.'); return }
     setSalvando(true)
     try {
       const planoObj = planos.find(p=>p.nome===nova.plano_nome)
@@ -158,7 +158,7 @@ export default function SuperAdmin({ onToast }) {
         headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token}` },
         body: JSON.stringify({ action:'create_user', email:nova.admin_email, password:nova.admin_senha,
           nome:nova.admin_nome, papel:'admin', empresa_id:emp.id,
-          codigo_acesso:'ADMIN'+emp.id.slice(-4).toUpperCase() }),
+          codigo_acesso: nova.admin_codigo.toUpperCase() }),
       })
       const json = await resp.json()
       if (!resp.ok) throw new Error(json.error)
@@ -335,7 +335,10 @@ export default function SuperAdmin({ onToast }) {
             <Fld label="Nome *"><DI value={nova.admin_nome} onChange={v=>setNova(x=>({...x,admin_nome:v}))} /></Fld>
             <Fld label="E-mail *"><DI value={nova.admin_email} onChange={v=>setNova(x=>({...x,admin_email:v}))} type="email"/></Fld>
           </G2>
-          <Fld label="Senha inicial"><DI value={nova.admin_senha} onChange={v=>setNova(x=>({...x,admin_senha:v}))} /></Fld>
+          <G2>
+            <Fld label="Código de acesso *"><DI value={nova.admin_codigo} onChange={v=>setNova(x=>({...x,admin_codigo:v.toUpperCase()}))} placeholder="Ex.: SINDICO01"/></Fld>
+            <Fld label="Senha inicial"><DI value={nova.admin_senha} onChange={v=>setNova(x=>({...x,admin_senha:v}))} /></Fld>
+          </G2>
           <Btn onClick={criarEmpresa} disabled={salvando} style={{ width:'100%', marginTop:4 }}>
             {salvando?'Criando...':'Criar empresa + admin'}
           </Btn>
