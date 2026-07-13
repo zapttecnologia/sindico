@@ -98,23 +98,20 @@ export default function Admin({ onToast }) {
   const cadastrarCondo = async () => {
     if (!novoCondo.nome.trim()) { onToast('Informe o nome do condomínio.'); return }
     setSalvando(true)
-    // Verificar limites do plano
     if (perfil?.empresa_id) {
       const { pode, motivo } = await podeAdicionarCondominio(
-        perfil.empresa_id,
-        Number(novoCondo.total_unidades) || 0
+        perfil.empresa_id, Number(novoCondo.total_unidades) || 0
       )
-      if (!pode) {
-        setSalvando(false)
-        onToast('❌ ' + motivo)
-        return
-      }
+      if (!pode) { setSalvando(false); onToast('❌ ' + motivo); return }
     }
-    const { error } = await supabase.from('condominios').insert({
-      ...novoCondo,
-      total_unidades: novoCondo.total_unidades ? Number(novoCondo.total_unidades) : null,
-      ano_construcao: novoCondo.ano_construcao ? Number(novoCondo.ano_construcao) : null,
-    })
+    // Campos de data: string vazia → null
+    const CAMPOS_DATA = ['mandato_inicio','mandato_fim','gestao_inicio','seguro_vencimento','plano_vencimento']
+    const dados = { ...novoCondo }
+    CAMPOS_DATA.forEach(f => { if (dados[f] === '') dados[f] = null })
+    dados.total_unidades = novoCondo.total_unidades ? Number(novoCondo.total_unidades) : null
+    dados.ano_construcao = novoCondo.ano_construcao ? Number(novoCondo.ano_construcao) : null
+
+    const { error } = await supabase.from('condominios').insert(dados)
     setSalvando(false)
     if (error) { onToast('Erro: '+error.message); return }
     onToast('✅ Condomínio cadastrado!'); setNovoCondo(CONDO_VAZIO); setSecao('condominios'); carregarCondos()
