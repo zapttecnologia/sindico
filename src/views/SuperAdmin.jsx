@@ -372,8 +372,9 @@ export default function SuperAdmin({ onToast }) {
           <Fld label="Obs."><DI value={modalEditarEmpresa.obs||''} onChange={v=>setModalEditarEmpresa(m=>({...m,obs:v}))} /></Fld>
           <Btn onClick={salvarEmpresa} style={{ width:'100%' }}>Salvar dados da empresa</Btn>
 
-          <div style={{ borderTop:'1px solid #30363d', marginTop:20, paddingTop:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#8b949e', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
+          {/* Seção: alterar código de acesso do admin */}
+          <div style={{ borderTop:`1px solid #30363d`, marginTop:20, paddingTop:20 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
               Código de acesso do admin
             </div>
             <AdminCodigoEditor empresaId={modalEditarEmpresa.id} onToast={onToast} />
@@ -383,64 +384,122 @@ export default function SuperAdmin({ onToast }) {
     </div>
   )
 }
+
+// ── Editor de código do admin da empresa ───────────────────
 function AdminCodigoEditor({ empresaId, onToast }) {
   const [admins, setAdmins] = useState([])
   const [editando, setEditando] = useState({})
   const [salvando, setSalvando] = useState({})
+  const [showCriar, setShowCriar] = useState(false)
+  const [novoAdmin, setNovoAdmin] = useState({ nome:'', email:'', codigo:'', senha:'mudar123' })
+  const [criando, setCriando] = useState(false)
 
-  useEffect(() => {
-    supabase.from('perfis')
-      .select('id,nome,papel,codigo_acesso')
+  const carregar = async () => {
+    const { data } = await supabase.from('perfis')
+      .select('id,nome,papel,codigo_acesso,email')
       .eq('empresa_id', empresaId)
       .in('papel', ['admin','equipe'])
-      .then(({ data }) => setAdmins(data || []))
-  }, [empresaId])
+    setAdmins(data || [])
+  }
+
+  useEffect(() => { carregar() }, [empresaId])
 
   const salvar = async (user) => {
     const novo = editando[user.id]
     if (!novo?.trim()) { onToast('Informe o código.'); return }
     setSalvando(s => ({...s, [user.id]:true}))
     const { error } = await supabase.from('perfis')
-      .update({ codigo_acesso: novo.toUpperCase().trim() })
-      .eq('id', user.id)
+      .update({ codigo_acesso: novo.toUpperCase().trim() }).eq('id', user.id)
     setSalvando(s => ({...s, [user.id]:false}))
     if (error) { onToast('Erro: '+error.message); return }
     onToast('Código atualizado!')
-    setAdmins(prev => prev.map(u => u.id===user.id ? {...u, codigo_acesso:novo.toUpperCase()} : u))
+    await carregar()
     setEditando(e => ({...e, [user.id]:''}))
   }
 
-  if (!admins.length) return (
-    <p style={{ fontSize:13, color:'#8b949e' }}>Nenhum admin/síndico encontrado.</p>
-  )
+  const criarAdmin = async () => {
+    if (!novoAdmin.nome||!novoAdmin.email||!novoAdmin.codigo) { onToast('Preencha todos os campos.'); return }
+    setCriando(true)
+    const sess = (await supabase.auth.getSession()).data.session
+    const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${sess?.access_token}` },
+      body: JSON.stringify({ action:'create_user', email:novoAdmin.email, password:novoAdmin.senha,
+        nome:novoAdmin.nome, papel:'admin', empresa_id:empresaId,
+        codigo_acesso:novoAdmin.codigo.toUpperCase() }),
+    })
+    const json = await resp.json()
+    setCriando(false)
+    if (!resp.ok) { onToast('Erro: '+(json.error||'falha')); return }
+    onToast('Admin criado! Código: '+novoAdmin.codigo.toUpperCase())
+    setShowCriar(false)
+    setNovoAdmin({ nome:'', email:'', codigo:'', senha:'mudar123' })
+    await carregar()
+  }
 
   return (
     <div>
       {admins.map(u => (
         <div key={u.id} style={{ marginBottom:12 }}>
-          <div style={{ fontSize:12, color:'#8b949e', marginBottom:4 }}>
-            {u.nome} <span style={{ color: u.papel==='admin' ? '#f59e0b' : '#3fb950', fontWeight:700 }}>({u.papel})</span>
-            {u.codigo_acesso && <span style={{ marginLeft:8, color:'#a78bfa' }}>Atual: {u.codigo_acesso}</span>}
+          <div style={{ fontSize:12, color:C.muted, marginBottom:4 }}>
+            {u.nome||u.email} <span style={{ color:u.papel==='admin'?C.amber:C.green, fontWeight:700 }}>({u.papel})</span>
+            {u.codigo_acesso && <span style={{ marginLeft:8, color:C.violet }}>Atual: <b>{u.codigo_acesso}</b></span>}
           </div>
           <div style={{ display:'flex', gap:8 }}>
-            <input
-              value={editando[u.id] ?? ''}
-              onChange={e => setEditando(ev => ({...ev, [u.id]:e.target.value.toUpperCase()}))}
-              placeholder={u.codigo_acesso || 'Novo código'}
-              style={{ flex:1, background:'#0d1117', border:'1px solid #30363d', borderRadius:7,
-                padding:'8px 11px', color:'#e6edf3', fontSize:13, outline:'none' }}
-            />
+            <input value={editando[u.id]??''} onChange={e=>setEditando(ev=>({...ev,[u.id]:e.target.value.toUpperCase()}))}
+              placeholder="Novo código de acesso"
+              style={{ flex:1, background:'#0d1117', border:`1px solid ${C.border}`, borderRadius:7,
+                padding:'8px 11px', color:C.text, fontSize:13, outline:'none' }} />
             <button onClick={()=>salvar(u)} disabled={salvando[u.id]}
               style={{ padding:'8px 14px', background:'#7c3aed', border:'none', borderRadius:7,
                 color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer' }}>
-              {salvando[u.id] ? '...' : 'Salvar'}
+              {salvando[u.id]?'...':'Salvar'}
             </button>
           </div>
         </div>
       ))}
+
+      {admins.length === 0 && !showCriar && (
+        <p style={{ fontSize:13, color:C.muted, margin:'0 0 10px' }}>Nenhum admin encontrado para esta empresa.</p>
+      )}
+
+      {!showCriar ? (
+        <button onClick={()=>setShowCriar(true)}
+          style={{ fontSize:12, color:C.violet, background:'none', border:`1px solid #7c3aed`,
+            borderRadius:6, padding:'5px 12px', cursor:'pointer', fontWeight:600 }}>
+          + Criar admin para esta empresa
+        </button>
+      ) : (
+        <div style={{ background:'#0d1117', border:`1px solid ${C.border}`, borderRadius:10, padding:14, marginTop:8 }}>
+          <div style={{ fontSize:11, color:C.violet, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>Novo admin</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+            <input value={novoAdmin.nome} onChange={e=>setNovoAdmin(x=>({...x,nome:e.target.value}))} placeholder="Nome *"
+              style={{ background:'#161b22', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:13, outline:'none' }}/>
+            <input value={novoAdmin.email} onChange={e=>setNovoAdmin(x=>({...x,email:e.target.value}))} placeholder="E-mail *" type="email"
+              style={{ background:'#161b22', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:13, outline:'none' }}/>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+            <input value={novoAdmin.codigo} onChange={e=>setNovoAdmin(x=>({...x,codigo:e.target.value.toUpperCase()}))} placeholder="Código de acesso *"
+              style={{ background:'#161b22', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:13, outline:'none' }}/>
+            <input value={novoAdmin.senha} onChange={e=>setNovoAdmin(x=>({...x,senha:e.target.value}))} placeholder="Senha inicial"
+              style={{ background:'#161b22', border:`1px solid ${C.border}`, borderRadius:6, padding:'7px 10px', color:C.text, fontSize:13, outline:'none' }}/>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={criarAdmin} disabled={criando}
+              style={{ padding:'7px 14px', background:'#7c3aed', border:'none', borderRadius:6, color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+              {criando?'Criando...':'Criar admin'}
+            </button>
+            <button onClick={()=>setShowCriar(false)}
+              style={{ padding:'7px 14px', background:'none', border:`1px solid ${C.border}`, borderRadius:6, color:C.muted, fontSize:12, cursor:'pointer' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
 // ── Painel de gestão de uma empresa ────────────────────────
 function EmpresaPanel({ empresa, planos, onBack, onToast }) {
   const [aba, setAba] = useState('condominios')
