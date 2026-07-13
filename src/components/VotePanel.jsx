@@ -70,14 +70,19 @@ export default function VotePanel({ solicitacaoId, aprovacaoStatus, podeVotar, e
     const [{ data:orcs }, { data:vts }] = await Promise.all([
       supabase.from('orcamentos').select('*').eq('solicitacao_id', solicitacaoId).order('numero'),
       supabase.from('votos_conselheiros')
-        .select('*, perfis(nome), orcamentos(fornecedor,numero)')
+        .select('*, orcamentos(fornecedor,numero)')
         .eq('solicitacao_id', solicitacaoId)
         .order('votado_em'),
     ])
     if (orcs) setOrcamentos(orcs)
     if (vts) {
-      setVotos(vts)
-      const meu = vts.find(v => v.conselheiro_id === perfil?.id)
+      // Buscar nomes dos conselheiros via perfis separadamente
+      const vtsComNome = await Promise.all(vts.map(async v => {
+        const { data:p } = await supabase.from('perfis').select('nome').eq('id', v.conselheiro_id).maybeSingle()
+        return { ...v, perfis: p || { nome: 'Conselheiro' } }
+      }))
+      setVotos(vtsComNome)
+      const meu = vtsComNome.find(v => v.conselheiro_id === perfil?.id)
       if (meu) { setMeuVoto(meu.voto); setOrcSel(meu.orcamento_id) }
     }
   }
