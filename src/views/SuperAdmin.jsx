@@ -237,7 +237,7 @@ export default function SuperAdmin({ onToast }) {
 
         {/* Tabs */}
         <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:20 }}>
-          {[['empresas','🏢 Clientes'],['planos','💳 Planos']].map(([id,label])=>(
+          {[['empresas','🏢 Clientes'],['admins','👤 Admins'],['planos','💳 Planos']].map(([id,label])=>(
             <button key={id} onClick={()=>setTab(id)} style={{
               padding:'9px 18px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
               color:tab===id?'#fff':C.muted, borderBottom:tab===id?`2px solid ${C.purple}`:'2px solid transparent', marginBottom:-1 }}>
@@ -301,6 +301,11 @@ export default function SuperAdmin({ onToast }) {
               </table>
             </div>
           </div>
+        )}
+
+        {/* ── ABA ADMINS ── */}
+        {tab==='admins' && (
+          <PainelAdmins empresas={empresas} onToast={onToast} />
         )}
 
         {/* ── ABA PLANOS ── */}
@@ -379,6 +384,128 @@ export default function SuperAdmin({ onToast }) {
             </div>
             <AdminCodigoEditor empresaId={modalEditarEmpresa.id} onToast={onToast} />
           </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Painel de gestão de admins ─────────────────────────────
+function PainelAdmins({ empresas, onToast }) {
+  const [admins, setAdmins] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editando, setEditando] = useState(null) // perfil sendo editado
+  const [salvando, setSalvando] = useState(false)
+
+  const carregar = async () => {
+    setLoading(true)
+    const { data } = await supabase.from('perfis')
+      .select('id,nome,email,papel,codigo_acesso,empresa_id,primeiro_acesso')
+      .in('papel', ['admin','equipe'])
+      .order('criado_em', { ascending:false })
+    setAdmins(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { carregar() }, [])
+
+  const salvar = async () => {
+    if (!editando) return
+    setSalvando(true)
+    const { error } = await supabase.from('perfis').update({
+      nome: editando.nome,
+      codigo_acesso: editando.codigo_acesso?.toUpperCase(),
+      empresa_id: editando.empresa_id || null,
+    }).eq('id', editando.id)
+    setSalvando(false)
+    if (error) { onToast('Erro: '+error.message); return }
+    onToast('Admin atualizado.')
+    setEditando(null)
+    await carregar()
+  }
+
+  const nomeEmpresa = (id) => empresas.find(e=>e.id===id)?.nome || '—'
+  const PAPEL_COR = { admin:C.amber, equipe:C.green }
+
+  return (
+    <div>
+      <div style={{ marginBottom:16, fontSize:13, color:C.muted }}>
+        {admins.length} administrador{admins.length!==1?'es':''} e síndico{admins.length!==1?'s':''} cadastrado{admins.length!==1?'s':''}
+      </div>
+
+      {loading && <div style={{ textAlign:'center', color:C.muted, padding:32 }}>Carregando...</div>}
+
+      {!loading && (
+        <div style={{ border:`1px solid ${C.border}`, borderRadius:10, overflow:'hidden' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead>
+              <tr style={{ background:C.surface, borderBottom:`1px solid ${C.border}` }}>
+                {['Usuário','Papel','Empresa vinculada','Código','Status',''].map(h=>(
+                  <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:11, fontWeight:700,
+                    color:C.muted, textTransform:'uppercase', letterSpacing:'.04em', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {admins.map(a => (
+                <tr key={a.id} style={{ borderBottom:`1px solid ${C.border2}` }}>
+                  <td style={{ padding:'11px 12px' }}>
+                    <div style={{ fontWeight:600, color:C.text }}>{a.nome||'—'}</div>
+                    <div style={{ fontSize:11, color:C.muted }}>{a.email}</div>
+                  </td>
+                  <td style={{ padding:'11px 12px' }}>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:5,
+                      background:'#21262d', color:PAPEL_COR[a.papel]||C.muted, textTransform:'uppercase' }}>
+                      {a.papel}
+                    </span>
+                  </td>
+                  <td style={{ padding:'11px 12px', color: a.empresa_id ? C.text : C.muted }}>
+                    {a.empresa_id ? nomeEmpresa(a.empresa_id) : '⚠ Sem empresa'}
+                  </td>
+                  <td style={{ padding:'11px 12px', fontFamily:'monospace', color:C.violet, fontSize:12 }}>
+                    {a.codigo_acesso || '—'}
+                  </td>
+                  <td style={{ padding:'11px 12px' }}>
+                    {a.primeiro_acesso===true
+                      ? <span style={{ fontSize:10, background:'#2d1a00', color:C.amber, padding:'2px 6px', borderRadius:4, fontWeight:700 }}>1º acesso</span>
+                      : <span style={{ fontSize:10, color:C.green }}>✓ Ativo</span>
+                    }
+                  </td>
+                  <td style={{ padding:'11px 12px' }}>
+                    <Btn sm variant='ghost' onClick={()=>setEditando({...a})}>Editar</Btn>
+                  </td>
+                </tr>
+              ))}
+              {admins.length === 0 && (
+                <tr><td colSpan={6} style={{ padding:32, textAlign:'center', color:C.muted }}>Nenhum admin cadastrado.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Modal editar admin */}
+      {editando && (
+        <Modal title="Editar admin / síndico" onClose={()=>setEditando(null)} maxWidth={440}>
+          <Fld label="Nome">
+            <DI value={editando.nome||''} onChange={v=>setEditando(m=>({...m,nome:v}))} />
+          </Fld>
+          <Fld label="Código de acesso">
+            <DI value={editando.codigo_acesso||''} onChange={v=>setEditando(m=>({...m,codigo_acesso:v.toUpperCase()}))} />
+          </Fld>
+          <Fld label="Empresa vinculada">
+            <DS value={editando.empresa_id||''} onChange={v=>setEditando(m=>({...m,empresa_id:v}))}>
+              <option value="">Sem empresa</option>
+              {empresas.map(e=><option key={e.id} value={e.id}>{e.nome}</option>)}
+            </DS>
+          </Fld>
+          <div style={{ padding:'10px 12px', background:'#1a1f2e', borderRadius:'var(--r-md)',
+            fontSize:12, color:C.muted, marginBottom:16 }}>
+            Ao vincular a uma empresa, este usuário verá <b style={{color:C.text}}>apenas</b> os condominios e chamados dessa empresa.
+          </div>
+          <Btn onClick={salvar} disabled={salvando} style={{ width:'100%' }}>
+            {salvando ? 'Salvando...' : 'Salvar'}
+          </Btn>
         </Modal>
       )}
     </div>
