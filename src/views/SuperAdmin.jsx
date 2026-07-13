@@ -370,7 +370,14 @@ export default function SuperAdmin({ onToast }) {
             <Fld label="Telefone"><DI value={modalEditarEmpresa.telefone_contato||''} onChange={v=>setModalEditarEmpresa(m=>({...m,telefone_contato:v}))} /></Fld>
           </G2>
           <Fld label="Obs."><DI value={modalEditarEmpresa.obs||''} onChange={v=>setModalEditarEmpresa(m=>({...m,obs:v}))} /></Fld>
-          <Btn onClick={salvarEmpresa} style={{ width:'100%' }}>Salvar</Btn>
+          <Btn onClick={salvarEmpresa} style={{ width:'100%' }}>Salvar dados da empresa</Btn>
+
+          <div style={{ borderTop:'1px solid #30363d', marginTop:20, paddingTop:20 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#8b949e', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
+              Código de acesso do admin
+            </div>
+            <AdminCodigoEditor empresaId={modalEditarEmpresa.id} onToast={onToast} />
+          </div>
         </Modal>
       )}
     </div>
