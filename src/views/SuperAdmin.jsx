@@ -556,10 +556,13 @@ export default function SuperAdmin({ onToast }) {
                     )}
                     {empresasFiltradas().map((e,i)=>{
                       const vencEm = e.plano_vencimento ? Math.ceil((new Date(e.plano_vencimento)-new Date())/86400000) : null
+                      const rowBg = tema==='dark'
+                        ? (i%2===0 ? 'transparent' : 'rgba(255,255,255,.015)')
+                        : (i%2===0 ? '#ffffff' : '#fafbfc')
                       return (
-                        <tr key={e.id} style={{ borderBottom:`1px solid ${C.border2}`, transition:'background .1s' }}
-                          onMouseEnter={el=>el.currentTarget.style.background=tema==='dark'?'rgba(255,255,255,.02)':'rgba(0,0,0,.03)'}
-                          onMouseLeave={el=>el.currentTarget.style.background='transparent'}>
+                        <tr key={e.id} style={{ borderBottom:`1px solid ${C.border2}`, background:rowBg, transition:'background .1s' }}
+                          onMouseEnter={el=>el.currentTarget.style.background=tema==='dark'?'rgba(124,58,237,.07)':'#f5f3ff'}
+                          onMouseLeave={el=>el.currentTarget.style.background=rowBg}>
                           <td style={{ padding:'12px 14px' }}>
                             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                               <div style={{ width:32, height:32, borderRadius:8, background:`${corPrimaria}20`,
@@ -824,7 +827,7 @@ function PainelAdmins({ empresas, onToast }) {
             {loading&&<tr><td colSpan={6} style={{ padding:40, textAlign:'center', color:C.muted }}>Carregando...</td></tr>}
             {!loading&&adminsFiltrados.length===0&&<tr><td colSpan={6} style={{ padding:40, textAlign:'center', color:C.muted }}>Nenhum usuário encontrado.</td></tr>}
             {adminsFiltrados.map(a=>(
-              <tr key={a.id} style={{ borderBottom:`1px solid ${C.border2}` }}>
+              <tr key={a.id} style={{ borderBottom:`1px solid ${C.border2}`, background:C.surface }}>
                 <td style={{ padding:'11px 14px' }}>
                   <div style={{ fontWeight:700, color:C.text }}>{a.nome||'—'}</div>
                   <div style={{ fontSize:11, color:C.muted }}>{a.email}</div>
