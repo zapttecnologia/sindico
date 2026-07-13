@@ -11,6 +11,14 @@ export default function Conselheiro({ view, onToast }) {
   const [descricao, setDescricao] = useState('')
   const [loading, setLoading] = useState(false)
   const [confirmNum, setConfirmNum] = useState(null)
+  const [ticketVotando, setTicketVotando] = useState(null)
+  const [orcamentos, setOrcamentos] = useState([])
+  const [votosExistentes, setVotosExistentes] = useState([])
+  const [opcaoVoto, setOpcaoVoto] = useState(null)
+  const [orcSel, setOrcSel] = useState(null)
+  const [obsVoto, setObsVoto] = useState('')
+  const [salvandoVoto, setSalvandoVoto] = useState(false)
+  const [meuVoto, setMeuVoto] = useState(null)
 
   useEffect(() => { setCatSel(null); setDescricao(''); setConfirmNum(null) }, [view])
 
@@ -121,15 +129,6 @@ export default function Conselheiro({ view, onToast }) {
   )
 
   // ── APROVAÇÕES ─────────────────────────────────────────────
-  const [ticketVotando, setTicketVotando] = useState(null)
-  const [orcamentos, setOrcamentos] = useState([])
-  const [votosExistentes, setVotosExistentes] = useState([])
-  const [opcaoVoto, setOpcaoVoto] = useState(null)
-  const [orcSel, setOrcSel] = useState(null)
-  const [obsVoto, setObsVoto] = useState('')
-  const [salvandoVoto, setSalvandoVoto] = useState(false)
-  const [meuVoto, setMeuVoto] = useState(null)
-
   const abrirVotacao = async (ticket) => {
     setTicketVotando(ticket)
     setOpcaoVoto(null); setOrcSel(null); setObsVoto('')
