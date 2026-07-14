@@ -41,6 +41,8 @@ function TabBar({ tabs, active, onChange }) {
 export default function Admin({ onToast }) {
   const { perfil, session } = useAuth()
   const [condoGerenciando, setCondoGerenciando] = useState(null)
+  const [todasCategorias, setTodasCategorias] = useState([])
+  const [catsSelecionadas, setCatsSelecionadas] = useState([])
   const [secao, setSecao] = useState('condominios')
   const [condominios, setCondominios] = useState([])
   const [blocos, setBlocos] = useState([])
@@ -85,7 +87,11 @@ export default function Admin({ onToast }) {
     setUsuariosPorCondo(prev => ({ ...prev, [condoId]: data||[] }))
   }
 
-  useEffect(() => { carregarCondos(); carregarBlocos() }, [])
+  useEffect(() => {
+    carregarCondos(); carregarBlocos()
+    supabase.from('categorias_sistema').select('*').eq('ativo', true).order('ordem')
+      .then(({ data }) => setTodasCategorias(data || []))
+  }, [])
 
   // Auto-código baseado no papel selecionado
   useEffect(() => {
@@ -127,10 +133,19 @@ export default function Admin({ onToast }) {
     dados.total_unidades = novoCondo.total_unidades ? Number(novoCondo.total_unidades) : null
     dados.ano_construcao = novoCondo.ano_construcao ? Number(novoCondo.ano_construcao) : null
 
-    const { error } = await supabase.from('condominios').insert(dados)
+    const { data:novoCond, error } = await supabase.from('condominios').insert(dados).select().single()
     setSalvando(false)
     if (error) { onToast('Erro: '+error.message); return }
-    onToast('✅ Condomínio cadastrado!'); setNovoCondo(CONDO_VAZIO); setSecao('condominios'); carregarCondos()
+
+    // Salvar categorias selecionadas
+    if (novoCond && catsSelecionadas.length > 0) {
+      const vinculos = catsSelecionadas.map(catId => ({
+        condominio_id: novoCond.id, categoria_id: catId, ativo: true
+      }))
+      await supabase.from('categorias_condominio').insert(vinculos)
+    }
+
+    onToast('✅ Condomínio cadastrado!'); setNovoCondo(CONDO_VAZIO); setCatsSelecionadas([]); setSecao('condominios'); carregarCondos()
   }
 
   const salvarCondoCompleto = async () => {
@@ -448,8 +463,38 @@ export default function Admin({ onToast }) {
             </div>
           ))}
 
+          {/* Seleção de categorias */}
+          <div style={{ marginTop:8, marginBottom:20, padding:'18px', background:'var(--gray-50)', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)' }}>
+            <h4 style={{ fontSize:14, fontWeight:700, color:'var(--navy)', margin:'0 0 4px' }}>🗂️ Categorias disponíveis</h4>
+            <p style={{ fontSize:12, color:'var(--gray-400)', margin:'0 0 14px' }}>
+              Selecione quais categorias os moradores deste condomínio poderão usar. Se nenhuma for marcada, todas ficam disponíveis.
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:8 }}>
+              {todasCategorias.map(cat => {
+                const marcada = catsSelecionadas.includes(cat.id)
+                return (
+                  <div key={cat.id} onClick={()=>setCatsSelecionadas(prev =>
+                    marcada ? prev.filter(id=>id!==cat.id) : [...prev, cat.id])}
+                    style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:'var(--r-md)',
+                      border:`1.5px solid ${marcada?'var(--blue)':'var(--gray-200)'}`,
+                      background:marcada?'var(--blue-bg)':'#fff', cursor:'pointer', transition:'all .15s' }}>
+                    <input type="checkbox" checked={marcada} onChange={()=>{}} style={{ width:15, height:15, cursor:'pointer' }}/>
+                    <span style={{ fontSize:18 }}>{cat.icone}</span>
+                    <span style={{ fontSize:13, fontWeight:600, color:marcada?'var(--blue)':'var(--gray-700)' }}>{cat.nome}</span>
+                  </div>
+                )
+              })}
+            </div>
+            {catsSelecionadas.length > 0 && (
+              <div style={{ marginTop:12, display:'flex', gap:8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setCatsSelecionadas([])}>Limpar seleção</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setCatsSelecionadas(todasCategorias.map(c=>c.id))}>Selecionar todas</button>
+              </div>
+            )}
+          </div>
+
           <button className="btn btn-primary btn-block" onClick={cadastrarCondo} disabled={salvando}>
-            {salvando ? 'Cadastrando...' : 'Cadastrar condominio'}
+            {salvando ? 'Cadastrando...' : 'Cadastrar condomínio'}
           </button>
         </div>
       )}

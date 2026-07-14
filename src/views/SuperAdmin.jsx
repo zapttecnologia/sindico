@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import SAFinanceiro from './SAFinanceiro'
+import SACategorias from './SACategorias'
 
 const TemaCtx = createContext('dark')
 
@@ -270,6 +271,7 @@ export default function SuperAdmin({ onToast }) {
     },
     { id:'usuarios',     label:'Usuários',       icon:'👤', section:null },
     { id:'planos',       label:'Planos',         icon:'💳', section:null },
+    { id:'categorias',   label:'Categorias',     icon:'🗂️', section:'Configurações' },
     { id:'financeiro',   label:'Financeiro',     icon:'💰', section:null },
   ]
 
@@ -654,6 +656,7 @@ export default function SuperAdmin({ onToast }) {
 
           {/* ── FINANCEIRO ── */}
           {activeMenu==='financeiro' && <SAFinanceiro empresas={empresas} planos={planos} />}
+          {activeMenu==='categorias' && <SACategorias C={C} tema={tema} onToast={onToast} />}
 
         </div>
       </div>
