@@ -58,9 +58,34 @@ function AppSuperAdmin() {
   return <><SuperAdmin onToast={toast} /><Toast msg={msg} show={show} /></>
 }
 
+function AcessoSuspenso() {
+  const { logout, perfil } = useAuth()
+  return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--navy)', padding:24 }}>
+      <div style={{ maxWidth:460, width:'100%', background:'#fff', borderRadius:16, padding:'36px 32px', textAlign:'center', boxShadow:'0 20px 60px rgba(0,0,0,.3)' }}>
+        <div style={{ width:64, height:64, borderRadius:'50%', background:'#fef2f2', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px', fontSize:30 }}>🔒</div>
+        <h1 style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:800, color:'var(--navy)', margin:'0 0 10px' }}>Acesso temporariamente suspenso</h1>
+        <p style={{ fontSize:14, color:'var(--gray-500)', lineHeight:1.6, margin:'0 0 8px' }}>
+          O acesso deste condomínio está suspenso por pendência financeira. Assim que o pagamento for regularizado, o acesso é liberado automaticamente — <b>nenhum dado é perdido</b>.
+        </p>
+        <p style={{ fontSize:13, color:'var(--gray-400)', lineHeight:1.6, margin:'0 0 24px' }}>
+          Fale com o responsável financeiro do seu condomínio ou com a administradora para regularizar.
+        </p>
+        <button onClick={logout}
+          style={{ padding:'11px 22px', background:'var(--gray-100)', border:'none', borderRadius:10, fontSize:13, fontWeight:700, color:'var(--gray-600)', cursor:'pointer' }}>
+          Sair
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function AppContent() {
-  const { perfil, isSuperAdmin } = useAuth()
+  const { perfil, isSuperAdmin, empresaStatus } = useAuth()
   if (isSuperAdmin) return <AppSuperAdmin />
+  // Bloqueio por billing: empresa suspensa barra todos os papéis, exceto super admin.
+  // Fail-open: só bloqueia com o status explicitamente 'suspensa'.
+  if (empresaStatus === 'suspensa') return <AcessoSuspenso />
   if (perfil?.primeiro_acesso === true) return <AlterarSenha />
   return <AppNormal />
 }
