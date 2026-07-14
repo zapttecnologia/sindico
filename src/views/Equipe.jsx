@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { CATEGORIAS, STATUS_LABEL, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES } from '../lib/constants'
+import { CATEGORIAS, STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES } from '../lib/constants'
 import TicketDetail from '../components/TicketDetail'
 import Dashboard from './Dashboard'
 
@@ -11,6 +11,7 @@ export default function Equipe({ view, onToast }) {
   const [subTela, setSubTela] = useState('lista')
   const [tickets, setTickets] = useState([])
   const [condominios, setCondominios] = useState([])
+  const [categoriasSistema, setCategoriasSistema] = useState([])
   const [condoFiltro, setCondoFiltro] = useState('todos')
   const [catFiltro, setCatFiltro] = useState('todas')
   const [statusFiltro, setStatusFiltro] = useState('todos')
@@ -44,20 +45,25 @@ export default function Equipe({ view, onToast }) {
     const { data } = await supabase.from('solicitacoes')
       .select('*, condominios(nome)').order('criado_em', { ascending:false })
     if (data) setTickets(data)
+    const { data:cats } = await supabase.from('categorias_sistema')
+      .select('nome').eq('ativo', true).order('ordem')
+    if (cats) setCategoriasSistema(cats)
   }
 
   useEffect(() => { carregarCondos(); carregar() }, [])
 
+  const ehPendente = (t) => t.status !== 'resolvido' && t.status !== 'cancelado'
+
   const globalStats = {
     total: tickets.length,
-    pendentes: tickets.filter(t => t.status !== 'concluido').length,
+    pendentes: tickets.filter(ehPendente).length,
     aprovacao: tickets.filter(t => t.aprovacao_status === 'aguardando').length,
   }
 
   const ticketsFiltrados = tickets.filter(t => {
     if (condoFiltro !== 'todos' && t.condominio_id !== condoFiltro) return false
     if (catFiltro !== 'todas' && t.categoria !== catFiltro) return false
-    if (statusFiltro === 'pendentes' && t.status === 'concluido') return false
+    if (statusFiltro === 'pendentes' && !ehPendente(t)) return false
     if (statusFiltro === 'aprovacao' && t.aprovacao_status !== 'aguardando') return false
     if (!['todos','pendentes','aprovacao'].includes(statusFiltro) && t.status !== statusFiltro) return false
     return true
@@ -65,7 +71,7 @@ export default function Equipe({ view, onToast }) {
 
   const filtStats = {
     total: ticketsFiltrados.length,
-    pendentes: ticketsFiltrados.filter(t => t.status !== 'concluido').length,
+    pendentes: ticketsFiltrados.filter(ehPendente).length,
     aprovacao: ticketsFiltrados.filter(t => t.aprovacao_status === 'aguardando').length,
   }
 
@@ -134,7 +140,7 @@ export default function Equipe({ view, onToast }) {
                 <label style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', display:'block', marginBottom:4 }}>Categoria</label>
                 <select className="input" style={{ fontSize:13 }} value={catFiltro} onChange={e => setCatFiltro(e.target.value)}>
                   <option value="todas">Todas</option>
-                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                  {categoriasSistema.map(c => <option key={c.nome} value={c.nome}>{c.nome}</option>)}
                 </select>
               </div>
               <div>
@@ -142,10 +148,8 @@ export default function Equipe({ view, onToast }) {
                 <select className="input" style={{ fontSize:13 }} value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)}>
                   <option value="todos">Todos</option>
                   <option value="pendentes">Pendentes</option>
-                  <option value="recebido">Recebido</option>
-                  <option value="andamento">Em andamento</option>
-                  <option value="concluido">Concluido</option>
-                  <option value="aprovacao">Ag. aprovacao</option>
+                  <option value="aprovacao">Ag. aprovação</option>
+                  {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                 </select>
               </div>
             </div>
@@ -170,7 +174,7 @@ export default function Equipe({ view, onToast }) {
             : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {ticketsFiltrados.map(t => {
                 const prio = t.prioridade && t.prioridade !== 'rotina' ? PRIORIDADES[t.prioridade] : null
-                const accentColor = prio?.cor || (t.status==='concluido' ? 'var(--emerald)' : t.aprovacao_status==='aguardando' ? 'var(--amber)' : 'var(--blue)')
+                const accentColor = prio?.cor || (t.status==='resolvido' ? 'var(--emerald)' : t.aprovacao_status==='aguardando' ? 'var(--amber)' : 'var(--blue)')
                 return (
                   <div key={t.id} onClick={() => setTicketSel(t)}
                     style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
