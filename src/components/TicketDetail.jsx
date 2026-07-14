@@ -14,16 +14,55 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
   const [showEnviarConselheiros, setShowEnviarConselheiros] = useState(false)
   const [msgConselheiros, setMsgConselheiros] = useState('')
   const [orcamentos, setOrcamentos] = useState([
-    { numero:1, fornecedor:'', valor:'', tipo:'servico', materiais:'', data_proposta:'', data_validade:'' },
+    { numero:1, fornecedor:'', fornecedor_id:'', valor:'', tipo:'servico', materiais:'', data_proposta:'', data_validade:'', arquivo:null },
   ])
   const [addOrcamento, setAddOrcamento] = useState(false)
+  const [fornecedores, setFornecedores] = useState([])
+  const [modalForn, setModalForn] = useState(null)   // { idx, razao_social, ... } cadastro rápido; idx = qual orçamento receberá
+
+  // Carrega fornecedores da empresa (para o seletor)
+  useEffect(() => {
+    if (!perfil?.empresa_id) return
+    supabase.from('fornecedores').select('id, razao_social, nome_fantasia')
+      .eq('empresa_id', perfil.empresa_id).eq('ativo', true).order('razao_social')
+      .then(({ data }) => setFornecedores(data || []))
+  }, [perfil?.empresa_id])
 
   const addOrc = () => {
     if (orcamentos.length >= 3) return
-    setOrcamentos(prev => [...prev, { numero:prev.length+1, fornecedor:'', valor:'', tipo:'servico', materiais:'', data_proposta:'', data_validade:'' }])
+    setOrcamentos(prev => [...prev, { numero:prev.length+1, fornecedor:'', fornecedor_id:'', valor:'', tipo:'servico', materiais:'', data_proposta:'', data_validade:'', arquivo:null }])
   }
   const removeOrc = (idx) => setOrcamentos(prev => prev.filter((_,i)=>i!==idx).map((o,i)=>({...o,numero:i+1})))
   const setOrcField = (idx, field, value) => setOrcamentos(prev => prev.map((o,i)=>i===idx?{...o,[field]:value}:o))
+
+  // Ao escolher um fornecedor do select, preenche id + nome (ou libera digitação manual)
+  const escolherFornecedor = (idx, valor) => {
+    if (valor === '__manual__') { setOrcField(idx,'fornecedor_id',''); setOrcField(idx,'fornecedor',''); return }
+    const f = fornecedores.find(x => x.id === valor)
+    setOrcamentos(prev => prev.map((o,i)=> i===idx ? { ...o, fornecedor_id: valor, fornecedor: f ? (f.nome_fantasia || f.razao_social) : o.fornecedor } : o))
+  }
+
+  // Cadastro rápido de fornecedor (mínimo) sem sair do fluxo
+  const salvarFornecedorRapido = async () => {
+    if (!modalForn.razao_social?.trim()) { onToast('Informe o nome do fornecedor.'); return }
+    setSalvando(true)
+    const { data, error } = await supabase.from('fornecedores').insert({
+      empresa_id: perfil.empresa_id,
+      tipo_pessoa: modalForn.tipo_pessoa || 'pj',
+      razao_social: modalForn.razao_social.trim(),
+      cnpj_cpf: modalForn.cnpj_cpf?.trim() || null,
+      telefone: modalForn.telefone?.trim() || null,
+      email: modalForn.email?.trim() || null,
+      ativo: true,
+    }).select().single()
+    setSalvando(false)
+    if (error) { onToast('Erro: ' + error.message); return }
+    // adiciona à lista e já seleciona no orçamento que abriu o cadastro
+    setFornecedores(prev => [...prev, data].sort((a,b)=>a.razao_social.localeCompare(b.razao_social)))
+    const idx = modalForn.idx
+    setOrcamentos(prev => prev.map((o,i)=> i===idx ? { ...o, fornecedor_id:data.id, fornecedor:data.razao_social } : o))
+    onToast('Fornecedor cadastrado!'); setModalForn(null)
+  }
 
   const recarregar = async () => {
     const { data } = await supabase.from('solicitacoes')
@@ -54,18 +93,28 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
     // Salva orçamentos
     if (orcsValidos.length > 0) {
       await supabase.from('orcamentos').delete().eq('solicitacao_id', ticket.id)
-      await supabase.from('orcamentos').insert(
+      const { data: inseridos } = await supabase.from('orcamentos').insert(
         orcsValidos.map(o => ({
           solicitacao_id: ticket.id,
           numero: o.numero,
           fornecedor: o.fornecedor.trim(),
+          fornecedor_id: o.fornecedor_id || null,
           valor: o.valor ? Number(o.valor) : null,
           tipo: o.tipo || 'servico',
           materiais: o.materiais.trim() || null,
           data_proposta: o.data_proposta || null,
           data_validade: o.data_validade || null,
         }))
-      )
+      ).select()
+      // Sobe o PDF (se houver) de cada orçamento, casando pelo número
+      for (const o of orcsValidos) {
+        if (!o.arquivo) continue
+        const orcInserido = (inseridos || []).find(x => x.numero === o.numero)
+        if (!orcInserido) continue
+        const nomeSeguro = `${Date.now()}_${o.arquivo.name}`.replace(/[^a-zA-Z0-9._-]/g, '_')
+        await supabase.storage.from('anexos-solicitacoes')
+          .upload(`${ticket.id}/orcamentos/${orcInserido.id}/${nomeSeguro}`, o.arquivo)
+      }
     }
     // Muda status de aprovação
     const { error } = await supabase.from('solicitacoes')
@@ -379,8 +428,24 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:8 }}>
                       <div className="field" style={{ margin:0 }}>
                         <label style={{ fontSize:11 }}>Fornecedor *</label>
-                        <input className="input" style={{ fontSize:13 }} value={orc.fornecedor}
-                          onChange={e=>setOrcField(idx,'fornecedor',e.target.value)} placeholder="Nome da empresa" />
+                        <select className="input" style={{ fontSize:13 }}
+                          value={orc.fornecedor_id || (orc.fornecedor ? '__manual__' : '')}
+                          onChange={e=>escolherFornecedor(idx, e.target.value)}>
+                          <option value="">Selecione um fornecedor...</option>
+                          {fornecedores.map(f => (
+                            <option key={f.id} value={f.id}>{f.nome_fantasia || f.razao_social}</option>
+                          ))}
+                          <option value="__manual__">✏ Digitar manualmente</option>
+                        </select>
+                        {/* Campo de texto aparece só quando é digitação manual (sem fornecedor selecionado) */}
+                        {!orc.fornecedor_id && (
+                          <input className="input" style={{ fontSize:13, marginTop:6 }} value={orc.fornecedor}
+                            onChange={e=>setOrcField(idx,'fornecedor',e.target.value)} placeholder="Nome da empresa" />
+                        )}
+                        <button type="button" onClick={()=>setModalForn({ idx, tipo_pessoa:'pj', razao_social:'', cnpj_cpf:'', telefone:'', email:'' })}
+                          style={{ background:'none', border:'none', color:'var(--blue)', fontSize:12, fontWeight:600, cursor:'pointer', padding:'4px 0', marginTop:2 }}>
+                          + Cadastrar novo fornecedor
+                        </button>
                       </div>
                       <div className="field" style={{ margin:0 }}>
                         <label style={{ fontSize:11 }}>Valor (R$)</label>
@@ -413,6 +478,20 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
                         <input className="input" style={{ fontSize:13 }} type="date" value={orc.data_validade}
                           onChange={e=>setOrcField(idx,'data_validade',e.target.value)} />
                       </div>
+                    </div>
+                    {/* Anexo da proposta (PDF/imagem) */}
+                    <div className="field" style={{ margin:'8px 0 0' }}>
+                      <label style={{ fontSize:11 }}>Anexar proposta (PDF/imagem)</label>
+                      {orc.arquivo ? (
+                        <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:'var(--gray-600)' }}>
+                          📎 {orc.arquivo.name}
+                          <button type="button" onClick={()=>setOrcField(idx,'arquivo',null)}
+                            style={{ background:'none', border:'none', color:'var(--rust)', cursor:'pointer', fontSize:14 }}>×</button>
+                        </div>
+                      ) : (
+                        <input type="file" accept=".pdf,image/*" style={{ fontSize:13 }}
+                          onChange={e=>{ const f=e.target.files?.[0]; if(f) setOrcField(idx,'arquivo',f); e.target.value='' }} />
+                      )}
                     </div>
                   </div>
                 ))}
@@ -507,6 +586,55 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
           onDecisao={decidirAprovacao}
           onToast={onToast}
         />
+      )}
+
+      {/* Modal: cadastro rápido de fornecedor (sem sair do envio ao conselho) */}
+      {modalForn && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModalForn(null)}>
+          <div className="modal" style={{ maxWidth:440, width:'100%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Novo fornecedor</h3>
+              <button className="modal-close" onClick={() => setModalForn(null)}>×</button>
+            </div>
+            <p style={{ fontSize:12, color:'var(--gray-400)', margin:'0 0 12px' }}>
+              Cadastro rápido. Você pode completar os demais dados depois em “Fornecedores”.
+            </p>
+            <div className="field">
+              <label>Tipo</label>
+              <div style={{ display:'flex', gap:8 }}>
+                {[['pj','Pessoa jurídica'],['pf','Pessoa física']].map(([v,l]) => (
+                  <button key={v} type="button" onClick={() => setModalForn(m=>({...m,tipo_pessoa:v}))}
+                    className={`chip${modalForn.tipo_pessoa===v?' selected':''}`}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <div className="field">
+              <label>{modalForn.tipo_pessoa==='pf' ? 'Nome completo *' : 'Razão social *'}</label>
+              <input className="input" value={modalForn.razao_social} onChange={e=>setModalForn(m=>({...m,razao_social:e.target.value}))}
+                placeholder={modalForn.tipo_pessoa==='pf' ? 'Nome do prestador' : 'Ex.: Elétrica Silva Ltda'} autoFocus />
+            </div>
+            <div className="field">
+              <label>{modalForn.tipo_pessoa==='pf' ? 'CPF' : 'CNPJ'}</label>
+              <input className="input" value={modalForn.cnpj_cpf} onChange={e=>setModalForn(m=>({...m,cnpj_cpf:e.target.value}))} placeholder="Opcional" />
+            </div>
+            <div className="row2" style={{ display:'flex', gap:12 }}>
+              <div className="field" style={{ flex:1 }}>
+                <label>Telefone</label>
+                <input className="input" value={modalForn.telefone} onChange={e=>setModalForn(m=>({...m,telefone:e.target.value}))} placeholder="(00) 00000-0000" />
+              </div>
+              <div className="field" style={{ flex:1 }}>
+                <label>E-mail</label>
+                <input className="input" type="email" value={modalForn.email} onChange={e=>setModalForn(m=>({...m,email:e.target.value}))} placeholder="Opcional" />
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10, marginTop:14 }}>
+              <button className="btn btn-ghost" style={{ flex:1 }} onClick={() => setModalForn(null)}>Cancelar</button>
+              <button className="btn btn-primary" style={{ flex:1 }} onClick={salvarFornecedorRapido} disabled={salvando}>
+                {salvando ? 'Salvando...' : 'Cadastrar e usar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
