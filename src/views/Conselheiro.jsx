@@ -8,7 +8,10 @@ export default function Conselheiro({ view, onToast }) {
   const { perfil, session } = useAuth()
   const [tickets, setTickets] = useState([])
   const [categoriasSistema, setCategoriasSistema] = useState([])
+  const [subcategorias, setSubcategorias] = useState([])   // subcategorias da categoria escolhida
   const [catSel, setCatSel] = useState(null)
+  const [subSel, setSubSel] = useState(null)
+  const [passo, setPasso] = useState(1)                    // 1=categoria, 2=subcategoria, 3=descrição
   const [descricao, setDescricao] = useState('')
   const [loading, setLoading] = useState(false)
   const [confirmNum, setConfirmNum] = useState(null)
@@ -20,8 +23,29 @@ export default function Conselheiro({ view, onToast }) {
   const [obsVoto, setObsVoto] = useState('')
   const [salvandoVoto, setSalvandoVoto] = useState(false)
   const [meuVoto, setMeuVoto] = useState(null)
+  // Filtros da aba Chamados
+  const [fBusca, setFBusca] = useState('')
+  const [fCategoria, setFCategoria] = useState('todas')
+  const [fStatus, setFStatus] = useState('todos')
+  const [fPrioridade, setFPrioridade] = useState('todas')
+  // Filtros da aba Aprovações
+  const [aBusca, setABusca] = useState('')
+  const [aCategoria, setACategoria] = useState('todas')
 
-  useEffect(() => { setCatSel(null); setDescricao(''); setConfirmNum(null) }, [view])
+  useEffect(() => { setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setConfirmNum(null) }, [view])
+
+  // Ao escolher categoria no novo chamado, carrega as subcategorias e avança
+  const escolherCategoria = async (cat) => {
+    setCatSel(cat)
+    setSubSel(null)
+    const { data } = await supabase.from('subcategorias_sistema')
+      .select('id, nome, icone, categoria_id, categorias_sistema(nome)')
+      .eq('ativo', true).order('ordem')
+    // filtra as subcategorias cuja categoria bate pelo nome
+    const doCat = (data || []).filter(s => s.categorias_sistema?.nome === cat)
+    setSubcategorias(doCat)
+    setPasso(doCat.length > 0 ? 2 : 3)   // se não há subcategorias, pula direto para descrição
+  }
 
   const carregar = async () => {
     const { data } = await supabase.from('solicitacoes')
@@ -51,6 +75,8 @@ export default function Conselheiro({ view, onToast }) {
       condominio_id: perfil.condominio_id,
       autor_id: session.user.id,
       categoria: catSel,
+      subcategoria: subSel?.nome || null,
+      subcategoria_id: subSel?.id || null,
       descricao: descricao.trim(),
       origem: 'Portal do conselheiro',
       nome_solicitante: perfil.nome,
@@ -60,7 +86,7 @@ export default function Conselheiro({ view, onToast }) {
     setLoading(false)
     if (error) { onToast('Erro: '+error.message); return }
     setConfirmNum(ticketNumber(data.id))
-    setCatSel(null); setDescricao('')
+    setCatSel(null); setSubSel(null); setPasso(1); setDescricao('')
     await carregar()
   }
 
@@ -145,7 +171,21 @@ export default function Conselheiro({ view, onToast }) {
       const { data:p } = await supabase.from('perfis').select('nome').eq('id', v.conselheiro_id).maybeSingle()
       return { ...v, perfis: p || { nome: 'Conselheiro' } }
     }))
-    setOrcamentos(orcs||[])
+    // Para cada orçamento, lista os anexos (PDF/imagem) enviados pelo síndico.
+    // Bucket é privado → gera URL assinada temporária (respeita a permissão do conselheiro).
+    const orcsComAnexo = await Promise.all((orcs||[]).map(async o => {
+      try {
+        const pasta = `${ticket.id}/orcamentos/${o.id}`
+        const { data:arquivos } = await supabase.storage.from('anexos-solicitacoes').list(pasta)
+        const anexos = await Promise.all((arquivos||[]).filter(a => a.name).map(async a => {
+          const { data:signed } = await supabase.storage.from('anexos-solicitacoes')
+            .createSignedUrl(`${pasta}/${a.name}`, 3600)   // válida por 1h
+          return { nome: a.name, url: signed?.signedUrl }
+        }))
+        return { ...o, anexos: anexos.filter(x => x.url) }
+      } catch { return { ...o, anexos: [] } }
+    }))
+    setOrcamentos(orcsComAnexo)
     setVotosExistentes(votosComNome)
     const meu = votosComNome.find(v => v.conselheiro_id === session.user.id)
     setMeuVoto(meu||null)
@@ -238,6 +278,18 @@ export default function Conselheiro({ view, onToast }) {
                       {o.tipo==='servico'?'Prestação de serviço':'Produto'}
                       {o.materiais?` · ${o.materiais}`:''}
                     </div>
+                    {o.anexos && o.anexos.length > 0 && (
+                      <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:6 }} onClick={e=>e.stopPropagation()}>
+                        {o.anexos.map((a,ai) => (
+                          <a key={ai} href={a.url} target="_blank" rel="noopener noreferrer"
+                            style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11, fontWeight:600,
+                              color:'var(--blue)', background:'var(--blue-bg,#eff6ff)', border:'1px solid var(--blue)',
+                              borderRadius:6, padding:'4px 9px', textDecoration:'none' }}>
+                            📎 Ver proposta
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -322,15 +374,38 @@ export default function Conselheiro({ view, onToast }) {
     )
 
     // Lista de pendentes
+    const pendFiltrados = pendentes.filter(t => {
+      if (aBusca) {
+        const q = aBusca.toLowerCase()
+        if (!(t.descricao||'').toLowerCase().includes(q) && !(t.nome_solicitante||'').toLowerCase().includes(q) && !(t.condominios?.nome||'').toLowerCase().includes(q)) return false
+      }
+      if (aCategoria !== 'todas' && t.categoria !== aCategoria) return false
+      return true
+    })
     return (
       <div>
         {header}
         <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 16px' }}>
           Votação do conselho
         </h2>
+
+        {/* Filtros */}
+        {pendentes.length > 0 && (
+          <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
+            <input className="input" placeholder="Buscar..." value={aBusca} onChange={e=>setABusca(e.target.value)} style={{ maxWidth:220 }}/>
+            <select className="input" value={aCategoria} onChange={e=>setACategoria(e.target.value)} style={{ maxWidth:200 }}>
+              <option value="todas">Todas as categorias</option>
+              {categoriasSistema.map(c=><option key={c.nome} value={c.nome}>{c.nome}</option>)}
+            </select>
+            <span style={{ marginLeft:'auto', fontSize:13, color:'var(--gray-400)' }}>{pendFiltrados.length} aguardando</span>
+          </div>
+        )}
+
         {pendentes.length === 0
           ? <div className="empty-state">✅ Nenhum chamado aguardando seu voto.</div>
-          : pendentes.map(t => (
+          : pendFiltrados.length === 0
+          ? <div className="empty-state">Nenhum resultado com esses filtros.</div>
+          : pendFiltrados.map(t => (
             <div key={t.id} onClick={()=>abrirVotacao(t)}
               style={{ background:'#fff', border:'1px solid var(--gray-200)', borderLeft:'3px solid var(--amber)',
                 borderRadius:'var(--r-lg)', padding:'16px 18px', marginBottom:10, cursor:'pointer',
@@ -367,18 +442,49 @@ export default function Conselheiro({ view, onToast }) {
   }
 
   // ── CHAMADOS ───────────────────────────────────────────────
-  if (view === 'chamados') return (
-    <div>
-      {header}
-      <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 16px' }}>
-        Todos os chamados
-      </h2>
-      {tickets.length===0
-        ? <div className="empty-state">Nenhum chamado.</div>
-        : tickets.map(t=><TicketCard key={t.id} ticket={t} onUpdate={carregar} onToast={onToast} />)
+  if (view === 'chamados') {
+    const STATUS_OPCOES = [['todos','Todos'],['aberto','Aberto'],['em_analise','Em análise'],['em_andamento','Em andamento'],['aguardando_terceiro','Aguardando terceiro'],['resolvido','Resolvido'],['cancelado','Cancelado']]
+    const PRIO_OPCOES = [['todas','Todas'],['baixa','Baixa'],['media','Média'],['alta','Alta'],['urgente','Urgente']]
+    const filtrados = tickets.filter(t => {
+      if (fBusca) {
+        const q = fBusca.toLowerCase()
+        if (!(t.descricao||'').toLowerCase().includes(q) && !(t.nome_solicitante||'').toLowerCase().includes(q) && !(t.categoria||'').toLowerCase().includes(q)) return false
       }
-    </div>
-  )
+      if (fCategoria !== 'todas' && t.categoria !== fCategoria) return false
+      if (fStatus !== 'todos' && t.status !== fStatus) return false
+      if (fPrioridade !== 'todas' && t.prioridade !== fPrioridade) return false
+      return true
+    })
+    return (
+      <div>
+        {header}
+        <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 16px' }}>
+          Todos os chamados
+        </h2>
+
+        {/* Filtros */}
+        <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
+          <input className="input" placeholder="Buscar..." value={fBusca} onChange={e=>setFBusca(e.target.value)} style={{ maxWidth:200 }}/>
+          <select className="input" value={fCategoria} onChange={e=>setFCategoria(e.target.value)} style={{ maxWidth:180 }}>
+            <option value="todas">Todas as categorias</option>
+            {categoriasSistema.map(c=><option key={c.nome} value={c.nome}>{c.nome}</option>)}
+          </select>
+          <select className="input" value={fStatus} onChange={e=>setFStatus(e.target.value)} style={{ maxWidth:170 }}>
+            {STATUS_OPCOES.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+          </select>
+          <select className="input" value={fPrioridade} onChange={e=>setFPrioridade(e.target.value)} style={{ maxWidth:140 }}>
+            {PRIO_OPCOES.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+          </select>
+          <span style={{ marginLeft:'auto', fontSize:13, color:'var(--gray-400)' }}>{filtrados.length} chamado{filtrados.length!==1?'s':''}</span>
+        </div>
+
+        {filtrados.length===0
+          ? <div className="empty-state">Nenhum chamado com esses filtros.</div>
+          : filtrados.map(t=><TicketCard key={t.id} ticket={t} onUpdate={carregar} onToast={onToast} />)
+        }
+      </div>
+    )
+  }
 
   // ── NOVO CHAMADO ───────────────────────────────────────────
   if (view === 'novo-chamado') return (
@@ -397,23 +503,79 @@ export default function Conselheiro({ view, onToast }) {
             #{confirmNum}
           </div>
           <br/>
-          <button className="btn btn-ghost" onClick={()=>setConfirmNum(null)}>Abrir outro</button>
+          <button className="btn btn-ghost" onClick={()=>{ setConfirmNum(null); setPasso(1) }}>Abrir outro</button>
         </div>
       ) : (
         <div className="card">
-          <div className="field">
-            <label>Categoria</label>
-            <div className="chip-row">
-              {categoriasSistema.map(c=><button key={c.nome} className={`chip${catSel===c.nome?' selected':''}`} onClick={()=>setCatSel(c.nome)}>{c.icone?c.icone+' ':''}{c.nome}</button>)}
+          {/* Trilha dos passos */}
+          <div style={{ display:'flex', gap:8, marginBottom:18, fontSize:12, flexWrap:'wrap' }}>
+            {catSel && (
+              <button onClick={()=>{ setPasso(1); setCatSel(null); setSubSel(null) }}
+                style={{ background:'var(--mint)', color:'var(--emerald)', border:'none', borderRadius:'var(--r-full)', padding:'4px 12px', fontWeight:700, cursor:'pointer' }}>
+                {catSel} ✕
+              </button>
+            )}
+            {subSel && (
+              <button onClick={()=>{ setPasso(2); setSubSel(null) }}
+                style={{ background:'var(--mint)', color:'var(--emerald)', border:'none', borderRadius:'var(--r-full)', padding:'4px 12px', fontWeight:700, cursor:'pointer' }}>
+                {subSel.nome} ✕
+              </button>
+            )}
+          </div>
+
+          {/* Passo 1 — Categoria */}
+          {passo === 1 && (
+            <div className="field">
+              <label>1. Escolha a categoria</label>
+              {categoriasSistema.length === 0
+                ? <div className="empty-state">Nenhuma categoria disponível.</div>
+                : <div className="chip-row">
+                    {categoriasSistema.map(c=>(
+                      <button key={c.nome} className="chip" onClick={()=>escolherCategoria(c.nome)}>
+                        {c.icone?c.icone+' ':''}{c.nome}
+                      </button>
+                    ))}
+                  </div>}
             </div>
-          </div>
-          <div className="field">
-            <label>Descricao</label>
-            <textarea className="input" rows={4} value={descricao} onChange={e=>setDescricao(e.target.value)} />
-          </div>
-          <button className="btn btn-primary btn-block" onClick={enviar} disabled={loading||!catSel||!descricao.trim()}>
-            {loading ? 'Enviando...' : 'Enviar chamado'}
-          </button>
+          )}
+
+          {/* Passo 2 — Subcategoria */}
+          {passo === 2 && (
+            <div className="field">
+              <label>2. Escolha a subcategoria</label>
+              <div className="chip-row">
+                {subcategorias.map(s=>(
+                  <button key={s.id} className={`chip${subSel?.id===s.id?' selected':''}`}
+                    onClick={()=>{ setSubSel(s); setPasso(3) }}>
+                    {s.icone?s.icone+' ':''}{s.nome}
+                  </button>
+                ))}
+              </div>
+              <button className="btn btn-ghost btn-sm" style={{ marginTop:10 }} onClick={()=>setPasso(3)}>
+                Pular — não se aplica
+              </button>
+            </div>
+          )}
+
+          {/* Passo 3 — Descrição */}
+          {passo === 3 && (
+            <>
+              <div className="field">
+                <label>3. Descreva o chamado</label>
+                <textarea className="input" rows={4} value={descricao} onChange={e=>setDescricao(e.target.value)}
+                  placeholder="Detalhe o que precisa ser resolvido..." />
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button className="btn" onClick={()=>{ setDescricao('') }} disabled={loading}
+                  style={{ flexShrink:0, background:'var(--gray-100)', color:'var(--gray-600)', border:'none' }}>
+                  Limpar
+                </button>
+                <button className="btn btn-primary" style={{ flex:1 }} onClick={enviar} disabled={loading||!descricao.trim()}>
+                  {loading ? 'Enviando...' : '📨 Enviar chamado'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
