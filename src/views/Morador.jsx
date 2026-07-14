@@ -20,8 +20,6 @@ const CAT_LABEL = {
   'Limpeza':'Limpeza','Portaria':'Portaria','Interfone/Antena':'Interfone',
   'Outros':'Outros','Denuncia':'Denúncia','Sugestao':'Sugestões',
 }
-const CATEGORIAS_CHAMADO = ['Manutencao','Reclamacao','Elevador','Limpeza','Portaria','Interfone/Antena','Outros']
-const CATEGORIAS_EXTRA   = ['Denuncia','Sugestao']
 
 // Para o morador: esconde tudo relacionado a aprovação/conselheiros
 function statusMorador(ticket) {

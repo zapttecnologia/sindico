@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { CATEGORIAS, ticketNumber, fmtDate, STATUS_LABEL, statusClass, APROVACAO_LABEL, aprovClass } from '../lib/constants'
+import { ticketNumber, fmtDate, STATUS_LABEL, statusClass, APROVACAO_LABEL, aprovClass } from '../lib/constants'
 import TicketCard from '../components/TicketCard'
 
 export default function Conselheiro({ view, onToast }) {
   const { perfil, session } = useAuth()
   const [tickets, setTickets] = useState([])
+  const [categoriasSistema, setCategoriasSistema] = useState([])
   const [catSel, setCatSel] = useState(null)
   const [descricao, setDescricao] = useState('')
   const [loading, setLoading] = useState(false)
@@ -28,6 +29,9 @@ export default function Conselheiro({ view, onToast }) {
       .eq('condominio_id', perfil.condominio_id)
       .order('criado_em', { ascending:false })
     if (data) setTickets(data)
+    const { data:cats } = await supabase.from('categorias_sistema')
+      .select('nome, icone').eq('ativo', true).order('ordem')
+    if (cats) setCategoriasSistema(cats)
   }
 
   useEffect(() => { carregar() }, [])
@@ -35,9 +39,9 @@ export default function Conselheiro({ view, onToast }) {
   const pendentes = tickets.filter(t => t.aprovacao_status === 'aguardando').length
   const kpis = {
     total: tickets.length,
-    abertos: tickets.filter(t => t.status !== 'concluido').length,
+    abertos: tickets.filter(t => t.status !== 'resolvido' && t.status !== 'cancelado').length,
     pendentes,
-    concluidos: tickets.filter(t => t.status === 'concluido').length,
+    concluidos: tickets.filter(t => t.status === 'resolvido').length,
   }
 
   const enviar = async () => {
@@ -400,7 +404,7 @@ export default function Conselheiro({ view, onToast }) {
           <div className="field">
             <label>Categoria</label>
             <div className="chip-row">
-              {CATEGORIAS.map(c=><button key={c} className={`chip${catSel===c?' selected':''}`} onClick={()=>setCatSel(c)}>{c}</button>)}
+              {categoriasSistema.map(c=><button key={c.nome} className={`chip${catSel===c.nome?' selected':''}`} onClick={()=>setCatSel(c.nome)}>{c.icone?c.icone+' ':''}{c.nome}</button>)}
             </div>
           </div>
           <div className="field">

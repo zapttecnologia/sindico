@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { CATEGORIAS, STATUS_LABEL, DEPARTAMENTOS, fmtDate } from '../lib/constants'
+import { STATUS_LABEL, DEPARTAMENTOS, fmtDate } from '../lib/constants'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -11,6 +11,7 @@ const hoje = new Date()
 export default function Relatorio({ onToast }) {
   const { perfil } = useAuth()
   const [condominios, setCondominios] = useState([])
+  const [categoriasSistema, setCategoriasSistema] = useState([])
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(false)
   const [gerandoPDF, setGerandoPDF] = useState(false)
@@ -35,6 +36,8 @@ export default function Relatorio({ onToast }) {
       }
     }
     carregarCondos()
+    supabase.from('categorias_sistema').select('nome').eq('ativo', true).order('ordem')
+      .then(({ data }) => { if (data) setCategoriasSistema(data) })
   }, [])
 
   const buscarDados = async () => {
@@ -245,7 +248,7 @@ export default function Relatorio({ onToast }) {
             <label>Categoria</label>
             <select className="input" value={catFiltro} onChange={e=>setCatFiltro(e.target.value)}>
               <option value="todas">Todas</option>
-              {CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}
+              {categoriasSistema.map(c=><option key={c.nome} value={c.nome}>{c.nome}</option>)}
             </select>
           </div>
           <div className="field" style={{ margin:0 }}>

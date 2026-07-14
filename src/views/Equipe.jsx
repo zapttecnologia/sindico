@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { CATEGORIAS, STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES } from '../lib/constants'
+import { STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES } from '../lib/constants'
 import TicketDetail from '../components/TicketDetail'
 import Dashboard from './Dashboard'
 
@@ -316,7 +316,7 @@ export default function Equipe({ view, onToast }) {
             <div className="field"><label>Solicitante</label><input className="input" value={novoNome} onChange={e=>setNovoNome(e.target.value)}/></div>
             <div className="field"><label>Categoria</label>
               <div className="chip-row">
-                {CATEGORIAS.map(c=><button key={c} className={`chip${novaCategoria===c?' selected':''}`} onClick={()=>setNovaCategoria(c)}>{c}</button>)}
+                {categoriasSistema.map(c=><button key={c.nome} className={`chip${novaCategoria===c.nome?' selected':''}`} onClick={()=>setNovaCategoria(c.nome)}>{c.icone?c.icone+' ':''}{c.nome}</button>)}
               </div>
             </div>
             <div className="field"><label>Descricao</label><textarea className="input" rows={3} value={novaDescricao} onChange={e=>setNovaDescricao(e.target.value)}/></div>
