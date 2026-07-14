@@ -40,6 +40,92 @@ function StatusBadge({ status }) {
   )
 }
 
+// Gráfico de barras: faturado vs recebido (6 meses)
+function BarChart6({ dados }) {
+  const max = Math.max(1, ...dados.map(d => Math.max(d.faturado, d.recebido)))
+  const W = 520, H = 200, pad = 28, bw = (W - pad*2) / dados.length
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto' }}>
+      {[0.25,0.5,0.75,1].map(t => (
+        <line key={t} x1={pad} y1={H-30-(H-50)*t} x2={W-pad} y2={H-30-(H-50)*t} stroke="rgba(255,255,255,.06)" strokeWidth="1"/>
+      ))}
+      {dados.map((d,i) => {
+        const x = pad + i*bw
+        const hF = (H-50) * (d.faturado/max)
+        const hR = (H-50) * (d.recebido/max)
+        const w = bw*0.32
+        return (
+          <g key={i}>
+            <rect x={x+bw*0.16} y={H-30-hF} width={w} height={hF} rx="3" fill="#3b82f6" opacity="0.85"/>
+            <rect x={x+bw*0.52} y={H-30-hR} width={w} height={hR} rx="3" fill="#22c55e"/>
+            <text x={x+bw*0.5} y={H-12} fontSize="10" fill="#64748b" textAnchor="middle">{d.mes}</text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// Gráfico donut: composição da receita por plano
+function DonutChart({ dados, total }) {
+  const cores = ['#8b5cf6','#3b82f6','#22c55e','#f59e0b','#ef4444']
+  const R = 70, r = 44, cx = 90, cy = 90
+  let ang = -Math.PI/2
+  const arcos = dados.map((d,i) => {
+    const frac = total>0 ? d.receita/total : 0
+    const a0 = ang, a1 = ang + frac*Math.PI*2
+    ang = a1
+    const x0 = cx+R*Math.cos(a0), y0 = cy+R*Math.sin(a0)
+    const x1 = cx+R*Math.cos(a1), y1 = cy+R*Math.sin(a1)
+    const xi1 = cx+r*Math.cos(a1), yi1 = cy+r*Math.sin(a1)
+    const xi0 = cx+r*Math.cos(a0), yi0 = cy+r*Math.sin(a0)
+    const large = frac > 0.5 ? 1 : 0
+    const path = `M ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1} L ${xi1} ${yi1} A ${r} ${r} 0 ${large} 0 ${xi0} ${yi0} Z`
+    return { path, cor:cores[i%cores.length], nome:d.nome, receita:d.receita, frac }
+  })
+  return (
+    <div style={{ display:'flex', gap:18, alignItems:'center', flexWrap:'wrap' }}>
+      <svg viewBox="0 0 180 180" style={{ width:150, height:150, flexShrink:0 }}>
+        {arcos.map((a,i) => <path key={i} d={a.path} fill={a.cor}/>)}
+      </svg>
+      <div style={{ flex:1, minWidth:140 }}>
+        {arcos.map((a,i) => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            <span style={{ width:10, height:10, borderRadius:2, background:a.cor, display:'inline-block' }}/>
+            <span style={{ fontSize:12, color:'#f1f5f9', flex:1 }}>{a.nome}</span>
+            <span style={{ fontSize:12, fontWeight:700, color:a.cor }}>{Math.round(a.frac*100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Gráfico de linha: fluxo de caixa projetado (30 dias)
+function LineChart30({ dados }) {
+  const W = 520, H = 180, pad = 34
+  if (dados.length === 0) return <div style={{ color:'#64748b', fontSize:13, padding:'20px 0', textAlign:'center' }}>Nenhuma fatura a vencer nos próximos 30 dias.</div>
+  const max = Math.max(1, ...dados.map(d => d.valor))
+  const x0 = new Date().getTime()
+  const xN = x0 + 30*86400000
+  const px = (dt) => pad + (W-pad*2) * ((dt.getTime()-x0)/(xN-x0))
+  const py = (v) => (H-28) - (H-48)*(v/max)
+  const pts = dados.map(d => `${px(d.data)},${py(d.valor)}`)
+  const area = `M ${pad},${H-28} L ${pts.join(' L ')} L ${px(dados[dados.length-1].data)},${H-28} Z`
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto' }}>
+      {[0.25,0.5,0.75,1].map(t => (
+        <line key={t} x1={pad} y1={py(max*t)} x2={W-pad} y2={py(max*t)} stroke="rgba(255,255,255,.06)" strokeWidth="1"/>
+      ))}
+      <path d={area} fill="rgba(139,92,246,.15)"/>
+      <polyline points={pts.join(' ')} fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinejoin="round"/>
+      {dados.map((d,i) => <circle key={i} cx={px(d.data)} cy={py(d.valor)} r="3" fill="#8b5cf6"/>)}
+      <text x={pad} y={H-8} fontSize="10" fill="#64748b">hoje</text>
+      <text x={W-pad} y={H-8} fontSize="10" fill="#64748b" textAnchor="end">+30 dias</text>
+    </svg>
+  )
+}
+
 export default function SAFinanceiro({ empresas, planos }) {
   const [faturas, setFaturas] = useState([])
   const [subSecao, setSubSecao] = useState('overview')
@@ -104,7 +190,33 @@ export default function SAFinanceiro({ empresas, planos }) {
     }
   })
 
-  const [gerandoPDF, setGerandoPDF] = useState(false)
+  // ── Série 6 meses: faturado vs recebido ──────────────────
+  const MESES_ABREV = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
+  const serie6meses = [5,4,3,2,1,0].map(offset => {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth()-offset, 1)
+    const ym = (dt) => dt.getFullYear()*12 + dt.getMonth()
+    const alvo = ym(d)
+    const doMes = faturas.filter(f => { const fd = new Date(f.vencimento); return ym(fd) === alvo })
+    const faturado = doMes.reduce((s,f)=>s+Number(f.valor||0),0)
+    const recebido = doMes.filter(f=>f.status==='pago').reduce((s,f)=>s+Number(f.valor||0),0)
+    return { mes:`${MESES_ABREV[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, faturado, recebido }
+  })
+
+  // ── Fluxo próximos 30 dias: a receber acumulado ──────────
+  const em30dias = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()+30)
+  const aReceber30 = faturas
+    .filter(f => f.status!=='pago' && f.status!=='cancelado' && new Date(f.vencimento) >= hoje && new Date(f.vencimento) <= em30dias)
+    .sort((a,b)=> new Date(a.vencimento) - new Date(b.vencimento))
+  let acc = 0
+  const fluxo30 = aReceber30.map(f => { acc += Number(f.valor||0); return { data:new Date(f.vencimento), valor:acc } })
+  const totalAReceber30 = acc
+
+  // Inadimplência (faturas atrasadas)
+  const totalAtrasado = faturasAtrasadas.reduce((s,f)=>s+Number(f.valor||0),0)
+  const baseInadim = totalAtrasado + totalRecebido
+  const inadimplenciaPct = baseInadim > 0 ? (totalAtrasado / baseInadim * 100) : 0
+
+
 
   const gerarRelatorio = async () => {
     setGerandoPDF(true)
@@ -317,9 +429,44 @@ export default function SAFinanceiro({ empresas, planos }) {
               sub="Clientes em atraso" />
             <KPI label="A receber" value={totalPendente} prefix="R$ " cor="#f59e0b" icon="💸"
               sub={`${faturasPendentes.length} fatura${faturasPendentes.length!==1?'s':''} pendente${faturasPendentes.length!==1?'s':''}`} />
+            <KPI label="Recebido" value={totalRecebido} prefix="R$ " cor="#22c55e" icon="✅"
+              sub="Faturas pagas (total)" />
+            <KPI label="Inadimplência" value={Number(inadimplenciaPct.toFixed(1))} suffix="%" cor={inadimplenciaPct>0?'#ef4444':'#22c55e'} icon="⚠️"
+              sub={`${fmt(totalAtrasado)} em ${faturasAtrasadas.length} fatura${faturasAtrasadas.length!==1?'s':''} atrasada${faturasAtrasadas.length!==1?'s':''}`} />
           </div>
 
-          {/* Receita por plano */}
+          {/* Receitas vs Recebido — 6 meses */}
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'20px 22px', marginBottom:16 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:8 }}>
+              <span style={{ fontSize:14, fontWeight:700, color:C.text }}>Faturado vs Recebido · últimos 6 meses</span>
+              <div style={{ display:'flex', gap:16, fontSize:12 }}>
+                <span style={{ color:C.muted }}><span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:'#3b82f6', marginRight:5 }}/>Faturado</span>
+                <span style={{ color:C.muted }}><span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:'#22c55e', marginRight:5 }}/>Recebido</span>
+              </div>
+            </div>
+            <BarChart6 dados={serie6meses} />
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
+            {/* Composição da receita por plano (donut) */}
+            <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'20px 22px' }}>
+              <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:16 }}>Composição do MRR por plano</div>
+              {receitaPorPlano.length === 0
+                ? <p style={{ color:C.muted, fontSize:13 }}>Sem dados de planos.</p>
+                : <DonutChart dados={receitaPorPlano} total={mrr} />}
+            </div>
+
+            {/* Previsão de fluxo — 30 dias */}
+            <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'20px 22px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:16 }}>
+                <span style={{ fontSize:14, fontWeight:700, color:C.text }}>Fluxo projetado · 30 dias</span>
+                <span style={{ fontSize:13, fontWeight:700, color:'#8b5cf6' }}>{fmt(totalAReceber30)}</span>
+              </div>
+              <LineChart30 dados={fluxo30} />
+            </div>
+          </div>
+
+          {/* Receita por plano (detalhe) */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
             <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'20px 22px' }}>
               <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:16 }}>Receita por plano</div>
