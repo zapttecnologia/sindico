@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { ticketNumber, fmtDate, STATUS_LABEL, STATUS_ORDER, APROVACAO_LABEL, statusClass, aprovClass, DEPARTAMENTOS, PAPEIS_DEPARTAMENTO, PRIORIDADES, STATUS_DEPT } from '../lib/constants'
+import { ticketNumber, fmtDate, STATUS_LABEL, STATUS_ORDER, APROVACAO_LABEL, statusClass, aprovClass, DEPARTAMENTOS, PAPEIS_DEPARTAMENTO, PRIORIDADES, PRIORIDADE_LIST, STATUS_DEPT } from '../lib/constants'
 import ChatPanel from './ChatPanel'
 import AnexosPanel from './AnexosPanel'
 import VotePanel from './VotePanel'
@@ -168,20 +168,23 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
             Nível de prioridade
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {Object.entries(PRIORIDADES).map(([k,p])=>(
-              <button key={k}
-                onClick={async()=>{
-                  await supabase.from('solicitacoes').update({ prioridade:k }).eq('id',ticket.id)
-                  onToast(`Prioridade: ${p.label}`)
-                  await recarregar()
-                }}
-                style={{ padding:'7px 12px', borderRadius:'var(--r-md)', fontWeight:700, fontSize:12, cursor:'pointer',
-                  border: ticket.prioridade===k ? `2px solid ${p.cor}` : '2px solid var(--gray-200)',
-                  background: ticket.prioridade===k ? p.bg : '#fff',
-                  color: ticket.prioridade===k ? p.cor : 'var(--gray-500)' }}>
-                {p.icon} {p.label}
-              </button>
-            ))}
+            {PRIORIDADE_LIST.map(k=>{
+              const p = PRIORIDADES[k]
+              return (
+                <button key={k}
+                  onClick={async()=>{
+                    await supabase.from('solicitacoes').update({ prioridade:k }).eq('id',ticket.id)
+                    onToast(`Prioridade: ${p.label}`)
+                    await recarregar()
+                  }}
+                  style={{ padding:'7px 12px', borderRadius:'var(--r-md)', fontWeight:700, fontSize:12, cursor:'pointer',
+                    border: ticket.prioridade===k ? `2px solid ${p.cor}` : '2px solid var(--gray-200)',
+                    background: ticket.prioridade===k ? p.bg : '#fff',
+                    color: ticket.prioridade===k ? p.cor : 'var(--gray-500)' }}>
+                  {p.icon} {p.label}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
