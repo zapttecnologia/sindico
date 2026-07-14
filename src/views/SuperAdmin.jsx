@@ -284,11 +284,24 @@ export default function SuperAdmin({ onToast }) {
     // (verificarUsoPlano) faz join por plano_id; sem isso o plano antigo persiste.
     const planoObj = planos.find(p=>p.nome===modalEditar.plano_nome)
     const { error } = await supabase.from('empresas').update({
-      nome:modalEditar.nome, cnpj:modalEditar.cnpj,
-      email_contato:modalEditar.email_contato, telefone_contato:modalEditar.telefone_contato,
+      nome:modalEditar.nome,
+      nome_fantasia:modalEditar.nome_fantasia||null,
+      cnpj:modalEditar.cnpj||null,
+      inscricao_estadual:modalEditar.inscricao_estadual||null,
+      email_contato:modalEditar.email_contato||null,
+      telefone_contato:modalEditar.telefone_contato||null,
+      responsavel_nome:modalEditar.responsavel_nome||null,
+      resp_fin_nome:modalEditar.resp_fin_nome||null,
+      resp_fin_email:modalEditar.resp_fin_email||null,
+      resp_fin_telefone:modalEditar.resp_fin_telefone||null,
+      cep:modalEditar.cep||null, logradouro:modalEditar.logradouro||null, bairro:modalEditar.bairro||null,
+      cidade:modalEditar.cidade||null, uf:modalEditar.uf||null,
+      dia_vencimento: modalEditar.dia_vencimento ? Number(modalEditar.dia_vencimento) : null,
+      forma_pagamento:modalEditar.forma_pagamento||null,
+      trial_expira_em: modalEditar.plano_nome==='trial' ? (modalEditar.trial_expira_em||null) : null,
       plano_id:planoObj?.id||null,
       plano_nome:modalEditar.plano_nome, status:modalEditar.status,
-      plano_vencimento:modalEditar.plano_vencimento||null, obs:modalEditar.obs,
+      plano_vencimento:modalEditar.plano_vencimento||null, obs:modalEditar.obs||null,
     }).eq('id', modalEditar.id)
     if (error) { onToast('Erro: '+error.message); return }
     onToast('Salvo.'); setModalEditar(null); await carregar()
@@ -831,29 +844,77 @@ export default function SuperAdmin({ onToast }) {
 
       {/* Modal editar empresa */}
       {modalEditar && (
-        <Modal title="Editar empresa" onClose={()=>setModalEditar(null)} maxWidth={460}>
-          <Fld label="Nome"><DI value={modalEditar.nome} onChange={v=>setModalEditar(m=>({...m,nome:v}))}/></Fld>
+        <Modal title="Editar empresa" onClose={()=>setModalEditar(null)} maxWidth={560}>
+          <SecLbl C={C}>Identificação</SecLbl>
+          <Fld label="Nome / Razão social"><DI value={modalEditar.nome||''} onChange={v=>setModalEditar(m=>({...m,nome:v}))}/></Fld>
           <G2>
+            <Fld label="Nome fantasia"><DI value={modalEditar.nome_fantasia||''} onChange={v=>setModalEditar(m=>({...m,nome_fantasia:v}))}/></Fld>
             <Fld label="CNPJ"><DI value={modalEditar.cnpj||''} onChange={v=>setModalEditar(m=>({...m,cnpj:v}))}/></Fld>
+          </G2>
+          <G2>
+            <Fld label="Inscrição estadual"><DI value={modalEditar.inscricao_estadual||''} onChange={v=>setModalEditar(m=>({...m,inscricao_estadual:v}))}/></Fld>
             <Fld label="Status">
               <DS value={modalEditar.status} onChange={v=>setModalEditar(m=>({...m,status:v}))}>
                 {['ativa','inadimplente','suspensa','cancelada'].map(s=><option key={s}>{s}</option>)}
               </DS>
             </Fld>
           </G2>
+
+          <SecLbl C={C}>Contato</SecLbl>
+          <G2>
+            <Fld label="E-mail"><DI value={modalEditar.email_contato||''} onChange={v=>setModalEditar(m=>({...m,email_contato:v}))} type="email"/></Fld>
+            <Fld label="Telefone"><DI value={modalEditar.telefone_contato||''} onChange={v=>setModalEditar(m=>({...m,telefone_contato:v}))}/></Fld>
+          </G2>
+          <Fld label="Responsável (contato principal)"><DI value={modalEditar.responsavel_nome||''} onChange={v=>setModalEditar(m=>({...m,responsavel_nome:v}))}/></Fld>
+
+          <SecLbl C={C}>Responsável financeiro (recebe as faturas)</SecLbl>
+          <Fld label="Nome"><DI value={modalEditar.resp_fin_nome||''} onChange={v=>setModalEditar(m=>({...m,resp_fin_nome:v}))}/></Fld>
+          <G2>
+            <Fld label="E-mail para faturas"><DI value={modalEditar.resp_fin_email||''} onChange={v=>setModalEditar(m=>({...m,resp_fin_email:v}))} type="email"/></Fld>
+            <Fld label="Telefone"><DI value={modalEditar.resp_fin_telefone||''} onChange={v=>setModalEditar(m=>({...m,resp_fin_telefone:v}))}/></Fld>
+          </G2>
+
+          <SecLbl C={C}>Endereço</SecLbl>
+          <G2>
+            <Fld label="CEP"><DI value={modalEditar.cep||''} onChange={v=>setModalEditar(m=>({...m,cep:v}))}/></Fld>
+            <Fld label="Logradouro"><DI value={modalEditar.logradouro||''} onChange={v=>setModalEditar(m=>({...m,logradouro:v}))}/></Fld>
+          </G2>
+          <G2>
+            <Fld label="Bairro"><DI value={modalEditar.bairro||''} onChange={v=>setModalEditar(m=>({...m,bairro:v}))}/></Fld>
+            <G2>
+              <Fld label="Cidade"><DI value={modalEditar.cidade||''} onChange={v=>setModalEditar(m=>({...m,cidade:v}))}/></Fld>
+              <Fld label="UF"><DI value={modalEditar.uf||''} onChange={v=>setModalEditar(m=>({...m,uf:(v||'').toUpperCase().slice(0,2)}))}/></Fld>
+            </G2>
+          </G2>
+
+          <SecLbl C={C}>Plano e cobrança</SecLbl>
           <G2>
             <Fld label="Plano">
               <DS value={modalEditar.plano_nome} onChange={v=>setModalEditar(m=>({...m,plano_nome:v}))}>
                 {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
               </DS>
             </Fld>
-            <Fld label="Vencimento"><DI value={modalEditar.plano_vencimento||''} onChange={v=>setModalEditar(m=>({...m,plano_vencimento:v}))} type="date"/></Fld>
+            {modalEditar.plano_nome==='trial'
+              ? <Fld label="Trial expira em"><DI value={modalEditar.trial_expira_em||''} onChange={v=>setModalEditar(m=>({...m,trial_expira_em:v}))} type="date"/></Fld>
+              : <Fld label="Dia de vencimento da fatura">
+                  <DS value={String(modalEditar.dia_vencimento||'')} onChange={v=>setModalEditar(m=>({...m,dia_vencimento:v}))}>
+                    <option value="">Padrão (dia 10)</option>
+                    {Array.from({length:28},(_,i)=>i+1).map(d=><option key={d} value={d}>Dia {d}</option>)}
+                  </DS>
+                </Fld>}
           </G2>
-          <G2>
-            <Fld label="E-mail"><DI value={modalEditar.email_contato||''} onChange={v=>setModalEditar(m=>({...m,email_contato:v}))} type="email"/></Fld>
-            <Fld label="Telefone"><DI value={modalEditar.telefone_contato||''} onChange={v=>setModalEditar(m=>({...m,telefone_contato:v}))}/></Fld>
-          </G2>
-          <Fld label="Obs."><DI value={modalEditar.obs||''} onChange={v=>setModalEditar(m=>({...m,obs:v}))}/></Fld>
+          {modalEditar.plano_nome!=='trial' && (
+            <Fld label="Forma de pagamento">
+              <DS value={modalEditar.forma_pagamento||''} onChange={v=>setModalEditar(m=>({...m,forma_pagamento:v}))}>
+                <option value="">—</option>
+                <option value="pix">PIX</option>
+                <option value="boleto">Boleto</option>
+                <option value="cartao">Cartão</option>
+                <option value="transferencia">Transferência</option>
+              </DS>
+            </Fld>
+          )}
+          <Fld label="Observações"><DI value={modalEditar.obs||''} onChange={v=>setModalEditar(m=>({...m,obs:v}))}/></Fld>
           <Btn onClick={salvarEmpresa} style={{ width:'100%' }}>Salvar</Btn>
           <div style={{ borderTop:`1px solid ${C.border}`, marginTop:20, paddingTop:20 }}>
             <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>Código do admin</div>
