@@ -226,9 +226,13 @@ export default function SuperAdmin({ onToast }) {
 
   const salvarEmpresa = async () => {
     if (!modalEditar) return
+    // Sincroniza plano_id com o plano_nome escolhido — o cálculo de uso/limites
+    // (verificarUsoPlano) faz join por plano_id; sem isso o plano antigo persiste.
+    const planoObj = planos.find(p=>p.nome===modalEditar.plano_nome)
     const { error } = await supabase.from('empresas').update({
       nome:modalEditar.nome, cnpj:modalEditar.cnpj,
       email_contato:modalEditar.email_contato, telefone_contato:modalEditar.telefone_contato,
+      plano_id:planoObj?.id||null,
       plano_nome:modalEditar.plano_nome, status:modalEditar.status,
       plano_vencimento:modalEditar.plano_vencimento||null, obs:modalEditar.obs,
     }).eq('id', modalEditar.id)
