@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { gerarCodigo } from '../lib/constants'
+import { mascaraCNPJ, cnpjCompleto, consultarCNPJ } from '../lib/cnpj'
 import ImportarMoradores from '../components/ImportarMoradores'
 import GerenciarCondominio from './GerenciarCondominio'
 import UsoPlanoBadge from '../components/UsoPlanoBadge'
@@ -68,6 +69,32 @@ export default function Admin({ onToast }) {
     gestao_inicio:'', obs:'', regulamento_pdf_url:'', convencao_pdf_url:''
   }
   const [novoCondo, setNovoCondo] = useState(CONDO_VAZIO)
+  const [buscandoCNPJ, setBuscandoCNPJ] = useState(false)
+
+  // Busca dados na Receita ao completar o CNPJ do condomínio
+  const onChangeCNPJCondo = async (valor) => {
+    const mascarado = mascaraCNPJ(valor)
+    setNovoCondo(x => ({ ...x, cnpj: mascarado }))
+    if (!cnpjCompleto(mascarado)) return
+    setBuscandoCNPJ(true)
+    try {
+      const { dados } = await consultarCNPJ(mascarado)
+      setNovoCondo(x => ({
+        ...x,
+        nome: x.nome || dados.razao_social || '',
+        endereco_rua: x.endereco_rua || dados.logradouro || '',
+        endereco_bairro: x.endereco_bairro || dados.bairro || '',
+        endereco_cidade: x.endereco_cidade || dados.cidade || '',
+        endereco_uf: x.endereco_uf || dados.uf || '',
+        endereco_cep: x.endereco_cep || dados.cep || '',
+      }))
+      onToast('Dados encontrados na Receita!')
+    } catch (e) {
+      onToast(e.message || 'CNPJ não encontrado — preencha manualmente.')
+    } finally {
+      setBuscandoCNPJ(false)
+    }
+  }
   const [usuariosPorCondo, setUsuariosPorCondo] = useState({})
 
   const carregarCondos = useCallback(async () => {
@@ -422,8 +449,9 @@ export default function Admin({ onToast }) {
 
           {[
             { titulo:'Dados gerais', campos:[
-              [['Nome do condominio *','nome'],['CNPJ','cnpj']],
-              [['Total de unidades','total_unidades','number'],['Ano de construcao','ano_construcao','number']],
+              [['CNPJ · preenche automaticamente','cnpj']],
+              [['Nome do condominio *','nome'],['Total de unidades','total_unidades','number']],
+              [['Ano de construcao','ano_construcao','number']],
             ]},
             { titulo:'Endereco', campos:[
               [['Rua / Avenida','endereco_rua'],['Numero','endereco_numero']],
@@ -452,10 +480,16 @@ export default function Admin({ onToast }) {
               {sec.campos.map((row, ri) => (
                 <div key={ri} style={{ display:'grid', gridTemplateColumns:`repeat(${row.length},1fr)`, gap:12, marginBottom:12 }}>
                   {row.map(([label,key,type='text']) => (
-                    <div key={key} className="field" style={{ margin:0 }}>
+                    <div key={key} className="field" style={{ margin:0, position:'relative' }}>
                       <label>{label}</label>
                       <input className="input" type={type} value={novoCondo[key]||''}
-                        onChange={e=>setNovoCondo(x=>({...x,[key]:key==='endereco_uf'?e.target.value.toUpperCase().slice(0,2):e.target.value}))} />
+                        onChange={e=>{
+                          if (key==='cnpj') { onChangeCNPJCondo(e.target.value); return }
+                          setNovoCondo(x=>({...x,[key]:key==='endereco_uf'?e.target.value.toUpperCase().slice(0,2):e.target.value}))
+                        }} />
+                      {key==='cnpj' && buscandoCNPJ && (
+                        <span style={{ position:'absolute', right:12, top:34, fontSize:12, color:'var(--blue)' }}>buscando...</span>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { mascaraCNPJ, cnpjCompleto, consultarCNPJ } from '../lib/cnpj'
 
 const VAZIO = {
   tipo_pessoa:'pj', razao_social:'', nome_fantasia:'', cnpj_cpf:'',
@@ -18,6 +19,37 @@ export default function Fornecedores({ onToast }) {
   const [busca, setBusca] = useState('')
   const [modal, setModal] = useState(null)     // objeto (novo/editar) ou null
   const [salvando, setSalvando] = useState(false)
+  const [buscandoCNPJ, setBuscandoCNPJ] = useState(false)
+
+  // Busca dados na Receita ao completar o CNPJ e preenche os campos vazios
+  const onChangeCNPJ = async (valor) => {
+    const mascarado = mascaraCNPJ(valor)
+    setModal(m => ({ ...m, cnpj_cpf: mascarado }))
+    if (modal?.tipo_pessoa === 'pf') return       // só para PJ
+    if (!cnpjCompleto(mascarado)) return
+    setBuscandoCNPJ(true)
+    try {
+      const { dados } = await consultarCNPJ(mascarado)
+      setModal(m => ({
+        ...m,
+        razao_social: m.razao_social || dados.razao_social || '',
+        nome_fantasia: m.nome_fantasia || dados.nome_fantasia || '',
+        email: m.email || dados.email || '',
+        telefone: m.telefone || dados.telefone || '',
+        cep: m.cep || dados.cep || '',
+        logradouro: m.logradouro || dados.logradouro || '',
+        bairro: m.bairro || dados.bairro || '',
+        cidade: m.cidade || dados.cidade || '',
+        uf: m.uf || dados.uf || '',
+        categoria: m.categoria || dados.atividade_principal || '',
+      }))
+      onToast('Dados encontrados na Receita!')
+    } catch (e) {
+      onToast(e.message || 'CNPJ não encontrado — preencha manualmente.')
+    } finally {
+      setBuscandoCNPJ(false)
+    }
+  }
 
   const carregar = async () => {
     setLoading(true)
@@ -159,19 +191,27 @@ export default function Fornecedores({ onToast }) {
               </div>
             </div>
             <div className="field">
+              <label>
+                {modal.tipo_pessoa === 'pf' ? 'CPF' : 'CNPJ'}
+                {modal.tipo_pessoa !== 'pf' && <span style={{ fontWeight:400, color:'var(--gray-400)', marginLeft:6 }}>· preenche os dados automaticamente</span>}
+              </label>
+              <div style={{ position:'relative' }}>
+                <input className="input" value={modal.cnpj_cpf||''}
+                  onChange={e => modal.tipo_pessoa === 'pf' ? set('cnpj_cpf', e.target.value) : onChangeCNPJ(e.target.value)}
+                  placeholder={modal.tipo_pessoa === 'pf' ? '000.000.000-00' : '00.000.000/0000-00'} />
+                {buscandoCNPJ && (
+                  <span style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--blue)' }}>buscando...</span>
+                )}
+              </div>
+            </div>
+            <div className="field">
               <label>{modal.tipo_pessoa === 'pf' ? 'Nome completo *' : 'Razão social *'}</label>
               <input className="input" value={modal.razao_social||''} onChange={e => set('razao_social', e.target.value)}
                 placeholder={modal.tipo_pessoa === 'pf' ? 'Nome do prestador' : 'Ex.: Elétrica Silva Ltda'} />
             </div>
-            <div className="row2" style={{ display:'flex', gap:12 }}>
-              <div className="field" style={{ flex:1 }}>
-                <label>Nome fantasia</label>
-                <input className="input" value={modal.nome_fantasia||''} onChange={e => set('nome_fantasia', e.target.value)} placeholder="Opcional" />
-              </div>
-              <div className="field" style={{ flex:1 }}>
-                <label>{modal.tipo_pessoa === 'pf' ? 'CPF' : 'CNPJ'}</label>
-                <input className="input" value={modal.cnpj_cpf||''} onChange={e => set('cnpj_cpf', e.target.value)} placeholder={modal.tipo_pessoa === 'pf' ? '000.000.000-00' : '00.000.000/0000-00'} />
-              </div>
+            <div className="field">
+              <label>Nome fantasia</label>
+              <input className="input" value={modal.nome_fantasia||''} onChange={e => set('nome_fantasia', e.target.value)} placeholder="Opcional" />
             </div>
 
             {/* Contato */}

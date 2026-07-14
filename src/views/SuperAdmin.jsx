@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { mascaraCNPJ, cnpjCompleto, consultarCNPJ } from '../lib/cnpj'
 import SAFinanceiro from './SAFinanceiro'
 import SACategorias from './SACategorias'
 
@@ -168,6 +169,29 @@ export default function SuperAdmin({ onToast }) {
   const VAZIO = { nome:'', cnpj:'', email_contato:'', telefone_contato:'',
     plano_nome:'trial', plano_vencimento:'', obs:'', admin_nome:'', admin_email:'', admin_senha:'mudar123', admin_codigo:'' }
   const [nova, setNova] = useState(VAZIO)
+  const [buscandoCNPJ, setBuscandoCNPJ] = useState(false)
+
+  // Busca dados na Receita ao completar o CNPJ da nova empresa
+  const onChangeCNPJEmpresa = async (valor) => {
+    const mascarado = mascaraCNPJ(valor)
+    setNova(x => ({ ...x, cnpj: mascarado }))
+    if (!cnpjCompleto(mascarado)) return
+    setBuscandoCNPJ(true)
+    try {
+      const { dados } = await consultarCNPJ(mascarado)
+      setNova(x => ({
+        ...x,
+        nome: x.nome || dados.razao_social || '',
+        email_contato: x.email_contato || dados.email || '',
+        telefone_contato: x.telefone_contato || dados.telefone || '',
+      }))
+      onToast('Dados encontrados na Receita!')
+    } catch (e) {
+      onToast(e.message || 'CNPJ não encontrado — preencha manualmente.')
+    } finally {
+      setBuscandoCNPJ(false)
+    }
+  }
   const [salvando, setSalvando] = useState(false)
 
   const carregar = async () => {
@@ -668,20 +692,27 @@ export default function SuperAdmin({ onToast }) {
       {/* Modal nova empresa */}
       {modalNova && (
         <Modal title="Nova empresa" onClose={()=>setModalNova(false)} maxWidth={540}>
+          <Fld label="CNPJ · preenche os dados automaticamente">
+            <div style={{ position:'relative' }}>
+              <DI value={nova.cnpj} onChange={onChangeCNPJEmpresa} placeholder="00.000.000/0000-00"/>
+              {buscandoCNPJ && <span style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', fontSize:12, color:C.blue }}>buscando...</span>}
+            </div>
+          </Fld>
           <Fld label="Nome da empresa *"><DI value={nova.nome} onChange={v=>setNova(x=>({...x,nome:v}))} placeholder="Ex.: Síndico Prime Ltda"/></Fld>
           <G2>
-            <Fld label="CNPJ"><DI value={nova.cnpj} onChange={v=>setNova(x=>({...x,cnpj:v}))}/></Fld>
             <Fld label="Plano">
               <DS value={nova.plano_nome} onChange={v=>setNova(x=>({...x,plano_nome:v}))}>
                 {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
               </DS>
             </Fld>
+            <Fld label="Telefone"><DI value={nova.telefone_contato} onChange={v=>setNova(x=>({...x,telefone_contato:v}))}/></Fld>
           </G2>
           <G2>
             <Fld label="E-mail"><DI value={nova.email_contato} onChange={v=>setNova(x=>({...x,email_contato:v}))} type="email"/></Fld>
-            <Fld label="Telefone"><DI value={nova.telefone_contato} onChange={v=>setNova(x=>({...x,telefone_contato:v}))}/></Fld>
+            {nova.plano_nome!=='trial'
+              ? <Fld label="Vencimento"><DI value={nova.plano_vencimento} onChange={v=>setNova(x=>({...x,plano_vencimento:v}))} type="date"/></Fld>
+              : <div/>}
           </G2>
-          {nova.plano_nome!=='trial'&&<Fld label="Vencimento"><DI value={nova.plano_vencimento} onChange={v=>setNova(x=>({...x,plano_vencimento:v}))} type="date"/></Fld>}
           <div style={{ borderTop:`1px solid ${C.border}`, margin:'16px 0', paddingTop:16, fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em' }}>
             Admin da empresa
           </div>
