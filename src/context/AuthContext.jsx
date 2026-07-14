@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [perfil, setPerfil] = useState(null)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [empresaStatus, setEmpresaStatus] = useState(null)  // status da empresa do perfil (billing)
   const [loading, setLoading] = useState(true)
 
   const carregarPerfil = useCallback(async (userId) => {
@@ -22,6 +23,20 @@ export function AuthProvider({ children }) {
     // Carrega perfil normal
     const { data } = await supabase.from('perfis').select('*').eq('id', userId).single()
     setPerfil(data)
+
+    // Verifica o status de billing da empresa do perfil (para bloqueio de acesso).
+    // Fail-open: qualquer erro NÃO bloqueia o usuário.
+    try {
+      if (data?.empresa_id) {
+        const { data: emp } = await supabase
+          .from('empresas').select('status').eq('id', data.empresa_id).maybeSingle()
+        setEmpresaStatus(emp?.status || null)
+      } else {
+        setEmpresaStatus(null)
+      }
+    } catch {
+      setEmpresaStatus(null)
+    }
   }, [])
 
   useEffect(() => {
@@ -33,7 +48,7 @@ export function AuthProvider({ children }) {
     const { data: listener } = supabase.auth.onAuthStateChange((_e, sess) => {
       setSession(sess)
       if (sess) carregarPerfil(sess.user.id)
-      else { setPerfil(null); setIsSuperAdmin(false); setLoading(false) }
+      else { setPerfil(null); setIsSuperAdmin(false); setEmpresaStatus(null); setLoading(false) }
     })
     return () => listener.subscription.unsubscribe()
   }, [carregarPerfil])
@@ -55,11 +70,11 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     await supabase.auth.signOut()
-    setPerfil(null); setIsSuperAdmin(false)
+    setPerfil(null); setIsSuperAdmin(false); setEmpresaStatus(null)
   }
 
   return (
-    <AuthContext.Provider value={{ session, perfil, isSuperAdmin, loading, login, logout, carregarPerfil }}>
+    <AuthContext.Provider value={{ session, perfil, isSuperAdmin, empresaStatus, loading, login, logout, carregarPerfil }}>
       {children}
     </AuthContext.Provider>
   )
