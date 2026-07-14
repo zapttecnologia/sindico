@@ -800,3 +800,43 @@ tr:hover td { background: var(--gray-50); }
   .row2 { grid-template-columns: 1fr; }
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── Novos status badges ───────────────────────────────────── */
+.status-aberto      { background:#dbeafe; color:#1d4ed8; }
+.status-analise     { background:#fef9c3; color:#854d0e; }
+.status-andamento   { background:#dbeafe; color:#1d4ed8; }
+.status-aguardando  { background:#ffedd5; color:#9a3412; }
+.status-resolvido   { background:#dcfce7; color:#15803d; }
+.status-cancelado   { background:#f3f4f6; color:#6b7280; }
+.status-recebido    { background:#fef9c3; color:#854d0e; }
+.status-concluido   { background:#dcfce7; color:#15803d; }
+
+/* ── Categoria cards (novo chamado morador) ────────────────── */
+.cat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 12px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--r-lg);
+  background: #fff;
+  cursor: pointer;
+  transition: all .15s;
+  text-align: center;
+}
+.cat-card:hover {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+  transform: translateY(-2px);
+}
+.cat-card-icon {
+  font-size: 30px;
+  line-height: 1;
+}
+.cat-card-nome {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-700);
+  line-height: 1.3;
+}
