@@ -170,6 +170,7 @@ export default function SuperAdmin({ onToast }) {
   const [modalEditar, setModalEditar] = useState(null)
   const [busca, setBusca] = useState('')
   const VAZIO = { nome:'', nome_fantasia:'', cnpj:'', inscricao_estadual:'', email_contato:'', telefone_contato:'', responsavel_nome:'',
+    resp_fin_nome:'', resp_fin_email:'', resp_fin_telefone:'',
     cep:'', logradouro:'', bairro:'', cidade:'', uf:'',
     dia_vencimento:'', forma_pagamento:'',
     plano_nome:'trial', plano_vencimento:'', obs:'', admin_nome:'', admin_email:'', admin_senha:'mudar123', admin_codigo:'' }
@@ -238,16 +239,21 @@ export default function SuperAdmin({ onToast }) {
     setSalvando(true)
     try {
       const planoObj = planos.find(p=>p.nome===nova.plano_nome)
-      const venc = nova.plano_nome==='trial' ? new Date(Date.now()+30*86400000).toISOString().split('T')[0] : nova.plano_vencimento||null
+      const ehTrial = nova.plano_nome==='trial'
+      // Trial: define expiração em 30 dias. Plano pago: não usa "vencimento do plano" (controle por fatura)
+      const trialExpira = ehTrial ? new Date(Date.now()+30*86400000).toISOString().split('T')[0] : null
+      const venc = ehTrial ? trialExpira : (nova.plano_vencimento||null)
       const { data:emp, error:eErr } = await supabase.from('empresas').insert({
         nome:nova.nome, nome_fantasia:nova.nome_fantasia||null, cnpj:nova.cnpj||null,
         inscricao_estadual:nova.inscricao_estadual||null,
         email_contato:nova.email_contato||null, telefone_contato:nova.telefone_contato||null,
         responsavel_nome:nova.responsavel_nome||null,
+        resp_fin_nome:nova.resp_fin_nome||null, resp_fin_email:nova.resp_fin_email||null, resp_fin_telefone:nova.resp_fin_telefone||null,
         cep:nova.cep||null, logradouro:nova.logradouro||null, bairro:nova.bairro||null,
         cidade:nova.cidade||null, uf:nova.uf||null,
         dia_vencimento: nova.dia_vencimento ? Number(nova.dia_vencimento) : null,
         forma_pagamento:nova.forma_pagamento||null,
+        trial_expira_em: trialExpira,
         plano_id:planoObj?.id||null,
         plano_nome:nova.plano_nome, status:'ativa', plano_vencimento:venc, obs:nova.obs||null,
       }).select().single()
@@ -742,34 +748,47 @@ export default function SuperAdmin({ onToast }) {
             </G2>
           </G2>
 
+          <SecLbl C={C}>Responsável financeiro (recebe as faturas)</SecLbl>
+          <Fld label="Nome"><DI value={nova.resp_fin_nome} onChange={v=>setNova(x=>({...x,resp_fin_nome:v}))} placeholder="Quem cuida do pagamento"/></Fld>
+          <G2>
+            <Fld label="E-mail para faturas"><DI value={nova.resp_fin_email} onChange={v=>setNova(x=>({...x,resp_fin_email:v}))} type="email" placeholder="financeiro@empresa.com"/></Fld>
+            <Fld label="Telefone"><DI value={nova.resp_fin_telefone} onChange={v=>setNova(x=>({...x,resp_fin_telefone:v}))}/></Fld>
+          </G2>
+
           <SecLbl C={C}>Plano e cobrança</SecLbl>
-          <G2>
-            <Fld label="Plano">
-              <DS value={nova.plano_nome} onChange={v=>setNova(x=>({...x,plano_nome:v}))}>
-                {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
-              </DS>
-            </Fld>
-            {nova.plano_nome!=='trial'
-              ? <Fld label="Vencimento do plano"><DI value={nova.plano_vencimento} onChange={v=>setNova(x=>({...x,plano_vencimento:v}))} type="date"/></Fld>
-              : <div/>}
-          </G2>
-          <G2>
-            <Fld label="Dia de vencimento da fatura">
-              <DS value={String(nova.dia_vencimento||'')} onChange={v=>setNova(x=>({...x,dia_vencimento:v}))}>
-                <option value="">Padrão (dia 10)</option>
-                {Array.from({length:28},(_,i)=>i+1).map(d=><option key={d} value={d}>Dia {d}</option>)}
-              </DS>
-            </Fld>
-            <Fld label="Forma de pagamento">
-              <DS value={nova.forma_pagamento} onChange={v=>setNova(x=>({...x,forma_pagamento:v}))}>
-                <option value="">—</option>
-                <option value="pix">PIX</option>
-                <option value="boleto">Boleto</option>
-                <option value="cartao">Cartão</option>
-                <option value="transferencia">Transferência</option>
-              </DS>
-            </Fld>
-          </G2>
+          <Fld label="Plano">
+            <DS value={nova.plano_nome} onChange={v=>setNova(x=>({...x,plano_nome:v}))}>
+              {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
+            </DS>
+          </Fld>
+          {nova.plano_nome==='trial' ? (
+            <div style={{ fontSize:12, color:C.muted, padding:'8px 12px', background:tema==='dark'?'rgba(255,255,255,.04)':'rgba(0,0,0,.03)', borderRadius:8, marginBottom:4 }}>
+              ⏳ O período de teste expira automaticamente em <b>30 dias</b>. Após esse prazo, o acesso é suspenso até a migração para um plano pago.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize:12, color:C.muted, padding:'8px 12px', background:tema==='dark'?'rgba(255,255,255,.04)':'rgba(0,0,0,.03)', borderRadius:8, marginBottom:10 }}>
+                💳 Plano pago é cobrado por fatura mensal. O acesso depende do pagamento — sem "vencimento do plano".
+              </div>
+              <G2>
+                <Fld label="Dia de vencimento da fatura">
+                  <DS value={String(nova.dia_vencimento||'')} onChange={v=>setNova(x=>({...x,dia_vencimento:v}))}>
+                    <option value="">Padrão (dia 10)</option>
+                    {Array.from({length:28},(_,i)=>i+1).map(d=><option key={d} value={d}>Dia {d}</option>)}
+                  </DS>
+                </Fld>
+                <Fld label="Forma de pagamento">
+                  <DS value={nova.forma_pagamento} onChange={v=>setNova(x=>({...x,forma_pagamento:v}))}>
+                    <option value="">—</option>
+                    <option value="pix">PIX</option>
+                    <option value="boleto">Boleto</option>
+                    <option value="cartao">Cartão</option>
+                    <option value="transferencia">Transferência</option>
+                  </DS>
+                </Fld>
+              </G2>
+            </>
+          )}
 
           <div style={{ borderTop:`1px solid ${C.border}`, margin:'16px 0', paddingTop:16, fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em' }}>
             Admin da empresa
