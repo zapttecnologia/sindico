@@ -467,13 +467,19 @@ export default function Morador({ view, onToast }) {
             </div>
           )}
 
-          {/* Fotos */}
+          {/* Anexos */}
           <div className="field">
-            <label>Fotos / Vídeos (opcional)</label>
-            <input type="file" accept="image/*,video/*,.pdf" multiple onChange={e=>{
+            <label>Anexos (opcional)</label>
+            <input type="file" multiple onChange={e=>{
               const novos = Array.from(e.target.files||[]).filter(f=>f.size<=MAX_BYTES)
+              const grandes = Array.from(e.target.files||[]).filter(f=>f.size>MAX_BYTES)
+              if (grandes.length) onToast(`Ignorados (acima de 10MB): ${grandes.map(f=>f.name).join(', ')}`)
               setArquivosSel(a=>[...a,...novos].slice(0,5))
+              e.target.value = ''
             }} style={{ fontSize:13, color:'var(--gray-600)' }}/>
+            <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:4 }}>
+              Fotos, vídeos, PDF, documentos — até 5 arquivos, 10MB cada.
+            </div>
             {arquivosSel.length > 0 && (
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
                 {arquivosSel.map((f,i)=>(
@@ -488,10 +494,17 @@ export default function Morador({ view, onToast }) {
             )}
           </div>
 
-          <button className="btn btn-primary btn-block" onClick={enviarNovo}
-            disabled={loading || !descricao.trim()} style={{ fontSize:15, padding:'14px' }}>
-            {loading ? 'Enviando...' : '📨 Enviar chamado'}
-          </button>
+          <div style={{ display:'flex', gap:10 }}>
+            <button className="btn" onClick={()=>{ setDescricao(''); setArquivosSel([]); setPrioridade('media'); setAnonimo(false) }}
+              disabled={loading}
+              style={{ flexShrink:0, fontSize:15, padding:'14px 18px', background:'var(--gray-100)', color:'var(--gray-600)', border:'none' }}>
+              Limpar
+            </button>
+            <button className="btn btn-primary" onClick={enviarNovo}
+              disabled={loading || !descricao.trim()} style={{ flex:1, fontSize:15, padding:'14px' }}>
+              {loading ? 'Enviando...' : '📨 Enviar chamado'}
+            </button>
+          </div>
         </div>
       </div>
     )
