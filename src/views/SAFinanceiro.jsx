@@ -2,6 +2,25 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import React from 'react'
+
+// Captura erros de render e mostra a mensagem em vez de tela branca
+class ErroBoundary extends React.Component {
+  constructor(props){ super(props); this.state = { erro:null } }
+  static getDerivedStateFromError(erro){ return { erro } }
+  componentDidCatch(erro, info){ console.error('Erro no Financeiro:', erro, info) }
+  render(){
+    if (this.state.erro) {
+      return (
+        <div style={{ padding:24, background:'#111827', border:'1px solid rgba(239,68,68,.4)', borderRadius:12, color:'#f1f5f9', margin:20 }}>
+          <div style={{ fontSize:15, fontWeight:700, color:'#ef4444', marginBottom:8 }}>Algo quebrou ao montar o financeiro</div>
+          <div style={{ fontSize:13, color:'#94a3b8', fontFamily:'monospace', whiteSpace:'pre-wrap' }}>{String(this.state.erro?.message || this.state.erro)}</div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const C = {
   bg:'#0a0d14', surface:'#111827', border:'rgba(255,255,255,.07)',
@@ -126,7 +145,7 @@ function LineChart30({ dados }) {
   )
 }
 
-export default function SAFinanceiro({ empresas, planos }) {
+function SAFinanceiroInterno({ empresas, planos }) {
   const [faturas, setFaturas] = useState([])
   const [subSecao, setSubSecao] = useState('overview')
   const [modalNova, setModalNova] = useState(false)
@@ -215,7 +234,6 @@ export default function SAFinanceiro({ empresas, planos }) {
   const totalAtrasado = faturasAtrasadas.reduce((s,f)=>s+Number(f.valor||0),0)
   const baseInadim = totalAtrasado + totalRecebido
   const inadimplenciaPct = baseInadim > 0 ? (totalAtrasado / baseInadim * 100) : 0
-
 
 
   const gerarRelatorio = async () => {
@@ -739,5 +757,14 @@ export default function SAFinanceiro({ empresas, planos }) {
         </div>
       )}
     </div>
+  )
+}
+
+// Wrapper com error boundary — evita tela branca e mostra o erro
+export default function SAFinanceiro(props) {
+  return (
+    <ErroBoundary>
+      <SAFinanceiroInterno {...props} />
+    </ErroBoundary>
   )
 }
