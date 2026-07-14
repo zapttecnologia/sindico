@@ -113,6 +113,9 @@ function DS({ value, onChange, children }) {
 function G2({ children }) {
   return <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>{children}</div>
 }
+function SecLbl({ children, C }) {
+  return <div style={{ margin:'18px 0 10px', fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em' }}>{children}</div>
+}
 function Btn({ children, onClick, variant='primary', sm, disabled, style={} }) {
   const { tema, C } = useTema()
   const bg = variant==='primary'?C.purple:variant==='danger'?'transparent':tema==='light'?'rgba(0,0,0,.06)':'rgba(255,255,255,.06)'
@@ -166,7 +169,9 @@ export default function SuperAdmin({ onToast }) {
   const [modalNova, setModalNova] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
   const [busca, setBusca] = useState('')
-  const VAZIO = { nome:'', cnpj:'', email_contato:'', telefone_contato:'',
+  const VAZIO = { nome:'', nome_fantasia:'', cnpj:'', inscricao_estadual:'', email_contato:'', telefone_contato:'', responsavel_nome:'',
+    cep:'', logradouro:'', bairro:'', cidade:'', uf:'',
+    dia_vencimento:'', forma_pagamento:'',
     plano_nome:'trial', plano_vencimento:'', obs:'', admin_nome:'', admin_email:'', admin_senha:'mudar123', admin_codigo:'' }
   const [nova, setNova] = useState(VAZIO)
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false)
@@ -182,8 +187,14 @@ export default function SuperAdmin({ onToast }) {
       setNova(x => ({
         ...x,
         nome: x.nome || dados.razao_social || '',
+        nome_fantasia: x.nome_fantasia || dados.nome_fantasia || '',
         email_contato: x.email_contato || dados.email || '',
         telefone_contato: x.telefone_contato || dados.telefone || '',
+        cep: x.cep || dados.cep || '',
+        logradouro: x.logradouro || dados.logradouro || '',
+        bairro: x.bairro || dados.bairro || '',
+        cidade: x.cidade || dados.cidade || '',
+        uf: x.uf || dados.uf || '',
       }))
       onToast('Dados encontrados na Receita!')
     } catch (e) {
@@ -229,8 +240,15 @@ export default function SuperAdmin({ onToast }) {
       const planoObj = planos.find(p=>p.nome===nova.plano_nome)
       const venc = nova.plano_nome==='trial' ? new Date(Date.now()+30*86400000).toISOString().split('T')[0] : nova.plano_vencimento||null
       const { data:emp, error:eErr } = await supabase.from('empresas').insert({
-        nome:nova.nome, cnpj:nova.cnpj||null, email_contato:nova.email_contato||null,
-        telefone_contato:nova.telefone_contato||null, plano_id:planoObj?.id||null,
+        nome:nova.nome, nome_fantasia:nova.nome_fantasia||null, cnpj:nova.cnpj||null,
+        inscricao_estadual:nova.inscricao_estadual||null,
+        email_contato:nova.email_contato||null, telefone_contato:nova.telefone_contato||null,
+        responsavel_nome:nova.responsavel_nome||null,
+        cep:nova.cep||null, logradouro:nova.logradouro||null, bairro:nova.bairro||null,
+        cidade:nova.cidade||null, uf:nova.uf||null,
+        dia_vencimento: nova.dia_vencimento ? Number(nova.dia_vencimento) : null,
+        forma_pagamento:nova.forma_pagamento||null,
+        plano_id:planoObj?.id||null,
         plano_nome:nova.plano_nome, status:'ativa', plano_vencimento:venc, obs:nova.obs||null,
       }).select().single()
       if (eErr) throw new Error(eErr.message)
@@ -698,21 +716,61 @@ export default function SuperAdmin({ onToast }) {
               {buscandoCNPJ && <span style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', fontSize:12, color:C.blue }}>buscando...</span>}
             </div>
           </Fld>
-          <Fld label="Nome da empresa *"><DI value={nova.nome} onChange={v=>setNova(x=>({...x,nome:v}))} placeholder="Ex.: Síndico Prime Ltda"/></Fld>
+          <Fld label="Nome / Razão social *"><DI value={nova.nome} onChange={v=>setNova(x=>({...x,nome:v}))} placeholder="Ex.: Síndico Prime Ltda"/></Fld>
+          <G2>
+            <Fld label="Nome fantasia"><DI value={nova.nome_fantasia} onChange={v=>setNova(x=>({...x,nome_fantasia:v}))}/></Fld>
+            <Fld label="Inscrição estadual"><DI value={nova.inscricao_estadual} onChange={v=>setNova(x=>({...x,inscricao_estadual:v}))} placeholder="Opcional / Isento"/></Fld>
+          </G2>
+
+          <SecLbl C={C}>Contato</SecLbl>
+          <G2>
+            <Fld label="E-mail"><DI value={nova.email_contato} onChange={v=>setNova(x=>({...x,email_contato:v}))} type="email"/></Fld>
+            <Fld label="Telefone"><DI value={nova.telefone_contato} onChange={v=>setNova(x=>({...x,telefone_contato:v}))}/></Fld>
+          </G2>
+          <Fld label="Responsável (contato principal)"><DI value={nova.responsavel_nome} onChange={v=>setNova(x=>({...x,responsavel_nome:v}))} placeholder="Nome de quem decide na empresa"/></Fld>
+
+          <SecLbl C={C}>Endereço</SecLbl>
+          <G2>
+            <Fld label="CEP"><DI value={nova.cep} onChange={v=>setNova(x=>({...x,cep:v}))}/></Fld>
+            <Fld label="Logradouro"><DI value={nova.logradouro} onChange={v=>setNova(x=>({...x,logradouro:v}))} placeholder="Rua, número, complemento"/></Fld>
+          </G2>
+          <G2>
+            <Fld label="Bairro"><DI value={nova.bairro} onChange={v=>setNova(x=>({...x,bairro:v}))}/></Fld>
+            <G2>
+              <Fld label="Cidade"><DI value={nova.cidade} onChange={v=>setNova(x=>({...x,cidade:v}))}/></Fld>
+              <Fld label="UF"><DI value={nova.uf} onChange={v=>setNova(x=>({...x,uf:(v||'').toUpperCase().slice(0,2)}))}/></Fld>
+            </G2>
+          </G2>
+
+          <SecLbl C={C}>Plano e cobrança</SecLbl>
           <G2>
             <Fld label="Plano">
               <DS value={nova.plano_nome} onChange={v=>setNova(x=>({...x,plano_nome:v}))}>
                 {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
               </DS>
             </Fld>
-            <Fld label="Telefone"><DI value={nova.telefone_contato} onChange={v=>setNova(x=>({...x,telefone_contato:v}))}/></Fld>
-          </G2>
-          <G2>
-            <Fld label="E-mail"><DI value={nova.email_contato} onChange={v=>setNova(x=>({...x,email_contato:v}))} type="email"/></Fld>
             {nova.plano_nome!=='trial'
-              ? <Fld label="Vencimento"><DI value={nova.plano_vencimento} onChange={v=>setNova(x=>({...x,plano_vencimento:v}))} type="date"/></Fld>
+              ? <Fld label="Vencimento do plano"><DI value={nova.plano_vencimento} onChange={v=>setNova(x=>({...x,plano_vencimento:v}))} type="date"/></Fld>
               : <div/>}
           </G2>
+          <G2>
+            <Fld label="Dia de vencimento da fatura">
+              <DS value={String(nova.dia_vencimento||'')} onChange={v=>setNova(x=>({...x,dia_vencimento:v}))}>
+                <option value="">Padrão (dia 10)</option>
+                {Array.from({length:28},(_,i)=>i+1).map(d=><option key={d} value={d}>Dia {d}</option>)}
+              </DS>
+            </Fld>
+            <Fld label="Forma de pagamento">
+              <DS value={nova.forma_pagamento} onChange={v=>setNova(x=>({...x,forma_pagamento:v}))}>
+                <option value="">—</option>
+                <option value="pix">PIX</option>
+                <option value="boleto">Boleto</option>
+                <option value="cartao">Cartão</option>
+                <option value="transferencia">Transferência</option>
+              </DS>
+            </Fld>
+          </G2>
+
           <div style={{ borderTop:`1px solid ${C.border}`, margin:'16px 0', paddingTop:16, fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em' }}>
             Admin da empresa
           </div>

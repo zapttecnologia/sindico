@@ -204,14 +204,20 @@ export default function SAFinanceiro({ empresas, planos }) {
   const gerarCobrancasMensais = async () => {
     const hj = new Date()
     const mesRef = `${MESES_PT[hj.getMonth()]}/${hj.getFullYear()}`
-    const vencimento = new Date(hj.getFullYear(), hj.getMonth()+1, 10).toISOString().split('T')[0]
+    // Vencimento base no dia 10 do próximo mês; cada empresa pode ter seu próprio dia
+    const vencPadrao = new Date(hj.getFullYear(), hj.getMonth()+1, 10).toISOString().split('T')[0]
+    const vencDaEmpresa = (emp) => {
+      const dia = Number(emp.dia_vencimento)
+      if (!dia || dia < 1 || dia > 28) return vencPadrao
+      return new Date(hj.getFullYear(), hj.getMonth()+1, dia).toISOString().split('T')[0]
+    }
     const empAtivas = empresas.filter(e => e.status === 'ativa')
     const paraGerar = empAtivas.filter(e => {
       const pl = planos.find(p => p.nome === e.plano_nome)
       return pl && Number(pl.valor_mensal) > 0
     })
     if (!paraGerar.length) { return }
-    const ok = window.confirm(`Gerar ${paraGerar.length} cobrança${paraGerar.length!==1?'s':''} referente a ${mesRef}?\nVencimento: dia 10 do próximo mês.`)
+    const ok = window.confirm(`Gerar ${paraGerar.length} cobrança${paraGerar.length!==1?'s':''} referente a ${mesRef}?\nVencimento: dia de cada empresa (padrão dia 10).`)
     if (!ok) return
     setGerandoCobrancas(true)
     let criadas = 0, ignoradas = 0
@@ -223,7 +229,7 @@ export default function SAFinanceiro({ empresas, planos }) {
         empresa_id: emp.id,
         descricao: `Mensalidade ${pl.nome_exibicao}`,
         valor: Number(pl.valor_mensal),
-        vencimento, referencia: mesRef, status: 'pendente',
+        vencimento: vencDaEmpresa(emp), referencia: mesRef, status: 'pendente',
       })
       criadas++
     }
