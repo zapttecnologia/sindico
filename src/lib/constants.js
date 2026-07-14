@@ -1,66 +1,88 @@
-export const CATEGORIAS = ['Manutenção','Reclamação','Elevador','Limpeza','Portaria','Interfone/Antena','Outros']
+// ── Formatação ────────────────────────────────────────────────
+export function fmtDate(d) {
+  if (!d) return '—'
+  const dt = new Date(d)
+  const hoje = new Date()
+  const diff = Math.floor((hoje - dt) / 1000)
+  if (diff < 60) return 'agora'
+  if (diff < 3600) return `há ${Math.floor(diff/60)} min`
+  if (diff < 86400) return `há ${Math.floor(diff/3600)}h`
+  if (diff < 172800) return 'ontem'
+  return dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
 
-export const STATUS_ORDER = ['recebido','andamento','concluido']
+export function ticketNumber(id) {
+  return id ? id.slice(-6).toUpperCase() : '------'
+}
 
+// ── Status ────────────────────────────────────────────────────
 export const STATUS_LABEL = {
+  aberto:              'Aberto',
+  em_analise:          'Em análise',
+  em_andamento:        'Em andamento',
+  aguardando_terceiro: 'Aguardando terceiro',
+  resolvido:           'Resolvido',
+  cancelado:           'Cancelado',
+  // legado
   recebido:  'Recebido',
-  andamento: 'Em andamento',
   concluido: 'Concluído',
 }
 
-export const APROVACAO_LABEL = {
-  aguardando: 'Pendente aprovação',
-  aprovado:   'Aprovado',
-  rejeitado:  'Rejeitado',
-}
-
-export const BUCKET_ANEXOS = 'anexos-solicitacoes'
-
-export function ticketNumber(id) {
-  return id.replace(/-/g, '').slice(-6).toUpperCase()
-}
-
-export function fmtDate(ts) {
-  const d = new Date(ts)
-  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-}
+export const STATUS_LIST = [
+  'aberto','em_analise','em_andamento','aguardando_terceiro','resolvido','cancelado'
+]
 
 export function statusClass(s) {
-  return { recebido: 'status-recebido', andamento: 'status-andamento', concluido: 'status-concluido' }[s] || ''
+  const m = {
+    aberto:              'status-aberto',
+    em_analise:          'status-analise',
+    em_andamento:        'status-andamento',
+    aguardando_terceiro: 'status-aguardando',
+    resolvido:           'status-resolvido',
+    cancelado:           'status-cancelado',
+    recebido:            'status-recebido',
+    concluido:           'status-concluido',
+  }
+  return m[s] || 'status-aberto'
 }
 
+// ── Aprovação ─────────────────────────────────────────────────
+export const APROVACAO_LABEL = {
+  aguardando:         'Ag. aprovação',
+  aprovado:           'Aprovado',
+  aprovado_ressalva:  'Aprovado c/ ressalva',
+  rejeitado:          'Rejeitado',
+}
 export function aprovClass(s) {
-  return { aguardando: 'aprov-aguardando', aprovado: 'aprov-aprovado', rejeitado: 'aprov-rejeitado' }[s] || ''
+  const m = {
+    aguardando:'aprov-aguardando', aprovado:'aprov-aprovado',
+    aprovado_ressalva:'aprov-aprovado', rejeitado:'aprov-rejeitado',
+  }
+  return m[s] || ''
 }
 
-export function progressSteps(status) {
-  const idx = STATUS_ORDER.indexOf(status)
-  return STATUS_ORDER.map((_, i) =>
-    i < idx ? 'done' : i === idx ? 'current' : ''
-  )
+// ── Prioridades ───────────────────────────────────────────────
+export const PRIORIDADES = {
+  baixa:    { label:'Baixa',   icon:'🔵', cor:'#3b82f6', bg:'#dbeafe' },
+  media:    { label:'Média',   icon:'🟡', cor:'#f59e0b', bg:'#fef3c7' },
+  alta:     { label:'Alta',    icon:'🟠', cor:'#f97316', bg:'#ffedd5' },
+  urgente:  { label:'Urgente', icon:'🔴', cor:'#dc2626', bg:'#fee2e2' },
+  // legado
+  emergencia:  { label:'Emergência', icon:'🔴', cor:'#dc2626', bg:'#fee2e2' },
+  urgente_old: { label:'Urgente',    icon:'🟠', cor:'#f97316', bg:'#ffedd5' },
+  prioritario: { label:'Prioritário',icon:'🟡', cor:'#f59e0b', bg:'#fef3c7' },
+  rotina:      { label:'Rotina',     icon:'🔵', cor:'#3b82f6', bg:'#dbeafe' },
 }
 
-// Gera iniciais do condomínio (ex.: "Jardins da Cidade" → "JDC")
-export function iniciaisCondo(nome) {
-  if (!nome) return ''
-  return nome
-    .split(' ')
-    .filter(w => w.length > 2 || w === w.toUpperCase()) // ignora "da", "de", etc.
-    .map(w => w[0].toUpperCase())
-    .join('')
-    .slice(0, 4)
-}
+export const PRIORIDADE_LIST = ['baixa','media','alta','urgente']
 
-// Gera código de acesso automático: iniciais + bloco + apto
-// Ex.: JDC + B + 302 → JDCB302
-export function gerarCodigo(nomeCondominio, bloco, apartamento) {
-  const ini = iniciaisCondo(nomeCondominio)
-  const b = (bloco || '').replace(/\s/g, '').toUpperCase().slice(0, 4)
-  const a = (apartamento || '').replace(/\s/g, '').toUpperCase().slice(0, 5)
-  return (ini + b + a).slice(0, 12) // máximo 12 chars
-}
+// ── Categorias (legado — mantido para compatibilidade) ────────
+export const CATEGORIAS = [
+  'Manutencao','Reclamacao','Elevador','Limpeza','Portaria',
+  'Interfone/Antena','Outros','Denuncia','Sugestao',
+]
 
-// Departamentos operacionais
+// ── Departamentos ─────────────────────────────────────────────
 export const DEPARTAMENTOS = {
   manutencao:     'Manutenção',
   limpeza:        'Limpeza',
@@ -71,21 +93,49 @@ export const DEPARTAMENTOS = {
   terceiros:      'Terceiros',
 }
 export const PAPEIS_DEPARTAMENTO = Object.keys(DEPARTAMENTOS)
-export const PAPEIS_EQUIPE = ['equipe','admin','conselheiro','morador']
+export const PAPEIS_EQUIPE      = ['equipe','admin','conselheiro','morador']
 
-// Prioridade dos chamados
-export const PRIORIDADES = {
-  emergencia:  { label:'Emergência/Crítico',    cor:'#dc2626', bg:'#fee2e2', icon:'🔴', ordem:1 },
-  urgente:     { label:'Urgente',               cor:'#ea580c', bg:'#ffedd5', icon:'🟠', ordem:2 },
-  prioritario: { label:'Prioritário',           cor:'#ca8a04', bg:'#fef9c3', icon:'🟡', ordem:3 },
-  rotina:      { label:'Rotina/Administrativo', cor:'#2563eb', bg:'#dbeafe', icon:'🔵', ordem:4 },
+export const SIGLAS_DEPT = {
+  manutencao:'MAN', limpeza:'LIM', administradora:'ADM',
+  portaria:'POR', seguranca:'SEG', zeladoria:'ZEL', terceiros:'TER',
 }
 
-// Status do departamento
+// ── Iniciais do condomínio ────────────────────────────────────
+export function iniciaisCondo(nome) {
+  if (!nome) return ''
+  return nome.split(' ').filter(w => w.length > 2)
+    .map(w => w[0]).join('').toUpperCase().slice(0, 3)
+}
+
+export function gerarCodigo(nomeCondominio, bloco, apartamento) {
+  const ini = iniciaisCondo(nomeCondominio)
+  const b = (bloco || '').replace(/\s/g, '').toUpperCase().slice(0, 4)
+  const a = (apartamento || '').replace(/\s/g, '').toUpperCase().slice(0, 5)
+  return (ini + b + a).slice(0, 12)
+}
+
+// ── Departamentos status ──────────────────────────────────────
 export const STATUS_DEPT = {
-  aguardando:    { label:'Aguardando início', cor:'#6b7280', bg:'#f3f4f6' },
-  em_andamento:  { label:'Em andamento',      cor:'#2563eb', bg:'#dbeafe' },
-  em_aprovacao:  { label:'Em aprovação',      cor:'#d97706', bg:'#fef3c7' },
-  pausado:       { label:'Pausado',           cor:'#dc2626', bg:'#fee2e2' },
-  concluido:     { label:'Concluído',         cor:'#16a34a', bg:'#dcfce7' },
+  aguardando:    { label:'Aguardando',    cor:'#f59e0b' },
+  em_andamento:  { label:'Em andamento',  cor:'#3b82f6' },
+  em_aprovacao:  { label:'Em aprovação',  cor:'#8b5cf6' },
+  pausado:       { label:'Pausado',       cor:'#9ca3af' },
+  concluido:     { label:'Concluído',     cor:'#16a34a' },
+}
+
+export const STATUS_ORDER = ['aberto','em_analise','em_andamento','aguardando_terceiro','resolvido','cancelado']
+
+export const BUCKET_ANEXOS = 'anexos-solicitacoes'
+
+// ── Progress steps para timeline de chamado ───────────────────
+export function progressSteps(status) {
+  const steps = [
+    { key:'aberto',              label:'Aberto' },
+    { key:'em_analise',          label:'Em análise' },
+    { key:'em_andamento',        label:'Em andamento' },
+    { key:'aguardando_terceiro', label:'Aguardando' },
+    { key:'resolvido',           label:'Resolvido' },
+  ]
+  const idx = steps.findIndex(s => s.key === status)
+  return steps.map((s, i) => ({ ...s, done: i <= idx, current: i === idx }))
 }
