@@ -54,14 +54,21 @@ export default function Morador({ view, onToast }) {
   const { perfil, session, logout } = useAuth()
   const [tickets, setTickets] = useState([])
   const [condoInfo, setCondoInfo] = useState(null)
-  const [catSel, setCatSel] = useState(null)
+  const [categorias, setCategorias] = useState([])
+  const [subcategorias, setSubcategorias] = useState([])
+  // Novo fluxo: passo 1=categorias, 2=subcategorias, 3=formulário
+  const [passo, setPasso] = useState(1)
+  const [catSel, setCatSel] = useState(null)       // objeto categoria
+  const [subCatSel, setSubCatSel] = useState(null) // objeto subcategoria
   const [descricao, setDescricao] = useState('')
+  const [prioridade, setPrioridade] = useState('media')
+  const [anonimo, setAnonimo] = useState(false)
   const [extraAnonimo, setExtraAnonimo] = useState(false)
   const [loading, setLoading] = useState(false)
   const [ticketCriado, setTicketCriado] = useState(null)
   const [arquivosSel, setArquivosSel] = useState([])
   const [ticketDetalhe, setTicketDetalhe] = useState(null)
-  const [subTela, setSubTela] = useState(null) // 'regulamento' | 'convencao'
+  const [subTela, setSubTela] = useState(null)
   const MAX_BYTES = 10 * 1024 * 1024
 
   const carregar = async () => {
@@ -73,12 +80,28 @@ export default function Morador({ view, onToast }) {
     ])
     if (t) setTickets(t)
     if (c) setCondoInfo(c)
+
+    // Carregar categorias (filtradas pelo condomínio se configuradas)
+    const { data: catCondo } = perfil.condominio_id
+      ? await supabase.from('categorias_condominio').select('categoria_id').eq('condominio_id', perfil.condominio_id).eq('ativo', true)
+      : { data: null }
+
+    let query = supabase.from('categorias_sistema').select('*').eq('ativo', true).order('ordem')
+    if (catCondo && catCondo.length > 0) {
+      query = query.in('id', catCondo.map(c => c.categoria_id))
+    }
+    const { data: cats } = await query
+    setCategorias(cats || [])
   }
 
   useEffect(() => { carregar() }, [])
 
   // Resetar seleção ao mudar de view
-  useEffect(() => { setCatSel(null); setTicketCriado(null); setDescricao(''); setArquivosSel([]); setSubTela(null) }, [view])
+  useEffect(() => {
+    setPasso(1); setCatSel(null); setSubCatSel(null)
+    setTicketCriado(null); setDescricao(''); setArquivosSel([])
+    setSubTela(null); setAnonimo(false); setPrioridade('media')
+  }, [view])
 
   const kpis = {
     total:    tickets.length,
@@ -94,8 +117,38 @@ export default function Morador({ view, onToast }) {
     e.target.value = ''
   }
 
+  const enviarNovo = async () => {
+    if (!descricao.trim()) { onToast('Descreva o que aconteceu.'); return }
+    setLoading(true)
+    const { data, error } = await supabase.from('solicitacoes').insert({
+      condominio_id:    perfil.condominio_id,
+      autor_id:         session.user.id,
+      categoria:        catSel?.nome || 'Outros',
+      categoria_id:     catSel?.id || null,
+      subcategoria:     subCatSel?.nome || null,
+      subcategoria_id:  subCatSel?.id || null,
+      descricao:        descricao.trim(),
+      prioridade:       prioridade,
+      status:           'aberto',
+      origem:           'Portal do morador',
+      anonimo:          anonimo,
+      nome_solicitante: anonimo ? 'Anônimo' : perfil.nome,
+      bloco:            perfil.bloco,
+      apartamento:      perfil.apartamento,
+    }).select().single()
+    if (error) { setLoading(false); onToast('Erro: '+error.message); return }
+    for (const file of arquivosSel) {
+      const nomeSeguro = `${Date.now()}_${file.name}`.replace(/[^a-zA-Z0-9._-]/g, '_')
+      await supabase.storage.from('anexos-solicitacoes').upload(`${data.id}/${nomeSeguro}`, file)
+    }
+    setLoading(false)
+    setTicketCriado(data); setDescricao(''); setArquivosSel([])
+    setPasso(1); setCatSel(null); setSubCatSel(null); setAnonimo(false); setPrioridade('media')
+    await carregar()
+  }
+
   const enviar = async (tipo) => {
-    if (!descricao.trim()) { onToast('Escreva a descricao.'); return }
+    if (!descricao.trim()) { onToast('Escreva a descrição.'); return }
     setLoading(true)
     const isExtra = ['Denuncia','Sugestao'].includes(tipo)
     const { data, error } = await supabase.from('solicitacoes').insert({
@@ -103,9 +156,10 @@ export default function Morador({ view, onToast }) {
       autor_id: session.user.id,
       categoria: isExtra ? (tipo==='Denuncia'?'Reclamacao':'Outros') : (CAT_LABEL[tipo]||tipo),
       categoria_personalizada: isExtra ? tipo : null,
-      descricao: (isExtra && extraAnonimo ? '[ANONIMO] ' : '') + descricao.trim(),
+      descricao: (isExtra && extraAnonimo ? '[ANÔNIMO] ' : '') + descricao.trim(),
+      status: 'aberto',
       origem: 'Portal do morador',
-      nome_solicitante: isExtra && extraAnonimo ? 'Anonimo' : perfil.nome,
+      nome_solicitante: isExtra && extraAnonimo ? 'Anônimo' : perfil.nome,
       bloco: perfil.bloco,
       apartamento: perfil.apartamento,
     }).select().single()
@@ -416,37 +470,184 @@ export default function Morador({ view, onToast }) {
   )
 
   // ── VIEW: NOVO CHAMADO (grade de categorias) ───────────────
-  if (view === 'novo-chamado') return (
-    <div>
-      {header}
-      <div className="section-group">
-        <div className="section-group-title">Solicitacoes</div>
-        <div className="icon-grid">
-          {CATEGORIAS_CHAMADO.map(cat => (
-            <button key={cat} className="icon-btn" onClick={()=>{setCatSel(cat);setTicketCriado(null);setDescricao('')}}>
-              <div className="icon-btn-icon" style={{ background:CAT_ICONS[cat].bg, color:CAT_ICONS[cat].color }}>
-                {CAT_ICONS[cat].svg}
+  if (view === 'novo-chamado') {
+    const PRIO = [
+      { v:'baixa',   l:'Baixa',   c:'#3b82f6', bg:'#dbeafe', i:'🔵' },
+      { v:'media',   l:'Média',   c:'#f59e0b', bg:'#fef3c7', i:'🟡' },
+      { v:'alta',    l:'Alta',    c:'#f97316', bg:'#ffedd5', i:'🟠' },
+      { v:'urgente', l:'Urgente', c:'#dc2626', bg:'#fee2e2', i:'🔴' },
+    ]
+
+    // Sucesso
+    if (ticketCriado) return (
+      <div>
+        {header}
+        <div className="card" style={{ textAlign:'center', padding:'40px 20px' }}>
+          <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+          <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, color:'var(--navy)', margin:'0 0 8px' }}>
+            Chamado registrado!
+          </h2>
+          <p style={{ color:'var(--gray-500)', fontSize:14, margin:'0 0 8px' }}>
+            {catSel?.nome || 'Solicitação'}{subCatSel ? ` › ${subCatSel.nome}` : ''}
+          </p>
+          <p style={{ color:'var(--gray-400)', fontSize:13, margin:'0 0 24px' }}>
+            Protocolo <b style={{ fontFamily:'var(--font-mono)' }}>#{ticketCriado.id.slice(-6).toUpperCase()}</b>
+          </p>
+          {anonimo && <div style={{ padding:'8px 16px', background:'#f5f3ff', borderRadius:'var(--r-md)', fontSize:13, color:'#6d28d9', marginBottom:16 }}>🔒 Chamado enviado anonimamente</div>}
+          <button className="btn btn-primary" onClick={()=>{ setTicketCriado(null); setPasso(1); setCatSel(null); setSubCatSel(null) }}>
+            Novo chamado
+          </button>
+        </div>
+      </div>
+    )
+
+    // Passo 3 — Formulário
+    if (passo === 3) return (
+      <div>
+        {header}
+        <button onClick={()=>setPasso(2)} style={{ background:'var(--gray-100)', border:'none', borderRadius:'var(--r-md)',
+          padding:'7px 14px', fontSize:13, fontWeight:600, color:'var(--gray-600)', cursor:'pointer', marginBottom:16,
+          display:'flex', alignItems:'center', gap:6 }}>
+          ← Voltar
+        </button>
+
+        {/* Breadcrumb */}
+        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:20, fontSize:14, color:'var(--gray-500)' }}>
+          <span style={{ fontSize:22 }}>{catSel?.icone}</span>
+          <span style={{ fontWeight:600, color:'var(--navy)' }}>{catSel?.nome}</span>
+          {subCatSel && <><span>›</span><span style={{ fontWeight:600, color:'var(--navy)' }}>{subCatSel.icone} {subCatSel.nome}</span></>}
+        </div>
+
+        <div className="card">
+          <div className="field">
+            <label>Descreva o problema *</label>
+            <textarea className="input" rows={5} value={descricao} onChange={e=>setDescricao(e.target.value)}
+              placeholder="Quanto mais detalhes, mais rápida a resolução..."/>
+          </div>
+
+          {/* Prioridade */}
+          <div className="field">
+            <label>Prioridade</label>
+            <div className="chip-row">
+              {PRIO.map(p=>(
+                <button key={p.v} onClick={()=>setPrioridade(p.v)}
+                  style={{ padding:'7px 14px', borderRadius:'var(--r-full)', fontSize:12, fontWeight:700,
+                    cursor:'pointer', transition:'all .15s',
+                    border:`2px solid ${prioridade===p.v?p.c:'var(--gray-200)'}`,
+                    background:prioridade===p.v?p.bg:'#fff',
+                    color:prioridade===p.v?p.c:'var(--gray-500)' }}>
+                  {p.i} {p.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Anonimato (só em Reclamações e Ocorrências) */}
+          {['Reclamações','Ocorrências / Incidentes'].includes(catSel?.nome) && (
+            <div style={{ padding:'14px', background:anonimo?'#f5f3ff':'var(--gray-50)',
+              border:`1.5px solid ${anonimo?'#8b5cf6':'var(--gray-200)'}`,
+              borderRadius:'var(--r-md)', marginBottom:16, cursor:'pointer' }}
+              onClick={()=>setAnonimo(!anonimo)}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <input type="checkbox" checked={anonimo} onChange={()=>{}} style={{ width:16, height:16, cursor:'pointer' }}/>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, color:anonimo?'#6d28d9':'var(--gray-700)' }}>
+                    🔒 Enviar anonimamente
+                  </div>
+                  <div style={{ fontSize:12, color:'var(--gray-400)', marginTop:2 }}>
+                    Seu nome não será revelado. O síndico verá apenas o conteúdo.
+                  </div>
+                </div>
               </div>
-              <span className="icon-btn-label" style={{ fontSize:11 }}>{CAT_LABEL[cat]}</span>
-            </button>
+            </div>
+          )}
+
+          {/* Fotos */}
+          <div className="field">
+            <label>Fotos / Vídeos (opcional)</label>
+            <input type="file" accept="image/*,video/*,.pdf" multiple onChange={e=>{
+              const novos = Array.from(e.target.files||[]).filter(f=>f.size<=MAX_BYTES)
+              setArquivosSel(a=>[...a,...novos].slice(0,5))
+            }} style={{ fontSize:13, color:'var(--gray-600)' }}/>
+            {arquivosSel.length > 0 && (
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+                {arquivosSel.map((f,i)=>(
+                  <div key={i} style={{ display:'flex', alignItems:'center', gap:4, background:'var(--gray-100)',
+                    padding:'4px 10px', borderRadius:'var(--r-full)', fontSize:11 }}>
+                    📎 {f.name.slice(0,20)}
+                    <button onClick={()=>setArquivosSel(a=>a.filter((_,j)=>j!==i))}
+                      style={{ background:'none', border:'none', cursor:'pointer', color:'var(--rust)', fontSize:14, lineHeight:1 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button className="btn btn-primary btn-block" onClick={enviarNovo}
+            disabled={loading || !descricao.trim()} style={{ fontSize:15, padding:'14px' }}>
+            {loading ? 'Enviando...' : '📨 Enviar chamado'}
+          </button>
+        </div>
+      </div>
+    )
+
+    // Passo 2 — Subcategorias
+    if (passo === 2) return (
+      <div>
+        {header}
+        <button onClick={()=>setPasso(1)} style={{ background:'var(--gray-100)', border:'none', borderRadius:'var(--r-md)',
+          padding:'7px 14px', fontSize:13, fontWeight:600, color:'var(--gray-600)', cursor:'pointer', marginBottom:16,
+          display:'flex', alignItems:'center', gap:6 }}>
+          ← Voltar
+        </button>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+          <span style={{ fontSize:28 }}>{catSel?.icone}</span>
+          <div>
+            <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:0 }}>{catSel?.nome}</h2>
+            <p style={{ fontSize:13, color:'var(--gray-400)', margin:'2px 0 0' }}>{catSel?.descricao}</p>
+          </div>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
+          {subcategorias.map(s => (
+            <div key={s.id} className="cat-card" onClick={()=>{ setSubCatSel(s); setPasso(3) }}>
+              <div className="cat-card-icon">{s.icone}</div>
+              <div className="cat-card-nome">{s.nome}</div>
+            </div>
+          ))}
+          <div className="cat-card" onClick={()=>{ setSubCatSel(null); setPasso(3) }}
+            style={{ border:'1.5px dashed var(--gray-300)' }}>
+            <div className="cat-card-icon">📝</div>
+            <div className="cat-card-nome" style={{ color:'var(--gray-400)' }}>Outro / Geral</div>
+          </div>
+        </div>
+      </div>
+    )
+
+    // Passo 1 — Categorias
+    return (
+      <div>
+        {header}
+        <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 6px' }}>
+          Nova solicitação
+        </h2>
+        <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 20px' }}>Selecione o tipo de chamado</p>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
+          {categorias.map(cat => (
+            <div key={cat.id} className="cat-card" onClick={async ()=>{
+              setCatSel(cat); setTicketCriado(null); setDescricao('')
+              const { data:subs } = await supabase.from('subcategorias_sistema')
+                .select('*').eq('categoria_id', cat.id).eq('ativo', true).order('ordem')
+              setSubcategorias(subs||[])
+              setPasso(2)
+            }}>
+              <div className="cat-card-icon">{cat.icone}</div>
+              <div className="cat-card-nome">{cat.nome}</div>
+            </div>
           ))}
         </div>
       </div>
-      <div className="section-group">
-        <div className="section-group-title">Comunicacao</div>
-        <div className="icon-grid">
-          {CATEGORIAS_EXTRA.map(cat => (
-            <button key={cat} className="icon-btn" onClick={()=>{setCatSel(cat);setTicketCriado(null);setDescricao('')}}>
-              <div className="icon-btn-icon" style={{ background:CAT_ICONS[cat].bg, color:CAT_ICONS[cat].color }}>
-                {CAT_ICONS[cat].svg}
-              </div>
-              <span className="icon-btn-label" style={{ fontSize:11 }}>{CAT_LABEL[cat]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
+    )
+  }
 
   // ── VIEW: MEUS CHAMADOS ────────────────────────────────────
   if (view === 'meus-chamados') {
