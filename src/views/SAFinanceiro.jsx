@@ -153,6 +153,7 @@ function SAFinanceiroInterno({ empresas, planos }) {
   const [salvando, setSalvando] = useState(false)
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [loading, setLoading] = useState(true)
+  const [gerandoPDF, setGerandoPDF] = useState(false)
 
   const carregar = async () => {
     setLoading(true)
