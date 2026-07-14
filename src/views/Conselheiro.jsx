@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { ticketNumber, fmtDate, STATUS_LABEL, statusClass, APROVACAO_LABEL, aprovClass } from '../lib/constants'
+import { ticketNumber, fmtDate, STATUS_LABEL, statusClass, APROVACAO_LABEL, aprovClass, PRIORIDADES } from '../lib/constants'
 import TicketCard from '../components/TicketCard'
+
+const MAX_BYTES = 10 * 1024 * 1024  // 10MB por arquivo
 
 export default function Conselheiro({ view, onToast }) {
   const { perfil, session } = useAuth()
@@ -13,6 +15,7 @@ export default function Conselheiro({ view, onToast }) {
   const [subSel, setSubSel] = useState(null)
   const [passo, setPasso] = useState(1)                    // 1=categoria, 2=subcategoria, 3=descrição
   const [descricao, setDescricao] = useState('')
+  const [arquivosSel, setArquivosSel] = useState([])
   const [loading, setLoading] = useState(false)
   const [confirmNum, setConfirmNum] = useState(null)
   const [ticketVotando, setTicketVotando] = useState(null)
@@ -30,9 +33,10 @@ export default function Conselheiro({ view, onToast }) {
   const [fPrioridade, setFPrioridade] = useState('todas')
   // Filtros da aba Aprovações
   const [aBusca, setABusca] = useState('')
-  const [aCategoria, setACategoria] = useState('todas')
+  const [aStatus, setAStatus] = useState('aguardando')  // aguardando | aprovado | rejeitado | todos
+  const [chamadoAberto, setChamadoAberto] = useState(null)
 
-  useEffect(() => { setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setConfirmNum(null) }, [view])
+  useEffect(() => { setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([]); setConfirmNum(null) }, [view])
 
   // Ao escolher categoria no novo chamado, carrega as subcategorias e avança
   const escolherCategoria = async (cat) => {
@@ -83,10 +87,15 @@ export default function Conselheiro({ view, onToast }) {
       bloco: perfil.bloco,
       apartamento: perfil.apartamento,
     }).select().single()
+    if (error) { setLoading(false); onToast('Erro: '+error.message); return }
+    // Upload dos anexos (mesmo padrão do morador: pasta = id da solicitação)
+    for (const file of arquivosSel) {
+      const nomeSeguro = `${Date.now()}_${file.name}`.replace(/[^a-zA-Z0-9._-]/g, '_')
+      await supabase.storage.from('anexos-solicitacoes').upload(`${data.id}/${nomeSeguro}`, file)
+    }
     setLoading(false)
-    if (error) { onToast('Erro: '+error.message); return }
     setConfirmNum(ticketNumber(data.id))
-    setCatSel(null); setSubSel(null); setPasso(1); setDescricao('')
+    setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([])
     await carregar()
   }
 
@@ -234,6 +243,7 @@ export default function Conselheiro({ view, onToast }) {
 
   if (view === 'aprovacoes') {
     const pendentes = tickets.filter(t => t.aprovacao_status === 'aguardando')
+    const emAprovacao = tickets.filter(t => t.aprovacao_status)  // aguardando, aprovado ou rejeitado
 
     // Tela de votação aberta
     if (ticketVotando) return (
@@ -373,41 +383,65 @@ export default function Conselheiro({ view, onToast }) {
       </div>
     )
 
-    // Lista de pendentes
-    const pendFiltrados = pendentes.filter(t => {
+    // Lista filtrada por estado de aprovação
+    const APROV_TABS = [
+      ['aguardando', '⏳ Pendentes'],
+      ['aprovado', '✅ Aprovados'],
+      ['rejeitado', '❌ Não aprovados'],
+      ['todos', 'Todos'],
+    ]
+    const aprovFiltrados = emAprovacao.filter(t => {
+      if (aStatus !== 'todos' && t.aprovacao_status !== aStatus) return false
       if (aBusca) {
         const q = aBusca.toLowerCase()
-        if (!(t.descricao||'').toLowerCase().includes(q) && !(t.nome_solicitante||'').toLowerCase().includes(q) && !(t.condominios?.nome||'').toLowerCase().includes(q)) return false
+        if (!(t.descricao||'').toLowerCase().includes(q) && !(t.nome_solicitante||'').toLowerCase().includes(q) && !(t.condominios?.nome||'').toLowerCase().includes(q) && !(t.categoria||'').toLowerCase().includes(q)) return false
       }
-      if (aCategoria !== 'todas' && t.categoria !== aCategoria) return false
       return true
     })
+    const badgeAprov = (st) => {
+      if (st === 'aprovado') return { bg:'var(--mint)', cor:'var(--emerald)', txt:'✅ Aprovado' }
+      if (st === 'rejeitado') return { bg:'#fef2f2', cor:'var(--rust)', txt:'❌ Não aprovado' }
+      return { bg:'var(--amber-bg)', cor:'#92400e', txt:'⏳ Aguardando voto' }
+    }
     return (
       <div>
         {header}
         <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 16px' }}>
-          Votação do conselho
+          Aprovações do conselho
         </h2>
 
-        {/* Filtros */}
-        {pendentes.length > 0 && (
-          <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
-            <input className="input" placeholder="Buscar..." value={aBusca} onChange={e=>setABusca(e.target.value)} style={{ maxWidth:220 }}/>
-            <select className="input" value={aCategoria} onChange={e=>setACategoria(e.target.value)} style={{ maxWidth:200 }}>
-              <option value="todas">Todas as categorias</option>
-              {categoriasSistema.map(c=><option key={c.nome} value={c.nome}>{c.nome}</option>)}
-            </select>
-            <span style={{ marginLeft:'auto', fontSize:13, color:'var(--gray-400)' }}>{pendFiltrados.length} aguardando</span>
-          </div>
-        )}
+        {/* Abas por estado de aprovação */}
+        <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
+          {APROV_TABS.map(([v,l]) => {
+            const n = v==='todos' ? emAprovacao.length : emAprovacao.filter(t=>t.aprovacao_status===v).length
+            return (
+              <button key={v} onClick={()=>setAStatus(v)}
+                style={{ padding:'7px 14px', borderRadius:'var(--r-full)', border:'none', cursor:'pointer',
+                  fontSize:13, fontWeight:700, transition:'all .15s',
+                  background: aStatus===v ? 'var(--navy)' : 'var(--gray-100)',
+                  color: aStatus===v ? '#fff' : 'var(--gray-600)' }}>
+                {l} {n>0 && <span style={{ opacity:.7 }}>({n})</span>}
+              </button>
+            )
+          })}
+        </div>
 
-        {pendentes.length === 0
-          ? <div className="empty-state">✅ Nenhum chamado aguardando seu voto.</div>
-          : pendFiltrados.length === 0
-          ? <div className="empty-state">Nenhum resultado com esses filtros.</div>
-          : pendFiltrados.map(t => (
+        {/* Busca */}
+        <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
+          <input className="input" placeholder="Buscar por condomínio, solicitante, categoria..." value={aBusca} onChange={e=>setABusca(e.target.value)} style={{ maxWidth:340 }}/>
+          <span style={{ marginLeft:'auto', fontSize:13, color:'var(--gray-400)' }}>{aprovFiltrados.length} chamado{aprovFiltrados.length!==1?'s':''}</span>
+        </div>
+
+        {emAprovacao.length === 0
+          ? <div className="empty-state">Nenhum chamado enviado para aprovação ainda.</div>
+          : aprovFiltrados.length === 0
+          ? <div className="empty-state">Nenhum chamado neste filtro.</div>
+          : aprovFiltrados.map(t => {
+            const bd = badgeAprov(t.aprovacao_status)
+            const podeVotar = t.aprovacao_status === 'aguardando'
+            return (
             <div key={t.id} onClick={()=>abrirVotacao(t)}
-              style={{ background:'#fff', border:'1px solid var(--gray-200)', borderLeft:'3px solid var(--amber)',
+              style={{ background:'#fff', border:'1px solid var(--gray-200)', borderLeft:`3px solid ${bd.cor}`,
                 borderRadius:'var(--r-lg)', padding:'16px 18px', marginBottom:10, cursor:'pointer',
                 transition:'all .15s', boxShadow:'var(--shadow-sm)' }}
               onMouseEnter={e=>{e.currentTarget.style.boxShadow='var(--shadow-md)';e.currentTarget.style.transform='translateY(-1px)'}}
@@ -415,8 +449,8 @@ export default function Conselheiro({ view, onToast }) {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8 }}>
                 <div>
                   <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
-                    background:'var(--amber-bg)', color:'#92400e' }}>
-                    ⏳ Aguardando voto
+                    background:bd.bg, color:bd.cor }}>
+                    {bd.txt}
                   </span>
                   <div style={{ fontFamily:'var(--font-display)', fontSize:16, fontWeight:700, color:'var(--navy)', margin:'8px 0 4px' }}>
                     {t.condominios?.nome}
@@ -425,7 +459,7 @@ export default function Conselheiro({ view, onToast }) {
                 </div>
                 <div style={{ textAlign:'right' }}>
                   <div style={{ fontSize:12, color:'var(--gray-400)' }}>{fmtDate(t.criado_em)}</div>
-                  <div style={{ fontSize:12, color:'var(--blue)', fontWeight:600, marginTop:4 }}>Votar →</div>
+                  <div style={{ fontSize:12, color:'var(--blue)', fontWeight:600, marginTop:4 }}>{podeVotar ? 'Votar →' : 'Ver →'}</div>
                 </div>
               </div>
               {t.descricao && (
@@ -435,7 +469,8 @@ export default function Conselheiro({ view, onToast }) {
                 </p>
               )}
             </div>
-          ))
+            )
+          })
         }
       </div>
     )
@@ -480,7 +515,87 @@ export default function Conselheiro({ view, onToast }) {
 
         {filtrados.length===0
           ? <div className="empty-state">Nenhum chamado com esses filtros.</div>
-          : filtrados.map(t=><TicketCard key={t.id} ticket={t} onUpdate={carregar} onToast={onToast} />)
+          : filtrados.map(t => {
+              const prio = t.prioridade && PRIORIDADES[t.prioridade] ? PRIORIDADES[t.prioridade] : null
+              const accentColor = prio?.cor || (t.status==='resolvido' ? 'var(--emerald)' : t.aprovacao_status==='aguardando' ? 'var(--amber)' : 'var(--blue)')
+              const aberto = chamadoAberto === t.id
+              return (
+                <div key={t.id} style={{ marginBottom:10 }}>
+                  <div onClick={() => setChamadoAberto(aberto ? null : t.id)}
+                    style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
+                      borderLeft:`3px solid ${accentColor}`,
+                      padding:'14px 18px', cursor:'pointer', transition:'all .15s', boxShadow:'var(--shadow-sm)' }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow='var(--shadow-md)'; e.currentTarget.style.transform='translateY(-1px)' }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow='var(--shadow-sm)'; e.currentTarget.style.transform='translateY(0)' }}>
+
+                    {/* Linha 1: categoria + badges + status + data */}
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+                      <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
+                        background:'var(--gray-100)', color:'var(--gray-600)' }}>
+                        {t.categoria_personalizada || t.categoria}
+                      </span>
+                      {prio && (
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:'var(--r-full)',
+                          background:prio.bg, color:prio.cor }}>
+                          {prio.icon} {prio.label}
+                        </span>
+                      )}
+                      {t.aprovacao_status === 'aguardando' && (
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:'var(--r-full)',
+                          background:'var(--amber-bg)', color:'#92400e' }}>
+                          ⏳ Ag. conselheiros
+                        </span>
+                      )}
+                      {t.departamento && (
+                        <span style={{ fontSize:10, fontWeight:600, padding:'3px 8px', borderRadius:'var(--r-full)',
+                          background:'#f5f3ff', color:'#6d28d9' }}>
+                          ⚙ {t.departamento}
+                        </span>
+                      )}
+                      <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:10 }}>
+                        <span className={`status-badge ${statusClass(t.status)}`}>{STATUS_LABEL[t.status]}</span>
+                        <span style={{ fontSize:11, color:'var(--gray-400)', fontFamily:'var(--font-mono)', whiteSpace:'nowrap' }}>
+                          {fmtDate(t.criado_em)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Linha 2: título + solicitante + descrição */}
+                    <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12 }}>
+                      <div>
+                        <div style={{ fontSize:14, fontWeight:700, color:'var(--navy)', marginBottom:2 }}>
+                          {t.condominios?.nome}
+                          {t.bloco ? ` · Bloco ${t.bloco}` : ''}
+                          {t.apartamento ? ` · Ap. ${t.apartamento}` : ''}
+                        </div>
+                        {t.nome_solicitante && (
+                          <div style={{ fontSize:12, color:'var(--gray-400)', display:'flex', alignItems:'center', gap:4 }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                            </svg>
+                            {t.nome_solicitante}
+                          </div>
+                        )}
+                      </div>
+                      {t.descricao && (
+                        <p style={{ fontSize:13, color:'var(--gray-500)', margin:0, maxWidth:'55%',
+                          overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2,
+                          WebkitBoxOrient:'vertical', textAlign:'right', lineHeight:1.4 }}>
+                          {t.descricao}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Ao abrir, mostra o painel completo (chat, anexos, votos) */}
+                  {aberto && (
+                    <div style={{ marginTop:8 }}>
+                      <TicketCard ticket={t} onUpdate={carregar} onToast={onToast} />
+                    </div>
+                  )}
+                </div>
+              )
+            })
         }
       </div>
     )
@@ -565,8 +680,30 @@ export default function Conselheiro({ view, onToast }) {
                 <textarea className="input" rows={4} value={descricao} onChange={e=>setDescricao(e.target.value)}
                   placeholder="Detalhe o que precisa ser resolvido..." />
               </div>
+              <div className="field">
+                <label>Anexos — fotos, vídeos ou PDF (opcional)</label>
+                <input type="file" accept="image/*,video/*,.pdf" multiple onChange={e=>{
+                  const files = Array.from(e.target.files||[])
+                  const invalidos = files.filter(f => f.size > MAX_BYTES)
+                  if (invalidos.length) onToast(`Ignorados (acima de 10MB): ${invalidos.map(f=>f.name).join(', ')}`)
+                  setArquivosSel(a=>[...a, ...files.filter(f=>f.size<=MAX_BYTES)].slice(0,5))
+                  e.target.value = ''
+                }} style={{ fontSize:13, color:'var(--gray-600)' }}/>
+                {arquivosSel.length > 0 && (
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+                    {arquivosSel.map((f,i)=>(
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:4, background:'var(--gray-100)',
+                        padding:'4px 10px', borderRadius:'var(--r-full)', fontSize:11 }}>
+                        📎 {f.name.slice(0,20)}
+                        <button onClick={()=>setArquivosSel(a=>a.filter((_,j)=>j!==i))}
+                          style={{ background:'none', border:'none', cursor:'pointer', color:'var(--rust)', fontSize:14, lineHeight:1 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div style={{ display:'flex', gap:10 }}>
-                <button className="btn" onClick={()=>{ setDescricao('') }} disabled={loading}
+                <button className="btn" onClick={()=>{ setDescricao(''); setArquivosSel([]) }} disabled={loading}
                   style={{ flexShrink:0, background:'var(--gray-100)', color:'var(--gray-600)', border:'none' }}>
                   Limpar
                 </button>
