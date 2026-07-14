@@ -175,6 +175,29 @@ export default function Morador({ view, onToast }) {
 
   const local = [perfil?.bloco?`Bloco ${perfil.bloco}`:'', perfil?.apartamento?`Ap. ${perfil.apartamento}`:''].filter(Boolean).join(', ')
 
+  const header = (
+    <div className="condo-header" style={{ marginBottom:24 }}>
+      <div className="condo-header-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8">
+          <path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/>
+        </svg>
+      </div>
+      <div style={{ flex:1 }}>
+        <div className="condo-header-name">{condoInfo?.nome || 'Meu Condomínio'}</div>
+        <div className="condo-header-sub">{perfil?.nome}{local?` · ${local}`:''}</div>
+      </div>
+      <button onClick={logout} style={{ background:'none', border:'1px solid var(--gray-200)',
+        borderRadius:'var(--r-md)', padding:'6px 12px', fontSize:12, fontWeight:600,
+        color:'var(--gray-500)', cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+          <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Sair
+      </button>
+    </div>
+  )
+
   // ── TELA: REGULAMENTO ───────────────────────────────────────
   if (subTela === 'regulamento') return (
     <div>
