@@ -532,6 +532,21 @@ export default function Morador({ view, onToast }) {
     return (
       <div>
         {header}
+        {/* Indicador de progresso */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
+          {[1,2,3].map(n => (
+            <div key={n} style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{ width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:12, fontWeight:700,
+                background: passo>=n ? 'var(--navy)' : 'var(--gray-200)',
+                color: passo>=n ? '#fff' : 'var(--gray-400)' }}>{n}</div>
+              {n<3 && <div style={{ width:24, height:2, background: passo>n ? 'var(--navy)' : 'var(--gray-200)' }}/>}
+            </div>
+          ))}
+          <span style={{ fontSize:12, color:'var(--gray-400)', marginLeft:6 }}>
+            {passo===1?'Categoria':passo===2?'Subcategoria':'Detalhes'}
+          </span>
+        </div>
         <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 6px' }}>
           Nova solicitação
         </h2>
