@@ -219,6 +219,28 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
         </div>
       )}
 
+      {/* Status do chamado */}
+      {ehEquipe && (
+        <div className="card" style={{ marginBottom:16, padding:'14px 20px' }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
+            🔁 Status do chamado
+          </div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {STATUS_ORDER.map(s=>(
+              <button key={s} disabled={salvando}
+                onClick={()=>{ if (ticket.status!==s) atualizarStatus(s) }}
+                className={`status-badge ${statusClass(s)}`}
+                style={{ padding:'8px 14px', borderRadius:'var(--r-md)', fontWeight:700, fontSize:12,
+                  cursor: ticket.status===s ? 'default' : 'pointer',
+                  border: ticket.status===s ? '2px solid currentColor' : '2px solid transparent',
+                  opacity: ticket.status===s ? 1 : .75 }}>
+                {STATUS_LABEL[s]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Ações rápidas */}
       {ehEquipe && (
         <div className="card" style={{ marginBottom:16, padding:'16px 20px' }}>
@@ -226,26 +248,6 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
             Acoes
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {ticket.status === 'recebido' && (
-              <button className="btn btn-primary btn-sm" disabled={salvando} onClick={() => atualizarStatus('andamento')}>
-                Marcar em andamento
-              </button>
-            )}
-            {ticket.status === 'andamento' && (
-              <button className="btn btn-primary btn-sm" disabled={salvando} onClick={() => atualizarStatus('concluido')}>
-                Marcar como concluido
-              </button>
-            )}
-            {ticket.status === 'concluido' && (
-              <button className="btn btn-ghost btn-sm" disabled={salvando} onClick={() => atualizarStatus('recebido')}>
-                Reabrir chamado
-              </button>
-            )}
-            {ticket.status !== 'recebido' && ticket.status !== 'concluido' && (
-              <button className="btn btn-ghost btn-sm" disabled={salvando} onClick={() => atualizarStatus('recebido')}>
-                Voltar para recebido
-              </button>
-            )}
             {!ticket.aprovacao_status && (
               <button
                 onClick={() => { setShowEnviarConselheiros(!showEnviarConselheiros); setShowAtribuir(false) }}
