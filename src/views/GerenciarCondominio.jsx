@@ -74,14 +74,83 @@ function BlocoRow({ bloco, totalUsuarios, onSave, onDelete }) {
   )
 }
 
+// Tabela de usuários reutilizável (usada em cada grupo: moradores, conselheiros, departamentos)
+function TabelaUsuarios({ lista, onEditar, mostrarBlocoApto=true, mostrarTipo=true }) {
+  if (lista.length === 0) return null
+  const cols = ['Usuário', 'Papel']
+  if (mostrarBlocoApto) cols.push('Bloco/Ap.')
+  if (mostrarTipo) cols.push('Tipo')
+  cols.push('Código', 'Status', '')
+  return (
+    <div style={{ border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
+      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+        <thead>
+          <tr style={{ background:'var(--gray-50)', borderBottom:'1px solid var(--gray-200)' }}>
+            {cols.map((h,i)=>(
+              <th key={i} style={{ padding:'9px 12px', textAlign:'left', fontSize:11, fontWeight:700,
+                color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', whiteSpace:'nowrap' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {lista.map((u,i) => (
+            <tr key={u.id} style={{ borderBottom:'1px solid var(--gray-100)', background:i%2===0?'#fff':'var(--gray-50)' }}>
+              <td style={{ padding:'10px 12px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ width:32, height:32, borderRadius:'50%', background:'var(--mint)',
+                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'var(--emerald)', flexShrink:0 }}>
+                    {(u.nome||'?')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight:600, color:'var(--gray-800)' }}>{u.nome||'—'}</div>
+                    <div style={{ fontSize:11, color:'var(--gray-400)' }}>{u.email}</div>
+                  </div>
+                </div>
+              </td>
+              <td style={{ padding:'10px 12px' }}>
+                <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:5,
+                  background:'var(--gray-100)', color:PAPEL_COR[u.papel]||'var(--gray-400)',
+                  textTransform:'uppercase', letterSpacing:'.03em' }}>
+                  {PAPEL_LABEL[u.papel]||u.papel}
+                </span>
+              </td>
+              {mostrarBlocoApto && (
+                <td style={{ padding:'10px 12px', color:'var(--gray-500)', fontSize:12 }}>
+                  {u.bloco ? `${u.bloco}${u.apartamento?' · Ap '+u.apartamento:''}` : '—'}
+                </td>
+              )}
+              {mostrarTipo && (
+                <td style={{ padding:'10px 12px', fontSize:12, color:'var(--gray-500)' }}>
+                  {u.tipo_ocupacao === 'inquilino' ? '🔑 Inquilino' : u.tipo_ocupacao === 'proprietario' ? '🏠 Proprietário' : '—'}
+                </td>
+              )}
+              <td style={{ padding:'10px 12px', fontFamily:'monospace', color:'var(--navy)', fontSize:12 }}>
+                {u.codigo_acesso||'—'}
+              </td>
+              <td style={{ padding:'10px 12px' }}>
+                {u.primeiro_acesso === true
+                  ? <span style={{ fontSize:10, background:'#fff3dc', color:'#8a5a00', padding:'2px 7px', borderRadius:4, fontWeight:700 }}>1º acesso</span>
+                  : <span style={{ fontSize:11, color:'var(--emerald)', fontWeight:600 }}>✓ Ativo</span>}
+              </td>
+              <td style={{ padding:'10px 12px' }}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>onEditar({...u,novaSenha:''})}>Editar</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
   const { perfil } = useAuth()
   const [aba, setAba] = useState('usuarios')
+  const [grupoAba, setGrupoAba] = useState('moradores')  // moradores | conselheiros | departamentos
   const [usuarios, setUsuarios] = useState([])
   const [blocos, setBlocos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
-  const [filtroPapel, setFiltroPapel] = useState('todos')
   const [modalNovo, setModalNovo] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
   const [modalImportar, setModalImportar] = useState(false)
@@ -189,12 +258,6 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
     onToast('Condomínio atualizado!')
   }
 
-  const usuariosFiltrados = usuarios.filter(u => {
-    if (busca && !u.nome?.toLowerCase().includes(busca.toLowerCase()) && !u.codigo_acesso?.toLowerCase().includes(busca.toLowerCase())) return false
-    if (filtroPapel !== 'todos' && u.papel !== filtroPapel) return false
-    return true
-  })
-
   const blocosDoCondo = blocos.map(b => b.nome)
 
   const kpis = {
@@ -249,98 +312,93 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
         ))}
       </div>
 
-      {/* ── ABA USUÁRIOS ── */}
-      {aba==='usuarios' && (
+      {/* ── ABA USUÁRIOS (separada por grupo) ── */}
+      {aba==='usuarios' && (() => {
+        // Aplica a busca de texto sobre todos os usuários
+        const q = busca.trim().toLowerCase()
+        const matchBusca = (u) => !q || (u.nome||'').toLowerCase().includes(q) || (u.codigo_acesso||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)
+        const moradores = usuarios.filter(u => u.papel==='morador' && matchBusca(u))
+        const conselheiros = usuarios.filter(u => u.papel==='conselheiro' && matchBusca(u))
+        const equipe = usuarios.filter(u => PAPEIS_DEPT.includes(u.papel) && matchBusca(u))
+        // Papel pré-selecionado ao criar, conforme o grupo ativo
+        const papelPadrao = grupoAba==='moradores' ? 'morador' : grupoAba==='conselheiros' ? 'conselheiro' : 'manutencao'
+        const abrirNovo = () => { setNovoConta(n => ({ ...n, papel: papelPadrao })); setModalNovo(true) }
+        const GRUPOS = [
+          ['moradores', '👥 Moradores', usuarios.filter(u=>u.papel==='morador').length],
+          ['conselheiros', '🏛️ Conselheiros', usuarios.filter(u=>u.papel==='conselheiro').length],
+          ['departamentos', '🔧 Departamentos', usuarios.filter(u=>PAPEIS_DEPT.includes(u.papel)).length],
+        ]
+        return (
         <div>
+          {/* Sub-abas de grupo */}
+          <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+            {GRUPOS.map(([id,label,count]) => (
+              <button key={id} onClick={()=>setGrupoAba(id)} style={{
+                padding:'8px 16px', borderRadius:'var(--r-md)', fontSize:13, fontWeight:700, cursor:'pointer',
+                border: grupoAba===id ? '2px solid var(--emerald)' : '1px solid var(--gray-200)',
+                background: grupoAba===id ? 'var(--mint)' : '#fff',
+                color: grupoAba===id ? 'var(--emerald)' : 'var(--gray-500)' }}>
+                {label} <span style={{ opacity:.7 }}>· {count}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Busca + ações */}
           <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap', alignItems:'center' }}>
             <input placeholder="Buscar por nome ou código..." value={busca} onChange={e=>setBusca(e.target.value)}
               className="input" style={{ maxWidth:240 }}/>
-            <select value={filtroPapel} onChange={e=>setFiltroPapel(e.target.value)} className="input" style={{ maxWidth:180 }}>
-              <option value="todos">Todos os papéis</option>
-              <option value="morador">Moradores</option>
-              <option value="conselheiro">Conselheiros</option>
-              <optgroup label="Departamentos">
-                {PAPEIS_DEPT.map(p=><option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}
-              </optgroup>
-            </select>
             <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
-              <button className="btn btn-ghost btn-sm" onClick={()=>setModalImportar(true)}
-                style={{ display:'flex', alignItems:'center', gap:6 }}>
-                📊 Importar Excel
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={()=>setModalNovo(true)}>
-                + Novo usuário
+              {grupoAba==='moradores' && (
+                <button className="btn btn-ghost btn-sm" onClick={()=>setModalImportar(true)} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  📊 Importar Excel
+                </button>
+              )}
+              <button className="btn btn-primary btn-sm" onClick={abrirNovo}>
+                + Novo {grupoAba==='moradores'?'morador':grupoAba==='conselheiros'?'conselheiro':'membro'}
               </button>
             </div>
           </div>
 
           {loading && <div className="empty-state">Carregando...</div>}
 
-          {!loading && usuariosFiltrados.length === 0 && (
-            <div className="empty-state">
-              {busca || filtroPapel!=='todos' ? 'Nenhum usuário encontrado com esses filtros.' : 'Nenhum usuário cadastrado neste condomínio.'}
-            </div>
+          {/* MORADORES */}
+          {!loading && grupoAba==='moradores' && (
+            moradores.length === 0
+              ? <div className="empty-state">{q ? 'Nenhum morador encontrado.' : 'Nenhum morador cadastrado neste condomínio.'}</div>
+              : <TabelaUsuarios lista={moradores} onEditar={setModalEditar} />
           )}
 
-          {/* Tabela de usuários */}
-          {!loading && usuariosFiltrados.length > 0 && (
-            <div style={{ border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-                <thead>
-                  <tr style={{ background:'var(--gray-50)', borderBottom:'1px solid var(--gray-200)' }}>
-                    {['Usuário','Papel','Bloco/Ap.','Tipo','Código','Status',''].map(h=>(
-                      <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:11, fontWeight:700,
-                        color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', whiteSpace:'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {usuariosFiltrados.map((u,i) => (
-                    <tr key={u.id} style={{ borderBottom:'1px solid var(--gray-100)', background:i%2===0?'#fff':'var(--gray-50)' }}>
-                      <td style={{ padding:'10px 12px' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                          <div style={{ width:32, height:32, borderRadius:'50%', background:'var(--mint)',
-                            display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'var(--emerald)', flexShrink:0 }}>
-                            {(u.nome||'?')[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight:600, color:'var(--gray-800)' }}>{u.nome||'—'}</div>
-                            <div style={{ fontSize:11, color:'var(--gray-400)' }}>{u.email}</div>
-                          </div>
+          {/* CONSELHEIROS */}
+          {!loading && grupoAba==='conselheiros' && (
+            conselheiros.length === 0
+              ? <div className="empty-state">{q ? 'Nenhum conselheiro encontrado.' : 'Nenhum conselheiro cadastrado. Conselheiros votam nas aprovações do condomínio.'}</div>
+              : <TabelaUsuarios lista={conselheiros} onEditar={setModalEditar} mostrarTipo={false} />
+          )}
+
+          {/* DEPARTAMENTOS — agrupados por função */}
+          {!loading && grupoAba==='departamentos' && (
+            equipe.length === 0
+              ? <div className="empty-state">{q ? 'Nenhum membro encontrado.' : 'Nenhum departamento cadastrado neste condomínio.'}</div>
+              : <div style={{ display:'grid', gap:20 }}>
+                  {PAPEIS_DEPT.map(dep => {
+                    const membros = equipe.filter(u => u.papel === dep)
+                    if (membros.length === 0) return null
+                    return (
+                      <div key={dep}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                          <span style={{ width:10, height:10, borderRadius:'50%', background:PAPEL_COR[dep], display:'inline-block' }}></span>
+                          <span style={{ fontSize:13, fontWeight:800, color:'var(--navy)' }}>{PAPEL_LABEL[dep]}</span>
+                          <span style={{ fontSize:12, color:'var(--gray-400)' }}>· {membros.length}</span>
                         </div>
-                      </td>
-                      <td style={{ padding:'10px 12px' }}>
-                        <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:5,
-                          background:'var(--gray-100)', color:PAPEL_COR[u.papel]||'var(--gray-400)',
-                          textTransform:'uppercase', letterSpacing:'.03em' }}>
-                          {PAPEL_LABEL[u.papel]||u.papel}
-                        </span>
-                      </td>
-                      <td style={{ padding:'10px 12px', color:'var(--gray-500)', fontSize:12 }}>
-                        {u.bloco ? `${u.bloco}${u.apartamento?' · Ap '+u.apartamento:''}` : '—'}
-                      </td>
-                      <td style={{ padding:'10px 12px', fontSize:12, color:'var(--gray-500)' }}>
-                        {u.tipo_ocupacao === 'inquilino' ? '🔑 Inquilino' : u.tipo_ocupacao === 'proprietario' ? '🏠 Proprietário' : '—'}
-                      </td>
-                      <td style={{ padding:'10px 12px', fontFamily:'monospace', color:'var(--navy)', fontSize:12 }}>
-                        {u.codigo_acesso||'—'}
-                      </td>
-                      <td style={{ padding:'10px 12px' }}>
-                        {u.primeiro_acesso === true
-                          ? <span style={{ fontSize:10, background:'#fff3dc', color:'#8a5a00', padding:'2px 7px', borderRadius:4, fontWeight:700 }}>1º acesso</span>
-                          : <span style={{ fontSize:11, color:'var(--emerald)', fontWeight:600 }}>✓ Ativo</span>}
-                      </td>
-                      <td style={{ padding:'10px 12px' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={()=>setModalEditar({...u,novaSenha:''})}>Editar</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <TabelaUsuarios lista={membros} onEditar={setModalEditar} mostrarBlocoApto={false} mostrarTipo={false} />
+                      </div>
+                    )
+                  })}
+                </div>
           )}
         </div>
-      )}
+        )
+      })()}
 
       {/* ── ABA BLOCOS ── */}
       {aba==='blocos' && (
