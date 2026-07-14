@@ -30,7 +30,7 @@ function KPI({ label, value, sub, cor, icon, prefix='', suffix='', C }) {
         <span style={{ fontSize:18 }}>{icon}</span>
       </div>
       <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:cor||C.text, lineHeight:1 }}>
-        {prefix}{typeof value==='number'?value.toLocaleString('pt-BR',{minimumFractionDigits:value%1?2:0}):value}{suffix}
+        {prefix}{typeof value==='number'?value.toLocaleString('pt-BR',{minimumFractionDigits:value%1?2:0, maximumFractionDigits:2}):value}{suffix}
       </div>
       {sub && <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>{sub}</div>}
     </div>

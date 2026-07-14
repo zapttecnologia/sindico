@@ -169,6 +169,8 @@ export default function SuperAdmin({ onToast }) {
   const [modalNova, setModalNova] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
   const [busca, setBusca] = useState('')
+  const [filtroPlano, setFiltroPlano] = useState('todos')
+  const [filtroStatusCli, setFiltroStatusCli] = useState('todos')
   const VAZIO = { nome:'', nome_fantasia:'', cnpj:'', inscricao_estadual:'', email_contato:'', telefone_contato:'', responsavel_nome:'',
     resp_fin_nome:'', resp_fin_email:'', resp_fin_telefone:'',
     cep:'', logradouro:'', bairro:'', cidade:'', uf:'',
@@ -227,10 +229,14 @@ export default function SuperAdmin({ onToast }) {
   const empresasFiltradas = () => {
     let base = empresas
     if (busca) base = base.filter(e => e.nome.toLowerCase().includes(busca.toLowerCase()) || (e.email_contato||'').toLowerCase().includes(busca.toLowerCase()))
-    if (subMenu === 'ativos') return base.filter(e => e.status === 'ativa')
-    if (subMenu === 'inadimplentes') return base.filter(e => e.status === 'inadimplente')
-    if (subMenu === 'suspensos') return base.filter(e => e.status === 'suspensa')
-    if (subMenu === 'cancelados') return base.filter(e => e.status === 'cancelada')
+    // Filtro de status pelo submenu lateral (tem precedência quando selecionado)
+    if (subMenu === 'ativos') base = base.filter(e => e.status === 'ativa')
+    else if (subMenu === 'inadimplentes') base = base.filter(e => e.status === 'inadimplente')
+    else if (subMenu === 'suspensos') base = base.filter(e => e.status === 'suspensa')
+    else if (subMenu === 'cancelados') base = base.filter(e => e.status === 'cancelada')
+    else if (filtroStatusCli !== 'todos') base = base.filter(e => e.status === filtroStatusCli) // filtro da tela (aba "Todos")
+    // Filtro por plano (select da tela)
+    if (filtroPlano !== 'todos') base = base.filter(e => e.plano_nome === filtroPlano)
     return base
   }
 
@@ -587,10 +593,25 @@ export default function SuperAdmin({ onToast }) {
                   </h2>
                   <p style={{ margin:'4px 0 0', fontSize:13, color:C.muted }}>{empresasFiltradas().length} empresa{empresasFiltradas().length!==1?'s':''}</p>
                 </div>
-                <div style={{ display:'flex', gap:10 }}>
-                  <input placeholder="Buscar..." value={busca} onChange={e=>setBusca(e.target.value)}
-                    style={{ background:'rgba(255,255,255,.05)', border:`1px solid ${C.border}`, borderRadius:8,
-                      padding:'8px 14px', color:C.text, fontSize:13, width:200, outline:'none' }}/>
+                <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+                  <input placeholder="Buscar cliente..." value={busca} onChange={e=>setBusca(e.target.value)}
+                    style={{ background:tema==='dark'?'rgba(255,255,255,.05)':'#fff', border:`1px solid ${C.border}`, borderRadius:8,
+                      padding:'8px 14px', color:C.text, fontSize:13, width:180, outline:'none', colorScheme:C.selectScheme }}/>
+                  <select value={filtroPlano} onChange={e=>setFiltroPlano(e.target.value)}
+                    style={{ background:C.inputBg, border:`1px solid ${C.border}`, borderRadius:8, padding:'8px 12px', color:C.text, fontSize:13, outline:'none', colorScheme:C.selectScheme }}>
+                    <option value="todos">Todos os planos</option>
+                    {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
+                  </select>
+                  {(!subMenu || subMenu==='todos') && (
+                    <select value={filtroStatusCli} onChange={e=>setFiltroStatusCli(e.target.value)}
+                      style={{ background:C.inputBg, border:`1px solid ${C.border}`, borderRadius:8, padding:'8px 12px', color:C.text, fontSize:13, outline:'none', colorScheme:C.selectScheme }}>
+                      <option value="todos">Todos os status</option>
+                      <option value="ativa">Ativa</option>
+                      <option value="inadimplente">Inadimplente</option>
+                      <option value="suspensa">Suspensa</option>
+                      <option value="cancelada">Cancelada</option>
+                    </select>
+                  )}
                   <Btn onClick={()=>setModalNova(true)}>+ Nova empresa</Btn>
                 </div>
               </div>
