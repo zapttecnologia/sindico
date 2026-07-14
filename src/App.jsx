@@ -10,6 +10,7 @@ import Conselheiro from './views/Conselheiro'
 import Admin from './views/Admin'
 import Perfil from './views/Perfil'
 import Relatorio from './views/Relatorio'
+import Fornecedores from './views/Fornecedores'
 import Departamento from './views/Departamento'
 import { Toast, useToast } from './components/Toast'
 
@@ -37,6 +38,7 @@ function AppNormal() {
       if (activeView === 'admin')     return <Admin onToast={toast} />
       if (activeView === 'perfil')    return <Perfil onToast={toast} />
       if (activeView === 'relatorio') return <Relatorio onToast={toast} />
+      if (activeView === 'fornecedores') return <Fornecedores onToast={toast} />
       return <Equipe view={activeView} onToast={toast} />
     }
     return <div style={{ padding:40 }}>Papel nao reconhecido: {perfil?.papel}</div>
