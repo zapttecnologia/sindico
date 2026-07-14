@@ -12,9 +12,9 @@ class ErroBoundary extends React.Component {
   render(){
     if (this.state.erro) {
       return (
-        <div style={{ padding:24, background:'#111827', border:'1px solid rgba(239,68,68,.4)', borderRadius:12, color:'#f1f5f9', margin:20 }}>
+        <div style={{ padding:24, background:'#fef2f2', border:'1px solid rgba(239,68,68,.4)', borderRadius:12, color:'#7f1d1d', margin:20 }}>
           <div style={{ fontSize:15, fontWeight:700, color:'#ef4444', marginBottom:8 }}>Algo quebrou ao montar o financeiro</div>
-          <div style={{ fontSize:13, color:'#94a3b8', fontFamily:'monospace', whiteSpace:'pre-wrap' }}>{String(this.state.erro?.message || this.state.erro)}</div>
+          <div style={{ fontSize:13, fontFamily:'monospace', whiteSpace:'pre-wrap' }}>{String(this.state.erro?.message || this.state.erro)}</div>
         </div>
       )
     }
@@ -22,23 +22,17 @@ class ErroBoundary extends React.Component {
   }
 }
 
-const C = {
-  bg:'#0a0d14', surface:'#111827', border:'rgba(255,255,255,.07)',
-  text:'#f1f5f9', muted:'#64748b', green:'#22c55e', amber:'#f59e0b',
-  red:'#ef4444', blue:'#3b82f6', purple:'#8b5cf6', violet:'#a855f7',
-}
-
-function KPI({ label, value, sub, cor, icon, prefix='', suffix='' }) {
+function KPI({ label, value, sub, cor, icon, prefix='', suffix='', C }) {
   return (
-    <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'20px 22px' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
-        <span style={{ fontSize:13, fontWeight:600, color:C.muted }}>{label}</span>
-        <span style={{ fontSize:20 }}>{icon}</span>
+    <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'18px 20px', boxShadow:C.shadow||'none' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+        <span style={{ fontSize:12, fontWeight:600, color:C.muted }}>{label}</span>
+        <span style={{ fontSize:18 }}>{icon}</span>
       </div>
-      <div style={{ fontFamily:'var(--font-display)', fontSize:32, fontWeight:800, color:cor||C.text, lineHeight:1 }}>
+      <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:cor||C.text, lineHeight:1 }}>
         {prefix}{typeof value==='number'?value.toLocaleString('pt-BR',{minimumFractionDigits:value%1?2:0}):value}{suffix}
       </div>
-      {sub && <div style={{ fontSize:12, color:C.muted, marginTop:6 }}>{sub}</div>}
+      {sub && <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>{sub}</div>}
     </div>
   )
 }
@@ -60,13 +54,14 @@ function StatusBadge({ status }) {
 }
 
 // Gráfico de barras: faturado vs recebido (6 meses)
-function BarChart6({ dados }) {
+function BarChart6({ dados, C }) {
+  const grade = C.tema==='light' ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.06)'
   const max = Math.max(1, ...dados.map(d => Math.max(d.faturado, d.recebido)))
   const W = 520, H = 200, pad = 28, bw = (W - pad*2) / dados.length
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto' }}>
       {[0.25,0.5,0.75,1].map(t => (
-        <line key={t} x1={pad} y1={H-30-(H-50)*t} x2={W-pad} y2={H-30-(H-50)*t} stroke="rgba(255,255,255,.06)" strokeWidth="1"/>
+        <line key={t} x1={pad} y1={H-30-(H-50)*t} x2={W-pad} y2={H-30-(H-50)*t} stroke={grade} strokeWidth="1"/>
       ))}
       {dados.map((d,i) => {
         const x = pad + i*bw
@@ -77,7 +72,7 @@ function BarChart6({ dados }) {
           <g key={i}>
             <rect x={x+bw*0.16} y={H-30-hF} width={w} height={hF} rx="3" fill="#3b82f6" opacity="0.85"/>
             <rect x={x+bw*0.52} y={H-30-hR} width={w} height={hR} rx="3" fill="#22c55e"/>
-            <text x={x+bw*0.5} y={H-12} fontSize="10" fill="#64748b" textAnchor="middle">{d.mes}</text>
+            <text x={x+bw*0.5} y={H-12} fontSize="10" fill={C.muted} textAnchor="middle">{d.mes}</text>
           </g>
         )
       })}
@@ -86,7 +81,7 @@ function BarChart6({ dados }) {
 }
 
 // Gráfico donut: composição da receita por plano
-function DonutChart({ dados, total }) {
+function DonutChart({ dados, total, C }) {
   const cores = ['#8b5cf6','#3b82f6','#22c55e','#f59e0b','#ef4444']
   const R = 70, r = 44, cx = 90, cy = 90
   let ang = -Math.PI/2
@@ -111,7 +106,7 @@ function DonutChart({ dados, total }) {
         {arcos.map((a,i) => (
           <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
             <span style={{ width:10, height:10, borderRadius:2, background:a.cor, display:'inline-block' }}/>
-            <span style={{ fontSize:12, color:'#f1f5f9', flex:1 }}>{a.nome}</span>
+            <span style={{ fontSize:12, color:C.text, flex:1 }}>{a.nome}</span>
             <span style={{ fontSize:12, fontWeight:700, color:a.cor }}>{Math.round(a.frac*100)}%</span>
           </div>
         ))}
@@ -121,9 +116,10 @@ function DonutChart({ dados, total }) {
 }
 
 // Gráfico de linha: fluxo de caixa projetado (30 dias)
-function LineChart30({ dados }) {
+function LineChart30({ dados, C }) {
+  const grade = C.tema==='light' ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.06)'
   const W = 520, H = 180, pad = 34
-  if (dados.length === 0) return <div style={{ color:'#64748b', fontSize:13, padding:'20px 0', textAlign:'center' }}>Nenhuma fatura a vencer nos próximos 30 dias.</div>
+  if (dados.length === 0) return <div style={{ color:C.muted, fontSize:13, padding:'20px 0', textAlign:'center' }}>Nenhuma fatura a vencer nos próximos 30 dias.</div>
   const max = Math.max(1, ...dados.map(d => d.valor))
   const x0 = new Date().getTime()
   const xN = x0 + 30*86400000
@@ -134,18 +130,21 @@ function LineChart30({ dados }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto' }}>
       {[0.25,0.5,0.75,1].map(t => (
-        <line key={t} x1={pad} y1={py(max*t)} x2={W-pad} y2={py(max*t)} stroke="rgba(255,255,255,.06)" strokeWidth="1"/>
+        <line key={t} x1={pad} y1={py(max*t)} x2={W-pad} y2={py(max*t)} stroke={grade} strokeWidth="1"/>
       ))}
       <path d={area} fill="rgba(139,92,246,.15)"/>
       <polyline points={pts.join(' ')} fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinejoin="round"/>
       {dados.map((d,i) => <circle key={i} cx={px(d.data)} cy={py(d.valor)} r="3" fill="#8b5cf6"/>)}
-      <text x={pad} y={H-8} fontSize="10" fill="#64748b">hoje</text>
-      <text x={W-pad} y={H-8} fontSize="10" fill="#64748b" textAnchor="end">+30 dias</text>
+      <text x={pad} y={H-8} fontSize="10" fill={C.muted}>hoje</text>
+      <text x={W-pad} y={H-8} fontSize="10" fill={C.muted} textAnchor="end">+30 dias</text>
     </svg>
   )
 }
 
-function SAFinanceiroInterno({ empresas, planos }) {
+function SAFinanceiroInterno({ empresas, planos, C: Cprop, tema }) {
+  // Tema vindo do SuperAdmin; fallback escuro se não vier (compatibilidade)
+  const C = { bg:'#0a0d14', surface:'#111827', card:'#161b22', border:'rgba(255,255,255,.07)',
+    text:'#f1f5f9', muted:'#64748b', shadow:'none', ...(Cprop||{}), tema: tema||'dark' }
   const [faturas, setFaturas] = useState([])
   const [subSecao, setSubSecao] = useState('overview')
   const [modalNova, setModalNova] = useState(false)
@@ -154,6 +153,25 @@ function SAFinanceiroInterno({ empresas, planos }) {
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [loading, setLoading] = useState(true)
   const [gerandoPDF, setGerandoPDF] = useState(false)
+  const [autoGerar, setAutoGerar] = useState(false)
+  const [autoDia, setAutoDia] = useState(5)
+  const [salvandoAuto, setSalvandoAuto] = useState(false)
+
+  // Carrega a config de geração automática (platform_settings)
+  useEffect(() => {
+    supabase.from('platform_settings').select('auto_gerar_faturas, auto_gerar_dia').eq('id','default').maybeSingle()
+      .then(({ data }) => { if (data) { setAutoGerar(!!data.auto_gerar_faturas); setAutoDia(data.auto_gerar_dia || 5) } })
+      .catch(()=>{})
+  }, [])
+
+  const salvarAutoGerar = async (ativo, dia) => {
+    setSalvandoAuto(true)
+    const { error } = await supabase.from('platform_settings')
+      .update({ auto_gerar_faturas: ativo, auto_gerar_dia: Number(dia) }).eq('id','default')
+    setSalvandoAuto(false)
+    if (error) { alert('Erro ao salvar: '+error.message); return }
+    setAutoGerar(ativo); setAutoDia(Number(dia))
+  }
 
   const carregar = async () => {
     setLoading(true)
@@ -435,23 +453,22 @@ function SAFinanceiroInterno({ empresas, planos }) {
       {/* ── VISÃO GERAL ── */}
       {subSecao === 'overview' && (
         <div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:14, marginBottom:24 }}>
-            <KPI label="MRR" value={mrr} prefix="R$ " cor="#22c55e" icon="📈"
-              sub={`${empresasAtivas.length} clientes ativos`} />
-            <KPI label="ARR" value={arr} prefix="R$ " cor="#3b82f6" icon="🎯"
-              sub="Receita anual recorrente" />
-            <KPI label="Ticket médio" value={ticketMedio} prefix="R$ " cor="#8b5cf6" icon="📊"
-              sub="Por cliente ativo" />
-            <KPI label="Churn rate" value={churnRate} suffix="%" cor={churnRate>5?'#ef4444':'#22c55e'} icon="📉"
-              sub={`${churn} cancelamentos`} />
-            <KPI label="Inadimplentes" value={totalInadimplentes} cor={totalInadimplentes>0?'#ef4444':'#22c55e'} icon="⚠️"
-              sub="Clientes em atraso" />
-            <KPI label="A receber" value={totalPendente} prefix="R$ " cor="#f59e0b" icon="💸"
-              sub={`${faturasPendentes.length} fatura${faturasPendentes.length!==1?'s':''} pendente${faturasPendentes.length!==1?'s':''}`} />
-            <KPI label="Recebido" value={totalRecebido} prefix="R$ " cor="#22c55e" icon="✅"
-              sub="Faturas pagas (total)" />
-            <KPI label="Inadimplência" value={Number(inadimplenciaPct.toFixed(1))} suffix="%" cor={inadimplenciaPct>0?'#ef4444':'#22c55e'} icon="⚠️"
-              sub={`${fmt(totalAtrasado)} em ${faturasAtrasadas.length} fatura${faturasAtrasadas.length!==1?'s':''} atrasada${faturasAtrasadas.length!==1?'s':''}`} />
+          {/* KPIs principais — 4 em destaque */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:14, marginBottom:14 }}>
+            <KPI C={C} label="MRR" value={mrr} prefix="R$ " cor="#22c55e" icon="📈" sub={`${empresasAtivas.length} clientes ativos`} />
+            <KPI C={C} label="Recebido" value={totalRecebido} prefix="R$ " cor="#22c55e" icon="✅" sub="Faturas pagas (total)" />
+            <KPI C={C} label="A receber" value={totalPendente} prefix="R$ " cor="#f59e0b" icon="💸"
+              sub={`${faturasPendentes.length} pendente${faturasPendentes.length!==1?'s':''}`} />
+            <KPI C={C} label="Inadimplência" value={Number(inadimplenciaPct.toFixed(1))} suffix="%" cor={inadimplenciaPct>0?'#ef4444':'#22c55e'} icon="⚠️"
+              sub={`${fmt(totalAtrasado)} · ${faturasAtrasadas.length} atrasada${faturasAtrasadas.length!==1?'s':''}`} />
+          </div>
+
+          {/* KPIs secundários — 4 métricas de contexto */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:14, marginBottom:24 }}>
+            <KPI C={C} label="ARR" value={arr} prefix="R$ " cor="#3b82f6" icon="🎯" sub="Receita anual" />
+            <KPI C={C} label="Ticket médio" value={ticketMedio} prefix="R$ " cor="#8b5cf6" icon="📊" sub="Por cliente" />
+            <KPI C={C} label="Churn rate" value={churnRate} suffix="%" cor={churnRate>5?'#ef4444':'#22c55e'} icon="📉" sub={`${churn} cancelados`} />
+            <KPI C={C} label="Inadimplentes" value={totalInadimplentes} cor={totalInadimplentes>0?'#ef4444':C.muted} icon="🔔" sub="Clientes em atraso" />
           </div>
 
           {/* Receitas vs Recebido — 6 meses */}
@@ -463,7 +480,7 @@ function SAFinanceiroInterno({ empresas, planos }) {
                 <span style={{ color:C.muted }}><span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:'#22c55e', marginRight:5 }}/>Recebido</span>
               </div>
             </div>
-            <BarChart6 dados={serie6meses} />
+            <BarChart6 dados={serie6meses} C={C} />
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
@@ -472,7 +489,7 @@ function SAFinanceiroInterno({ empresas, planos }) {
               <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:16 }}>Composição do MRR por plano</div>
               {receitaPorPlano.length === 0
                 ? <p style={{ color:C.muted, fontSize:13 }}>Sem dados de planos.</p>
-                : <DonutChart dados={receitaPorPlano} total={mrr} />}
+                : <DonutChart dados={receitaPorPlano} total={mrr} C={C} />}
             </div>
 
             {/* Previsão de fluxo — 30 dias */}
@@ -481,7 +498,7 @@ function SAFinanceiroInterno({ empresas, planos }) {
                 <span style={{ fontSize:14, fontWeight:700, color:C.text }}>Fluxo projetado · 30 dias</span>
                 <span style={{ fontSize:13, fontWeight:700, color:'#8b5cf6' }}>{fmt(totalAReceber30)}</span>
               </div>
-              <LineChart30 dados={fluxo30} />
+              <LineChart30 dados={fluxo30} C={C} />
             </div>
           </div>
 
@@ -503,7 +520,7 @@ function SAFinanceiroInterno({ empresas, planos }) {
                           <span style={{ fontSize:11, color:C.muted, marginLeft:6 }}>{p.clientes} cliente{p.clientes!==1?'s':''}</span>
                         </div>
                       </div>
-                      <div style={{ height:6, background:'rgba(255,255,255,.06)', borderRadius:3 }}>
+                      <div style={{ height:6, background:C.border2||'rgba(0,0,0,.06)', borderRadius:3 }}>
                         <div style={{ height:'100%', width:`${pct}%`, background:cores[i%cores.length], borderRadius:3, transition:'width .5s' }}/>
                       </div>
                       <div style={{ fontSize:10, color:C.muted, marginTop:2 }}>{pct}% da receita</div>
@@ -550,9 +567,9 @@ function SAFinanceiroInterno({ empresas, planos }) {
       {subSecao === 'receitas' && (
         <div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:24 }}>
-            <KPI label="MRR Total" value={mrr} prefix="R$ " cor="#22c55e" icon="💰"/>
-            <KPI label="Recebido (faturas)" value={totalRecebido} prefix="R$ " cor="#3b82f6" icon="✅"/>
-            <KPI label="A receber" value={totalPendente} prefix="R$ " cor="#f59e0b" icon="⏳"/>
+            <KPI C={C} label="MRR Total" value={mrr} prefix="R$ " cor="#22c55e" icon="💰"/>
+            <KPI C={C} label="Recebido (faturas)" value={totalRecebido} prefix="R$ " cor="#3b82f6" icon="✅"/>
+            <KPI C={C} label="A receber" value={totalPendente} prefix="R$ " cor="#f59e0b" icon="⏳"/>
           </div>
 
           <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'20px 22px' }}>
@@ -584,7 +601,7 @@ function SAFinanceiroInterno({ empresas, planos }) {
                     </tr>
                   )
                 })}
-                <tr style={{ background:'rgba(255,255,255,.03)', borderTop:`2px solid rgba(255,255,255,.1)` }}>
+                <tr style={{ background:C.card, borderTop:`2px solid ${C.border}` }}>
                   <td colSpan={3} style={{ padding:'11px 12px', fontWeight:700, color:C.text }}>Total</td>
                   <td style={{ padding:'11px 12px', fontWeight:800, color:'#22c55e', fontSize:15 }}>{fmt(mrr)}</td>
                   <td style={{ padding:'11px 12px', color:C.muted }}>100%</td>
@@ -626,10 +643,38 @@ function SAFinanceiroInterno({ empresas, planos }) {
             </div>
           </div>
 
-          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>
+          {/* Geração automática de faturas */}
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 18px', marginBottom:16, boxShadow:C.shadow||'none' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+              <div style={{ flex:1, minWidth:200 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:2 }}>⚙️ Geração automática de faturas</div>
+                <div style={{ fontSize:12, color:C.muted }}>
+                  {autoGerar
+                    ? <>Ativa — as faturas do mês são geradas automaticamente todo <b>dia {autoDia}</b>.</>
+                    : <>Desativada — você gera manualmente pelo botão acima.</>}
+                </div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <label style={{ fontSize:12, color:C.muted }}>Dia</label>
+                <select value={autoDia} disabled={salvandoAuto}
+                  onChange={e=>salvarAutoGerar(autoGerar, e.target.value)}
+                  style={{ background:C.inputBg||C.card, border:`1px solid ${C.border}`, borderRadius:7, padding:'7px 10px', color:C.text, fontSize:13, colorScheme:C.tema }}>
+                  {Array.from({length:28},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}
+                </select>
+                <button onClick={()=>salvarAutoGerar(!autoGerar, autoDia)} disabled={salvandoAuto}
+                  style={{ padding:'8px 16px', borderRadius:8, border:'none', cursor:'pointer', fontSize:13, fontWeight:700,
+                    background: autoGerar ? 'rgba(34,197,94,.15)' : C.card, color: autoGerar ? '#22c55e' : C.muted,
+                    boxShadow: autoGerar ? 'inset 0 0 0 1px rgba(34,197,94,.3)' : `inset 0 0 0 1px ${C.border}` }}>
+                  {salvandoAuto ? '...' : autoGerar ? '✓ Ativada' : 'Ativar'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', boxShadow:C.shadow||'none' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
               <thead>
-                <tr style={{ background:'rgba(255,255,255,.03)', borderBottom:`1px solid ${C.border}` }}>
+                <tr style={{ background:C.card, borderBottom:`1px solid ${C.border}` }}>
                   {['Cliente','Descrição','Referência','Valor','Vencimento','Status','Ações'].map(h=>(
                     <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:11, fontWeight:700,
                       color:C.muted, textTransform:'uppercase', letterSpacing:'.04em', whiteSpace:'nowrap' }}>{h}</th>
@@ -643,7 +688,7 @@ function SAFinanceiroInterno({ empresas, planos }) {
                 {faturasVisiveis.map(f => {
                   const atrasada = f.status==='pendente' && new Date(f.vencimento) < hoje
                   return (
-                    <tr key={f.id} style={{ borderBottom:`1px solid rgba(255,255,255,.04)` }}>
+                    <tr key={f.id} style={{ borderBottom:`1px solid ${C.border2||C.border}` }}>
                       <td style={{ padding:'11px 14px', fontWeight:600, color:C.text }}>{f.empresas?.nome||'—'}</td>
                       <td style={{ padding:'11px 14px', color:C.muted }}>{f.descricao}</td>
                       <td style={{ padding:'11px 14px', color:C.muted }}>{f.referencia||'—'}</td>
@@ -690,8 +735,8 @@ function SAFinanceiroInterno({ empresas, planos }) {
             </p>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
               {previsao.map((p,i) => (
-                <div key={p.mes} style={{ background:'rgba(255,255,255,.04)', borderRadius:10, padding:'16px',
-                  border:`1px solid ${p.real?'#7c3aed':'rgba(255,255,255,.06)'}` }}>
+                <div key={p.mes} style={{ background:C.card, borderRadius:10, padding:'16px',
+                  border:`1px solid ${p.real?'#7c3aed':C.border}` }}>
                   <div style={{ fontSize:12, color:C.muted, marginBottom:4, textTransform:'uppercase', letterSpacing:'.05em' }}>
                     {p.mes} {p.real&&<span style={{ color:'#a855f7', fontWeight:700 }}>· Atual</span>}
                   </div>
@@ -705,7 +750,7 @@ function SAFinanceiroInterno({ empresas, planos }) {
           </div>
           <div style={{ background:'rgba(245,158,11,.08)', border:'1px solid rgba(245,158,11,.2)', borderRadius:12, padding:'16px 20px' }}>
             <div style={{ fontSize:13, fontWeight:600, color:'#f59e0b', marginBottom:4 }}>💡 Para melhorar a previsão</div>
-            <p style={{ fontSize:13, color:'rgba(255,255,255,.5)', margin:0, lineHeight:1.6 }}>
+            <p style={{ fontSize:13, color:C.muted, margin:0, lineHeight:1.6 }}>
               Registre as cobranças mensais na aba "Cobranças" e marque como pagas quando receber.
               Isso permitirá análises mais precisas de churn e receita real no futuro.
             </p>
@@ -717,7 +762,7 @@ function SAFinanceiroInterno({ empresas, planos }) {
       {modalNova && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:60,
           display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <div style={{ background:'#161b22', border:'1px solid rgba(255,255,255,.1)', borderRadius:16,
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:16,
             width:'100%', maxWidth:440, padding:'24px 22px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
               <h3 style={{ margin:0, fontSize:16, fontWeight:700, color:C.text }}>Nova cobrança</h3>
@@ -735,8 +780,8 @@ function SAFinanceiroInterno({ empresas, planos }) {
                   textTransform:'uppercase', letterSpacing:'.04em', marginBottom:4 }}>{label}</label>
                 {type==='select'
                   ? <select value={form[field]} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))}
-                      style={{ width:'100%', background:'#0d1117', border:'1px solid rgba(255,255,255,.1)',
-                        borderRadius:7, padding:'8px 11px', color:C.text, fontSize:13, outline:'none' }}>
+                      style={{ width:'100%', background:C.inputBg||C.card, border:`1px solid ${C.border}`,
+                        borderRadius:7, padding:'8px 11px', color:C.text, fontSize:13, outline:'none', colorScheme:C.tema }}>
                       <option value="">Selecione...</option>
                       {empresas.filter(e=>e.status!=='cancelada').map(e=>(
                         <option key={e.id} value={e.id}>{e.nome}</option>
@@ -744,8 +789,8 @@ function SAFinanceiroInterno({ empresas, planos }) {
                     </select>
                   : <input type={type} value={form[field]} placeholder={placeholder}
                       onChange={e=>setForm(f=>({...f,[field]:e.target.value}))}
-                      style={{ width:'100%', background:'#0d1117', border:'1px solid rgba(255,255,255,.1)',
-                        borderRadius:7, padding:'8px 11px', color:C.text, fontSize:13, outline:'none', boxSizing:'border-box' }}/>
+                      style={{ width:'100%', background:C.inputBg||C.card, border:`1px solid ${C.border}`,
+                        borderRadius:7, padding:'8px 11px', color:C.text, fontSize:13, outline:'none', boxSizing:'border-box', colorScheme:C.tema }}/>
                 }
               </div>
             ))}

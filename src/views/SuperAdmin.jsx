@@ -376,7 +376,6 @@ export default function SuperAdmin({ onToast }) {
             <div key={item.id}>
               <button onClick={() => {
                 if (item.hasSubmenu) {
-                  setExpandidos(prev=>({...prev,[item.id]:!prev[item.id]}))
                   navTo(item.id, 'todos')
                 } else {
                   navTo(item.id)
@@ -390,7 +389,11 @@ export default function SuperAdmin({ onToast }) {
                 <span style={{ fontSize:15, flexShrink:0 }}>{item.icon}</span>
                 <span style={{ flex:1 }}>{item.label}</span>
                 {item.hasSubmenu && (
-                  <span style={{ fontSize:10, opacity:.5 }}>{expandidos[item.id]?'▲':'▼'}</span>
+                  <span role="button" tabIndex={0}
+                    onClick={(e)=>{ e.stopPropagation(); setExpandidos(prev=>({...prev,[item.id]:!prev[item.id]})) }}
+                    style={{ fontSize:10, opacity:.6, padding:'2px 6px', cursor:'pointer' }}>
+                    {expandidos[item.id]?'▲':'▼'}
+                  </span>
                 )}
               </button>
 
@@ -707,7 +710,7 @@ export default function SuperAdmin({ onToast }) {
           )}
 
           {/* ── FINANCEIRO ── */}
-          {activeMenu==='financeiro' && <SAFinanceiro empresas={empresas} planos={planos} />}
+          {activeMenu==='financeiro' && <SAFinanceiro empresas={empresas} planos={planos} C={C} tema={tema} />}
           {activeMenu==='categorias' && <SACategorias C={C} tema={tema} onToast={onToast} />}
 
         </div>
