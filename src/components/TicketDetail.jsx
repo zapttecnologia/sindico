@@ -113,11 +113,12 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
     let resumoEnviado = false
     if (ehFinal && enviarResumoConselho) {
       try {
-        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-new-ticket`, {
+        const { data: s } = await supabase.auth.getSession()
+        const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-new-ticket`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${s.session?.access_token}`,
           },
           body: JSON.stringify({
             evento: 'resumo_conselho',
@@ -125,7 +126,12 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
             mensagem: msgStatus.trim() || null,
           }),
         })
-        resumoEnviado = true
+        const dados = await resp.json().catch(() => ({}))
+        if (resp.ok && dados.ok) {
+          resumoEnviado = true
+        } else {
+          console.error('Resumo não enviado:', resp.status, dados)
+        }
       } catch (e) {
         console.error('Falha ao enviar resumo ao conselho:', e)
       }
