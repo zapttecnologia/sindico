@@ -61,7 +61,7 @@ export default function Equipe({ view, onToast }) {
       .select('*, condominios(nome)').order('criado_em', { ascending:false })
     if (data) setTickets(data)
     const { data:cats } = await supabase.from('categorias_sistema')
-      .select('nome').eq('ativo', true).order('ordem')
+      .select('nome, icone').eq('ativo', true).order('ordem')
     if (cats) setCategoriasSistema(cats)
   }
 
@@ -185,7 +185,7 @@ export default function Equipe({ view, onToast }) {
           </div>
 
           {/* Mini stats */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
+          <div className="filtros-row" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
             {[
               { l:'Total filtrado', v:filtStats.total, c:'var(--navy)' },
               { l:'Pendentes', v:filtStats.pendentes, c:'var(--amber)' },
@@ -356,8 +356,14 @@ export default function Equipe({ view, onToast }) {
             </div>
             <div className="field"><label>Solicitante</label><input className="input" value={novoNome} onChange={e=>setNovoNome(e.target.value)}/></div>
             <div className="field"><label>Categoria</label>
-              <div className="chip-row">
-                {categoriasSistema.map(c=><button key={c.nome} className={`chip${novaCategoria===c.nome?' selected':''}`} onClick={()=>setNovaCategoria(c.nome)}>{c.icone?c.icone+' ':''}{c.nome}</button>)}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px, 1fr))', gap:8 }}>
+                {categoriasSistema.map(c=>(
+                  <div key={c.nome} className={`cat-card${novaCategoria===c.nome?' selected':''}`}
+                    onClick={()=>setNovaCategoria(c.nome)} style={{ padding:'14px 8px' }}>
+                    <div className="cat-card-icon" style={{ fontSize:24 }}>{c.icone||'📋'}</div>
+                    <div className="cat-card-nome" style={{ fontSize:12 }}>{c.nome}</div>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="field"><label>Descricao</label><textarea className="input" rows={3} value={novaDescricao} onChange={e=>setNovaDescricao(e.target.value)}/></div>

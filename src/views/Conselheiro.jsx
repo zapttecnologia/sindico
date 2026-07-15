@@ -632,54 +632,80 @@ export default function Conselheiro({ view, onToast }) {
         </div>
       ) : (
         <div className="card">
-          {/* Trilha dos passos */}
-          <div style={{ display:'flex', gap:8, marginBottom:18, fontSize:12, flexWrap:'wrap' }}>
-            {catSel && (
-              <button onClick={()=>{ setPasso(1); setCatSel(null); setSubSel(null) }}
-                style={{ background:'var(--mint)', color:'var(--emerald)', border:'none', borderRadius:'var(--r-full)', padding:'4px 12px', fontWeight:700, cursor:'pointer' }}>
-                {catSel} ✕
-              </button>
-            )}
-            {subSel && (
-              <button onClick={()=>{ setPasso(2); setSubSel(null) }}
-                style={{ background:'var(--mint)', color:'var(--emerald)', border:'none', borderRadius:'var(--r-full)', padding:'4px 12px', fontWeight:700, cursor:'pointer' }}>
-                {subSel.nome} ✕
-              </button>
-            )}
+          {/* Indicador de progresso (igual morador) */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
+            {[1,2,3].map(n => (
+              <div key={n} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div style={{ width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                  fontSize:12, fontWeight:700,
+                  background: passo>=n ? 'var(--navy)' : 'var(--gray-200)',
+                  color: passo>=n ? '#fff' : 'var(--gray-400)' }}>{n}</div>
+                {n<3 && <div style={{ width:24, height:2, background: passo>n ? 'var(--navy)' : 'var(--gray-200)' }}/>}
+              </div>
+            ))}
+            <span style={{ fontSize:12, color:'var(--gray-400)', marginLeft:6 }}>
+              {passo===1?'Categoria':passo===2?'Subcategoria':'Detalhes'}
+            </span>
           </div>
 
-          {/* Passo 1 — Categoria */}
-          {passo === 1 && (
-            <div className="field">
-              <label>1. Escolha a categoria</label>
-              {categoriasSistema.length === 0
-                ? <div className="empty-state">Nenhuma categoria disponível.</div>
-                : <div className="chip-row">
-                    {categoriasSistema.map(c=>(
-                      <button key={c.nome} className="chip" onClick={()=>escolherCategoria(c.nome)}>
-                        {c.icone?c.icone+' ':''}{c.nome}
-                      </button>
-                    ))}
-                  </div>}
+          {/* Trilha do que já foi escolhido */}
+          {(catSel || subSel) && (
+            <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+              {catSel && (
+                <button onClick={()=>{ setPasso(1); setCatSel(null); setSubSel(null) }}
+                  style={{ background:'var(--mint)', color:'var(--emerald)', border:'none', borderRadius:'var(--r-full)', padding:'4px 12px', fontWeight:700, cursor:'pointer', fontSize:12 }}>
+                  {catSel} ✕
+                </button>
+              )}
+              {subSel && (
+                <button onClick={()=>{ setPasso(2); setSubSel(null) }}
+                  style={{ background:'var(--mint)', color:'var(--emerald)', border:'none', borderRadius:'var(--r-full)', padding:'4px 12px', fontWeight:700, cursor:'pointer', fontSize:12 }}>
+                  {subSel.nome} ✕
+                </button>
+              )}
             </div>
           )}
 
-          {/* Passo 2 — Subcategoria */}
+          {/* Passo 1 — Categoria (cards) */}
+          {passo === 1 && (
+            <>
+              <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 6px' }}>
+                Nova solicitação
+              </h2>
+              <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 20px' }}>Selecione o tipo de chamado</p>
+              {categoriasSistema.length === 0
+                ? <div className="empty-state">Nenhuma categoria disponível.</div>
+                : <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
+                    {categoriasSistema.map(c=>(
+                      <div key={c.nome} className="cat-card" onClick={()=>escolherCategoria(c.nome)}>
+                        <div className="cat-card-icon">{c.icone||'📋'}</div>
+                        <div className="cat-card-nome">{c.nome}</div>
+                      </div>
+                    ))}
+                  </div>}
+            </>
+          )}
+
+          {/* Passo 2 — Subcategoria (cards) */}
           {passo === 2 && (
-            <div className="field">
-              <label>2. Escolha a subcategoria</label>
-              <div className="chip-row">
+            <>
+              <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 6px' }}>
+                {catSel}
+              </h2>
+              <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 20px' }}>Escolha a subcategoria</p>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
                 {subcategorias.map(s=>(
-                  <button key={s.id} className={`chip${subSel?.id===s.id?' selected':''}`}
+                  <div key={s.id} className={`cat-card${subSel?.id===s.id?' selected':''}`}
                     onClick={()=>{ setSubSel(s); setPasso(3) }}>
-                    {s.icone?s.icone+' ':''}{s.nome}
-                  </button>
+                    <div className="cat-card-icon">{s.icone||'📄'}</div>
+                    <div className="cat-card-nome">{s.nome}</div>
+                  </div>
                 ))}
               </div>
-              <button className="btn btn-ghost btn-sm" style={{ marginTop:10 }} onClick={()=>setPasso(3)}>
+              <button className="btn btn-ghost btn-sm" style={{ marginTop:14 }} onClick={()=>setPasso(3)}>
                 Pular — não se aplica
               </button>
-            </div>
+            </>
           )}
 
           {/* Passo 3 — Descrição */}
