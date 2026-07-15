@@ -840,3 +840,48 @@ tr:hover td { background: var(--gray-50); }
   color: var(--gray-700);
   line-height: 1.3;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVIDADE MOBILE — ajustes gerais (telas do dia a dia)
+   Adicionado para acesso via celular de morador/síndico/conselho.
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Grids de filtro e colunas fixas passam a empilhar */
+  .filtros-row,
+  .row2,
+  .row3 { grid-template-columns: 1fr !important; }
+
+  /* Tabelas: permitem rolagem horizontal sem quebrar o layout */
+  table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+
+  /* Modais ocupam quase a tela inteira e rolam */
+  .modal {
+    width: 94vw !important;
+    max-width: 94vw !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 5vh auto;
+  }
+
+  /* Cabeçalho do condomínio empilha */
+  .condo-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+  /* Cards de categoria menores no celular (mais por linha) */
+  .cat-card { padding: 14px 8px; }
+  .cat-card-icon { font-size: 26px; }
+
+  /* KPIs e cards de estatística empilham */
+  .kpi-grid, .stats-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* Títulos de página um pouco menores */
+  .page-title { font-size: 20px !important; }
+
+  /* Evita que inputs/textos estourem a largura */
+  input, select, textarea, .input { max-width: 100%; box-sizing: border-box; }
+}
+
+/* Telas bem pequenas (celular estreito) */
+@media (max-width: 420px) {
+  .kpi-grid, .stats-grid { grid-template-columns: 1fr !important; }
+  .cat-card-nome { font-size: 11px; }
+}
