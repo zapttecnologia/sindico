@@ -150,6 +150,18 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
     await recarregar()
   }
 
+  // Converte "1.234,56" (pt-BR) ou "1234.56" ou "500" em número; retorna null se vazio/inválido
+  const parseValorBR = (v) => {
+    if (v === null || v === undefined || v === '') return null
+    const s = v.toString().trim()
+    // Se tem vírgula, assume formato pt-BR (ponto = milhar, vírgula = decimal)
+    const bruto = s.includes(',')
+      ? s.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '')
+      : s.replace(/[^\d.]/g, '')
+    const n = parseFloat(bruto)
+    return isNaN(n) ? null : n
+  }
+
   const enviarParaConselheiros = async () => {
     if (!msgConselheiros.trim()) { onToast('Escreva uma mensagem para os conselheiros.'); return }
     const orcsValidos = orcamentos.filter(o => o.fornecedor.trim())
@@ -169,7 +181,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
           numero: o.numero,
           fornecedor: o.fornecedor.trim(),
           fornecedor_id: o.fornecedor_id || null,
-          valor: o.valor ? Number(o.valor) : null,
+          valor: parseValorBR(o.valor),
           tipo: o.tipo || 'servico',
           materiais: o.materiais.trim() || null,
           data_proposta: o.data_proposta || null,
@@ -577,8 +589,14 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
                       </div>
                       <div className="field" style={{ margin:0 }}>
                         <label style={{ fontSize:11 }}>Valor (R$)</label>
-                        <input className="input" style={{ fontSize:13 }} type="number" value={orc.valor}
-                          onChange={e=>setOrcField(idx,'valor',e.target.value)} placeholder="0,00" />
+                        <input className="input" style={{ fontSize:13 }} type="text" inputMode="decimal" value={orc.valor}
+                          onChange={e=>setOrcField(idx,'valor',e.target.value)}
+                          onBlur={e=>{
+                            const bruto = (e.target.value||'').toString().replace(/\./g,'').replace(',', '.').replace(/[^\d.]/g,'')
+                            const n = parseFloat(bruto)
+                            if (!isNaN(n)) setOrcField(idx,'valor', n.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}))
+                          }}
+                          placeholder="0,00" />
                       </div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:8 }}>
