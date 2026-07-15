@@ -404,191 +404,152 @@ export default function Morador({ view, onToast }) {
             Chamado registrado!
           </h2>
           <p style={{ color:'var(--gray-500)', fontSize:14, margin:'0 0 8px' }}>
-            {catSel?.nome || 'Solicitação'}{subCatSel ? ` › ${subCatSel.nome}` : ''}
+            {catSel?.nome || 'Solicitação'}{(subCatSel && subCatSel !== 'geral') ? ` › ${subCatSel.nome}` : ''}
           </p>
           <p style={{ color:'var(--gray-400)', fontSize:13, margin:'0 0 24px' }}>
             Protocolo <b style={{ fontFamily:'var(--font-mono)' }}>#{ticketCriado.id.slice(-6).toUpperCase()}</b>
           </p>
           {anonimo && <div style={{ padding:'8px 16px', background:'#f5f3ff', borderRadius:'var(--r-md)', fontSize:13, color:'#6d28d9', marginBottom:16 }}>🔒 Chamado enviado anonimamente</div>}
-          <button className="btn btn-primary" onClick={()=>{ setTicketCriado(null); setPasso(1); setCatSel(null); setSubCatSel(null) }}>
+          <button className="btn btn-primary" onClick={()=>{ setTicketCriado(null); setCatSel(null); setSubCatSel(null); setSubcategorias([]); setDescricao('') }}>
             Novo chamado
           </button>
         </div>
       </div>
     )
 
-    // Passo 3 — Formulário
-    if (passo === 3) return (
-      <div>
-        {header}
-        <button onClick={()=>setPasso(2)} style={{ background:'var(--gray-100)', border:'none', borderRadius:'var(--r-md)',
-          padding:'7px 14px', fontSize:13, fontWeight:600, color:'var(--gray-600)', cursor:'pointer', marginBottom:16,
-          display:'flex', alignItems:'center', gap:6 }}>
-          ← Voltar
-        </button>
-
-        {/* Breadcrumb */}
-        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:20, fontSize:14, color:'var(--gray-500)' }}>
-          <span style={{ fontSize:22 }}>{catSel?.icone}</span>
-          <span style={{ fontWeight:600, color:'var(--navy)' }}>{catSel?.nome}</span>
-          {subCatSel && <><span>›</span><span style={{ fontWeight:600, color:'var(--navy)' }}>{subCatSel.icone} {subCatSel.nome}</span></>}
-        </div>
-
-        <div className="card">
-          <div className="field">
-            <label>Descreva o problema *</label>
-            <textarea className="input" rows={5} value={descricao} onChange={e=>setDescricao(e.target.value)}
-              placeholder="Quanto mais detalhes, mais rápida a resolução..."/>
-          </div>
-
-          {/* Prioridade */}
-          <div className="field">
-            <label>Prioridade</label>
-            <div className="chip-row">
-              {PRIO.map(p=>(
-                <button key={p.v} onClick={()=>setPrioridade(p.v)}
-                  style={{ padding:'7px 14px', borderRadius:'var(--r-full)', fontSize:12, fontWeight:700,
-                    cursor:'pointer', transition:'all .15s',
-                    border:`2px solid ${prioridade===p.v?p.c:'var(--gray-200)'}`,
-                    background:prioridade===p.v?p.bg:'#fff',
-                    color:prioridade===p.v?p.c:'var(--gray-500)' }}>
-                  {p.i} {p.l}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Anonimato (só em Reclamações e Ocorrências) */}
-          {['Reclamações','Ocorrências / Incidentes'].includes(catSel?.nome) && (
-            <div style={{ padding:'14px', background:anonimo?'#f5f3ff':'var(--gray-50)',
-              border:`1.5px solid ${anonimo?'#8b5cf6':'var(--gray-200)'}`,
-              borderRadius:'var(--r-md)', marginBottom:16, cursor:'pointer' }}
-              onClick={()=>setAnonimo(!anonimo)}>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <input type="checkbox" checked={anonimo} onChange={()=>{}} style={{ width:16, height:16, cursor:'pointer' }}/>
-                <div>
-                  <div style={{ fontSize:14, fontWeight:700, color:anonimo?'#6d28d9':'var(--gray-700)' }}>
-                    🔒 Enviar anonimamente
-                  </div>
-                  <div style={{ fontSize:12, color:'var(--gray-400)', marginTop:2 }}>
-                    Seu nome não será revelado. O síndico verá apenas o conteúdo.
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Anexos */}
-          <div className="field">
-            <label>Anexos (opcional)</label>
-            <input type="file" multiple onChange={e=>{
-              const novos = Array.from(e.target.files||[]).filter(f=>f.size<=MAX_BYTES)
-              const grandes = Array.from(e.target.files||[]).filter(f=>f.size>MAX_BYTES)
-              if (grandes.length) onToast(`Ignorados (acima de 10MB): ${grandes.map(f=>f.name).join(', ')}`)
-              setArquivosSel(a=>[...a,...novos].slice(0,5))
-              e.target.value = ''
-            }} style={{ fontSize:13, color:'var(--gray-600)' }}/>
-            <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:4 }}>
-              Fotos, vídeos, PDF, documentos — até 5 arquivos, 10MB cada.
-            </div>
-            {arquivosSel.length > 0 && (
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
-                {arquivosSel.map((f,i)=>(
-                  <div key={i} style={{ display:'flex', alignItems:'center', gap:4, background:'var(--gray-100)',
-                    padding:'4px 10px', borderRadius:'var(--r-full)', fontSize:11 }}>
-                    📎 {f.name.slice(0,20)}
-                    <button onClick={()=>setArquivosSel(a=>a.filter((_,j)=>j!==i))}
-                      style={{ background:'none', border:'none', cursor:'pointer', color:'var(--rust)', fontSize:14, lineHeight:1 }}>×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={{ display:'flex', gap:10 }}>
-            <button className="btn" onClick={()=>{ setDescricao(''); setArquivosSel([]); setPrioridade('media'); setAnonimo(false) }}
-              disabled={loading}
-              style={{ flexShrink:0, fontSize:15, padding:'14px 18px', background:'var(--gray-100)', color:'var(--gray-600)', border:'none' }}>
-              Limpar
-            </button>
-            <button className="btn btn-primary" onClick={enviarNovo}
-              disabled={loading || !descricao.trim()} style={{ flex:1, fontSize:15, padding:'14px' }}>
-              {loading ? 'Enviando...' : '📨 Enviar chamado'}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-
-    // Passo 2 — Subcategorias
-    if (passo === 2) return (
-      <div>
-        {header}
-        <button onClick={()=>setPasso(1)} style={{ background:'var(--gray-100)', border:'none', borderRadius:'var(--r-md)',
-          padding:'7px 14px', fontSize:13, fontWeight:600, color:'var(--gray-600)', cursor:'pointer', marginBottom:16,
-          display:'flex', alignItems:'center', gap:6 }}>
-          ← Voltar
-        </button>
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
-          <span style={{ fontSize:28 }}>{catSel?.icone}</span>
-          <div>
-            <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:0 }}>{catSel?.nome}</h2>
-            <p style={{ fontSize:13, color:'var(--gray-400)', margin:'2px 0 0' }}>{catSel?.descricao}</p>
-          </div>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
-          {subcategorias.map(s => (
-            <div key={s.id} className="cat-card" onClick={()=>{ setSubCatSel(s); setPasso(3) }}>
-              <div className="cat-card-icon">{s.icone}</div>
-              <div className="cat-card-nome">{s.nome}</div>
-            </div>
-          ))}
-          <div className="cat-card" onClick={()=>{ setSubCatSel(null); setPasso(3) }}
-            style={{ border:'1.5px dashed var(--gray-300)' }}>
-            <div className="cat-card-icon">📝</div>
-            <div className="cat-card-nome" style={{ color:'var(--gray-400)' }}>Outro / Geral</div>
-          </div>
-        </div>
-      </div>
-    )
-
-    // Passo 1 — Categorias
+    // Formato revelado: uma tela, etapas aparecem conforme escolhe
     return (
       <div>
         {header}
-        {/* Indicador de progresso */}
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
-          {[1,2,3].map(n => (
-            <div key={n} style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <div style={{ width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:12, fontWeight:700,
-                background: passo>=n ? 'var(--navy)' : 'var(--gray-200)',
-                color: passo>=n ? '#fff' : 'var(--gray-400)' }}>{n}</div>
-              {n<3 && <div style={{ width:24, height:2, background: passo>n ? 'var(--navy)' : 'var(--gray-200)' }}/>}
-            </div>
-          ))}
-          <span style={{ fontSize:12, color:'var(--gray-400)', marginLeft:6 }}>
-            {passo===1?'Categoria':passo===2?'Subcategoria':'Detalhes'}
-          </span>
-        </div>
-        <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 6px' }}>
+        <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, color:'var(--navy)', margin:'0 0 6px' }}>
           Nova solicitação
         </h2>
         <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 20px' }}>Selecione o tipo de chamado</p>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
-          {categorias.map(cat => (
-            <div key={cat.id} className="cat-card" onClick={async ()=>{
-              setCatSel(cat); setTicketCriado(null); setDescricao('')
-              const { data:subs } = await supabase.from('subcategorias_sistema')
-                .select('*').eq('categoria_id', cat.id).eq('ativo', true).order('ordem')
-              setSubcategorias(subs||[])
-              setPasso(2)
-            }}>
-              <div className="cat-card-icon">{cat.icone}</div>
-              <div className="cat-card-nome">{cat.nome}</div>
-            </div>
-          ))}
+
+        {/* ETAPA 1 — Categoria */}
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>Categoria</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
+            {categorias.map(cat => (
+              <div key={cat.id} className={`cat-card${catSel?.id===cat.id?' selected':''}`} onClick={async ()=>{
+                setCatSel(cat); setSubCatSel(null); setTicketCriado(null)
+                const { data:subs } = await supabase.from('subcategorias_sistema')
+                  .select('*').eq('categoria_id', cat.id).eq('ativo', true).order('ordem')
+                setSubcategorias(subs||[])
+              }}>
+                <div className="cat-card-icon">{cat.icone}</div>
+                <div className="cat-card-nome">{cat.nome}</div>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {/* ETAPA 2 — Subcategoria (aparece após escolher categoria, se houver) */}
+        {catSel && subcategorias.length > 0 && (
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>Subcategoria</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
+              {subcategorias.map(s => (
+                <div key={s.id} className={`cat-card${subCatSel?.id===s.id?' selected':''}`} onClick={()=>setSubCatSel(s)}>
+                  <div className="cat-card-icon">{s.icone}</div>
+                  <div className="cat-card-nome">{s.nome}</div>
+                </div>
+              ))}
+              <div className={`cat-card${subCatSel==='geral'?' selected':''}`} onClick={()=>setSubCatSel('geral')}
+                style={{ border:'1.5px dashed var(--gray-300)' }}>
+                <div className="cat-card-icon">📝</div>
+                <div className="cat-card-nome" style={{ color:'var(--gray-400)' }}>Outro / Geral</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ETAPA 3 — Formulário (aparece após categoria e, se houver, subcategoria) */}
+        {catSel && (subcategorias.length === 0 || subCatSel) && (
+          <div className="card">
+            <div className="field">
+              <label>Descreva o problema *</label>
+              <textarea className="input" rows={5} value={descricao} onChange={e=>setDescricao(e.target.value)}
+                placeholder="Quanto mais detalhes, mais rápida a resolução..."/>
+            </div>
+
+            {/* Prioridade */}
+            <div className="field">
+              <label>Prioridade</label>
+              <div className="chip-row">
+                {PRIO.map(p=>(
+                  <button key={p.v} onClick={()=>setPrioridade(p.v)}
+                    style={{ padding:'7px 14px', borderRadius:'var(--r-full)', fontSize:12, fontWeight:700,
+                      cursor:'pointer', transition:'all .15s',
+                      border:`2px solid ${prioridade===p.v?p.c:'var(--gray-200)'}`,
+                      background:prioridade===p.v?p.bg:'#fff',
+                      color:prioridade===p.v?p.c:'var(--gray-500)' }}>
+                    {p.i} {p.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Anonimato (só em Reclamações e Ocorrências) */}
+            {['Reclamações','Ocorrências / Incidentes'].includes(catSel?.nome) && (
+              <div style={{ padding:'14px', background:anonimo?'#f5f3ff':'var(--gray-50)',
+                border:`1.5px solid ${anonimo?'#8b5cf6':'var(--gray-200)'}`,
+                borderRadius:'var(--r-md)', marginBottom:16, cursor:'pointer' }}
+                onClick={()=>setAnonimo(!anonimo)}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <input type="checkbox" checked={anonimo} onChange={()=>{}} style={{ width:16, height:16, cursor:'pointer' }}/>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:anonimo?'#6d28d9':'var(--gray-700)' }}>
+                      🔒 Enviar anonimamente
+                    </div>
+                    <div style={{ fontSize:12, color:'var(--gray-400)', marginTop:2 }}>
+                      Seu nome não será revelado. O síndico verá apenas o conteúdo.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Anexos */}
+            <div className="field">
+              <label>Anexos (opcional)</label>
+              <input type="file" multiple onChange={e=>{
+                const novos = Array.from(e.target.files||[]).filter(f=>f.size<=MAX_BYTES)
+                const grandes = Array.from(e.target.files||[]).filter(f=>f.size>MAX_BYTES)
+                if (grandes.length) onToast(`Ignorados (acima de 10MB): ${grandes.map(f=>f.name).join(', ')}`)
+                setArquivosSel(a=>[...a,...novos].slice(0,5))
+                e.target.value = ''
+              }} style={{ fontSize:13, color:'var(--gray-600)' }}/>
+              <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:4 }}>
+                Fotos, vídeos, PDF, documentos — até 5 arquivos, 10MB cada.
+              </div>
+              {arquivosSel.length > 0 && (
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+                  {arquivosSel.map((f,i)=>(
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:4, background:'var(--gray-100)',
+                      padding:'4px 10px', borderRadius:'var(--r-full)', fontSize:11 }}>
+                      📎 {f.name.slice(0,20)}
+                      <button onClick={()=>setArquivosSel(a=>a.filter((_,j)=>j!==i))}
+                        style={{ background:'none', border:'none', cursor:'pointer', color:'var(--rust)', fontSize:14, lineHeight:1 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display:'flex', gap:10 }}>
+              <button className="btn" onClick={()=>{ setDescricao(''); setArquivosSel([]); setPrioridade('media'); setAnonimo(false) }}
+                disabled={loading}
+                style={{ flexShrink:0, fontSize:15, padding:'14px 18px', background:'var(--gray-100)', color:'var(--gray-600)', border:'none' }}>
+                Limpar
+              </button>
+              <button className="btn btn-primary" onClick={enviarNovo}
+                disabled={loading || !descricao.trim()} style={{ flex:1, fontSize:15, padding:'14px' }}>
+                {loading ? 'Enviando...' : '📨 Enviar chamado'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

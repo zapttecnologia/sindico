@@ -583,7 +583,7 @@ export default function Equipe({ view, onToast }) {
                   </div>
                 )}
 
-                {novaCategoria && (
+                {novaCategoria && (subcatsNovo.length === 0 || subSelNovo) && (
                   <>
                     <div className="field"><label>Origem</label>
                       <select className="input" value={novaOrigem} onChange={e => setNovaOrigem(e.target.value)}>
