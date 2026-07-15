@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES } from '../lib/constants'
+import { STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES, DEPARTAMENTOS } from '../lib/constants'
 import TicketDetail from '../components/TicketDetail'
 import Dashboard from './Dashboard'
 
@@ -24,11 +24,25 @@ export default function Equipe({ view, onToast }) {
   const [novoBloco, setNovoBloco] = useState('')
   const [novoApto, setNovoApto] = useState('')
   const [novoNome, setNovoNome] = useState('')
+  const [novoDpto, setNovoDpto] = useState('')          // departamento destino (opcional)
+  const [novoResponsavel, setNovoResponsavel] = useState('')  // pessoa destino (opcional)
+  const [equipeCondo, setEquipeCondo] = useState([])    // membros da equipe do condomínio escolhido
   const [salvando, setSalvando] = useState(false)
   const ehAdmin = perfil?.papel === 'admin'
 
   // Resetar subTela quando muda de view
   useEffect(() => { setSubTela('lista'); setTicketSel(null) }, [view])
+
+  // Carrega os membros da equipe/departamentos do condomínio escolhido (para direcionar)
+  useEffect(() => {
+    if (!novaCondo) { setEquipeCondo([]); return }
+    supabase.from('perfis')
+      .select('id, nome, papel')
+      .eq('condominio_id', novaCondo)
+      .in('papel', ['equipe','admin','manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros'])
+      .order('nome')
+      .then(({ data }) => setEquipeCondo(data || []))
+  }, [novaCondo])
 
   const carregarCondos = async () => {
     if (ehAdmin) {
@@ -82,12 +96,15 @@ export default function Equipe({ view, onToast }) {
       condominio_id:novaCondo, autor_id:perfil?.id, categoria:novaCategoria,
       descricao:novaDescricao.trim(), origem:novaOrigem,
       bloco:novoBloco, apartamento:novoApto, nome_solicitante:novoNome,
+      departamento: novoDpto || null,
+      atribuido_para: novoResponsavel || null,
     })
     setSalvando(false)
     if (error) { onToast('Erro: '+error.message); return }
     onToast('Chamado registrado.')
     setShowModalNovo(false)
     setNovaCategoria(null); setNovaDescricao(''); setNovoBloco(''); setNovoApto(''); setNovoNome('')
+    setNovoDpto(''); setNovoResponsavel('')
     await carregar()
   }
 
@@ -320,6 +337,33 @@ export default function Equipe({ view, onToast }) {
               </div>
             </div>
             <div className="field"><label>Descricao</label><textarea className="input" rows={3} value={novaDescricao} onChange={e=>setNovaDescricao(e.target.value)}/></div>
+
+            {/* Direcionamento (opcional): departamento OU pessoa da equipe */}
+            <div style={{ borderTop:'1px solid var(--gray-200)', margin:'6px 0 14px', paddingTop:14 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-500)', marginBottom:10, textTransform:'uppercase', letterSpacing:'.04em' }}>
+                Direcionar para (opcional)
+              </div>
+              <div className="row2">
+                <div className="field">
+                  <label>Departamento</label>
+                  <select className="input" value={novoDpto} onChange={e=>{ setNovoDpto(e.target.value); if(e.target.value) setNovoResponsavel('') }}>
+                    <option value="">— Nenhum —</option>
+                    {Object.entries(DEPARTAMENTOS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Pessoa da equipe</label>
+                  <select className="input" value={novoResponsavel} onChange={e=>{ setNovoResponsavel(e.target.value); if(e.target.value) setNovoDpto('') }} disabled={!novaCondo}>
+                    <option value="">— Ninguém —</option>
+                    {equipeCondo.map(m=><option key={m.id} value={m.id}>{m.nome}{m.papel!=='equipe'&&m.papel!=='admin'?` (${DEPARTAMENTOS[m.papel]||m.papel})`:''}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:2 }}>
+                Escolha um departamento <b>ou</b> uma pessoa específica. Deixe em branco para a equipe pegar depois.
+              </div>
+            </div>
+
             <button className="btn btn-primary btn-block" onClick={salvarNovo} disabled={salvando}>{salvando?'Salvando...':'Registrar'}</button>
           </div>
         </div>

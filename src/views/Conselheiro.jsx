@@ -16,6 +16,8 @@ export default function Conselheiro({ view, onToast }) {
   const [passo, setPasso] = useState(1)                    // 1=categoria, 2=subcategoria, 3=descrição
   const [descricao, setDescricao] = useState('')
   const [arquivosSel, setArquivosSel] = useState([])
+  const [equipeCondo, setEquipeCondo] = useState([])       // síndico + equipe do condomínio
+  const [destinoEquipe, setDestinoEquipe] = useState('')   // pessoa da equipe destino (opcional)
   const [loading, setLoading] = useState(false)
   const [confirmNum, setConfirmNum] = useState(null)
   const [ticketVotando, setTicketVotando] = useState(null)
@@ -36,7 +38,7 @@ export default function Conselheiro({ view, onToast }) {
   const [aStatus, setAStatus] = useState('aguardando')  // aguardando | aprovado | rejeitado | todos
   const [chamadoAberto, setChamadoAberto] = useState(null)
 
-  useEffect(() => { setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([]); setConfirmNum(null) }, [view])
+  useEffect(() => { setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([]); setDestinoEquipe(''); setConfirmNum(null) }, [view])
 
   // Ao escolher categoria no novo chamado, carrega as subcategorias e avança
   const escolherCategoria = async (cat) => {
@@ -60,6 +62,13 @@ export default function Conselheiro({ view, onToast }) {
     const { data:cats } = await supabase.from('categorias_sistema')
       .select('nome, icone').eq('ativo', true).order('ordem')
     if (cats) setCategoriasSistema(cats)
+    // Síndico + equipe do condomínio (papel equipe/admin) — para direcionar chamado
+    const { data:eq } = await supabase.from('perfis')
+      .select('id, nome, papel')
+      .eq('condominio_id', perfil.condominio_id)
+      .in('papel', ['equipe','admin'])
+      .order('nome')
+    if (eq) setEquipeCondo(eq)
   }
 
   useEffect(() => { carregar() }, [])
@@ -82,6 +91,7 @@ export default function Conselheiro({ view, onToast }) {
       subcategoria: subSel?.nome || null,
       subcategoria_id: subSel?.id || null,
       descricao: descricao.trim(),
+      atribuido_para: destinoEquipe || null,
       origem: 'Portal do conselheiro',
       nome_solicitante: perfil.nome,
       bloco: perfil.bloco,
@@ -95,7 +105,7 @@ export default function Conselheiro({ view, onToast }) {
     }
     setLoading(false)
     setConfirmNum(ticketNumber(data.id))
-    setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([])
+    setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([]); setDestinoEquipe('')
     await carregar()
   }
 
@@ -679,6 +689,16 @@ export default function Conselheiro({ view, onToast }) {
                 <label>3. Descreva o chamado</label>
                 <textarea className="input" rows={4} value={descricao} onChange={e=>setDescricao(e.target.value)}
                   placeholder="Detalhe o que precisa ser resolvido..." />
+              </div>
+              <div className="field">
+                <label>Direcionar para o síndico / equipe (opcional)</label>
+                <select className="input" value={destinoEquipe} onChange={e=>setDestinoEquipe(e.target.value)}>
+                  <option value="">Síndico e equipe (geral)</option>
+                  {equipeCondo.map(m=><option key={m.id} value={m.id}>{m.nome}{m.papel==='admin'?' (admin)':''}</option>)}
+                </select>
+                <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:2 }}>
+                  Deixe em "geral" para toda a equipe ver, ou escolha uma pessoa específica.
+                </div>
               </div>
               <div className="field">
                 <label>Anexos — fotos, vídeos ou PDF (opcional)</label>
