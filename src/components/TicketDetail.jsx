@@ -22,6 +22,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
   const [statusPendente, setStatusPendente] = useState(null)  // status escolhido, aguardando confirmação/mensagem
   const [msgStatus, setMsgStatus] = useState('')              // mensagem opcional ao mudar status
   const [fechando, setFechando] = useState(false)             // em processo de fechar chamado
+  const [enviarResumoConselho, setEnviarResumoConselho] = useState(false)  // enviar resumo aos conselheiros
 
   // Carrega fornecedores da empresa (para o seletor)
   useEffect(() => {
@@ -106,11 +107,37 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
 
     // Se fechou o chamado (resolvido/cancelado), o e-mail para morador + equipe
     // é enviado automaticamente pelo webhook de banco (notify-new-ticket),
-    // acionado pelo próprio UPDATE de status acima. Nada a fazer aqui.
+    // acionado pelo próprio UPDATE de status acima.
+
+    // Envio sob demanda do RESUMO aos conselheiros (chamado do conselho / com aprovação)
+    let resumoEnviado = false
+    if (ehFinal && enviarResumoConselho) {
+      try {
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-new-ticket`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            evento: 'resumo_conselho',
+            solicitacao_id: ticket.id,
+            mensagem: msgStatus.trim() || null,
+          }),
+        })
+        resumoEnviado = true
+      } catch (e) {
+        console.error('Falha ao enviar resumo ao conselho:', e)
+      }
+    }
 
     setSalvando(false)
-    onToast(ehFinal ? 'Chamado fechado.' : 'Status atualizado.')
-    setStatusPendente(null); setMsgStatus('')
+    onToast(
+      !ehFinal ? 'Status atualizado.'
+      : resumoEnviado ? 'Chamado fechado e resumo enviado aos conselheiros.'
+      : (enviarResumoConselho ? 'Chamado fechado, mas o e-mail de resumo falhou.' : 'Chamado fechado.')
+    )
+    setStatusPendente(null); setMsgStatus(''); setEnviarResumoConselho(false)
     await recarregar()
   }
 
@@ -351,6 +378,23 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
                   ? 'Mensagem para o morador (opcional) — ex.: o que foi feito, observações...'
                   : 'Adicionar uma mensagem/observação (opcional)'}
                 style={{ marginBottom:10 }}/>
+
+              {/* Enviar resumo aos conselheiros — só em fechamento de chamado do conselho ou com aprovação */}
+              {STATUS_FINAIS.includes(statusPendente) && (ticket.origem === 'Portal do conselheiro' || ticket.aprovacao_status) && (
+                <label style={{ display:'flex', alignItems:'flex-start', gap:8, cursor:'pointer', marginBottom:10,
+                  padding:'10px 12px', background:'#f5f3ff', borderRadius:'var(--r-md)', border:'1px solid #ddd6fe' }}>
+                  <input type="checkbox" checked={enviarResumoConselho}
+                    onChange={e=>setEnviarResumoConselho(e.target.checked)}
+                    style={{ width:16, height:16, marginTop:2, cursor:'pointer', flexShrink:0 }}/>
+                  <span style={{ fontSize:13, color:'#4338ca' }}>
+                    <b>Enviar resumo por e-mail aos conselheiros</b><br/>
+                    <span style={{ fontSize:12, color:'#6d28d9' }}>
+                      Inclui os dados do chamado, sua mensagem acima{ticket.aprovacao_status ? ' e o placar da votação' : ''}.
+                    </span>
+                  </span>
+                </label>
+              )}
+
               <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                 <button className="btn btn-primary" disabled={salvando} onClick={confirmarStatus}
                   style={{ background: STATUS_FINAIS.includes(statusPendente) ? (statusPendente==='cancelado'?'var(--rust)':'var(--emerald)') : undefined }}>
