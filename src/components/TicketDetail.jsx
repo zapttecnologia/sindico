@@ -111,6 +111,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
 
     // Envio sob demanda do RESUMO aos conselheiros (chamado do conselho / com aprovação)
     let resumoEnviado = false
+    let erroResumo = ''
     if (ehFinal && enviarResumoConselho) {
       try {
         const { data: s } = await supabase.auth.getSession()
@@ -130,9 +131,11 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
         if (resp.ok && dados.ok) {
           resumoEnviado = true
         } else {
+          erroResumo = `HTTP ${resp.status}${dados.error ? ' · ' + dados.error : ''}${dados.skipped ? ' · ' + dados.motivo : ''}`
           console.error('Resumo não enviado:', resp.status, dados)
         }
       } catch (e) {
+        erroResumo = String(e?.message || e)
         console.error('Falha ao enviar resumo ao conselho:', e)
       }
     }
@@ -141,7 +144,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
     onToast(
       !ehFinal ? 'Status atualizado.'
       : resumoEnviado ? 'Chamado fechado e resumo enviado aos conselheiros.'
-      : (enviarResumoConselho ? 'Chamado fechado, mas o e-mail de resumo falhou.' : 'Chamado fechado.')
+      : (enviarResumoConselho ? `Chamado fechado. E-mail falhou: ${erroResumo}` : 'Chamado fechado.')
     )
     setStatusPendente(null); setMsgStatus(''); setEnviarResumoConselho(false)
     await recarregar()
