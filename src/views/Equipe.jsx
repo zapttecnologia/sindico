@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES, DEPARTAMENTOS } from '../lib/constants'
+import { STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES, DEPARTAMENTOS, ticketNumber } from '../lib/constants'
 import TicketDetail from '../components/TicketDetail'
 import Dashboard from './Dashboard'
 
@@ -66,6 +66,19 @@ export default function Equipe({ view, onToast }) {
   }
 
   useEffect(() => { carregarCondos(); carregar() }, [])
+
+  // Recarrega ao trocar de view (mudar de assunto) e quando a aba volta ao foco
+  useEffect(() => { carregar() }, [view])
+  useEffect(() => {
+    const onFocus = () => carregar()
+    const onVisible = () => { if (!document.hidden) carregar() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
 
   const ehPendente = (t) => t.status !== 'resolvido' && t.status !== 'cancelado'
 
@@ -215,6 +228,9 @@ export default function Equipe({ view, onToast }) {
 
                     {/* Linha 1: categoria + badges + status + data */}
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+                      <span style={{ fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, color:'var(--gray-400)' }}>
+                        #{ticketNumber(t.id)}
+                      </span>
                       {t.origem === 'Portal do conselheiro' && (
                         <span style={{ fontSize:10, fontWeight:800, padding:'3px 9px', borderRadius:'var(--r-full)',
                           background:'#4338ca', color:'#fff', letterSpacing:'.02em' }}>
@@ -304,6 +320,9 @@ export default function Equipe({ view, onToast }) {
                   onMouseEnter={e => { e.currentTarget.style.boxShadow='var(--shadow-md)'; e.currentTarget.style.transform='translateY(-1px)' }}
                   onMouseLeave={e => { e.currentTarget.style.boxShadow='var(--shadow-sm)'; e.currentTarget.style.transform='translateY(0)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <span style={{ fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, color:'var(--gray-400)' }}>
+                      #{ticketNumber(t.id)}
+                    </span>
                     <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
                       background:'var(--gray-100)', color:'var(--gray-600)' }}>
                       {t.categoria_personalizada || t.categoria}

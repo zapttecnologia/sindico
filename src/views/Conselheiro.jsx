@@ -23,6 +23,7 @@ export default function Conselheiro({ view, onToast }) {
   const [confirmNum, setConfirmNum] = useState(null)
   const [ticketVotando, setTicketVotando] = useState(null)
   const [orcamentos, setOrcamentos] = useState([])
+  const [historicoVotacao, setHistoricoVotacao] = useState([])
   const [votosExistentes, setVotosExistentes] = useState([])
   const [opcaoVoto, setOpcaoVoto] = useState(null)
   const [orcSel, setOrcSel] = useState(null)
@@ -83,6 +84,19 @@ export default function Conselheiro({ view, onToast }) {
   }
 
   useEffect(() => { carregar() }, [])
+
+  // Recarrega ao trocar de view (mudar de assunto) e quando a aba volta ao foco
+  useEffect(() => { carregar() }, [view])
+  useEffect(() => {
+    const onFocus = () => carregar()
+    const onVisible = () => { if (!document.hidden) carregar() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
 
   const pendentes = tickets.filter(t => t.aprovacao_status === 'aguardando' && !meusVotos.includes(t.id)).length
   const kpis = {
@@ -192,10 +206,12 @@ export default function Conselheiro({ view, onToast }) {
   const abrirVotacao = async (ticket) => {
     setTicketVotando(ticket)
     setOpcaoVoto(null); setOrcSel(null); setObsVoto('')
-    const [{ data:orcs }, { data:votos }] = await Promise.all([
+    const [{ data:orcs }, { data:votos }, { data:notas }] = await Promise.all([
       supabase.from('orcamentos').select('*').eq('solicitacao_id', ticket.id).order('numero'),
       supabase.from('votos_conselheiros').select('*').eq('solicitacao_id', ticket.id),
+      supabase.from('notas_internas').select('*').eq('solicitacao_id', ticket.id).order('criado_em', { ascending: true }),
     ])
+    setHistoricoVotacao(notas || [])
     // Buscar nomes dos conselheiros separadamente
     const votosComNome = await Promise.all((votos||[]).map(async v => {
       const { data:p } = await supabase.from('perfis').select('nome').eq('id', v.conselheiro_id).maybeSingle()
@@ -281,12 +297,45 @@ export default function Conselheiro({ view, onToast }) {
               background:'var(--gray-100)', color:'var(--gray-600)' }}>
               {ticketVotando.categoria}
             </span>
+            <span style={{ fontFamily:'var(--font-mono)', fontSize:12, fontWeight:700, color:'var(--gray-400)', marginLeft:8 }}>
+              #{ticketNumber(ticketVotando.id)}
+            </span>
             <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'10px 0 4px' }}>
               {ticketVotando.condominios?.nome}
             </h2>
             <p style={{ fontSize:13, color:'var(--gray-500)', margin:'0 0 4px' }}>{ticketVotando.descricao}</p>
             <div style={{ fontSize:11, color:'var(--gray-400)' }}>{ticketVotando.nome_solicitante} · {fmtDate(ticketVotando.criado_em)}</div>
           </div>
+
+          {/* Histórico de mensagens do chamado */}
+          {historicoVotacao.length > 0 && (
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-500)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>
+                Histórico do chamado
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {historicoVotacao.map(n => {
+                  const paraConselho = (n.texto||'').startsWith('[Para conselheiros]')
+                  const texto = (n.texto||'').replace('[Para conselheiros]', '').trim()
+                  const ehEquipe = n.autor_tipo === 'equipe'
+                  return (
+                    <div key={n.id} style={{
+                      padding:'10px 12px', borderRadius:'var(--r-md)',
+                      background: paraConselho ? '#eef2ff' : ehEquipe ? 'var(--gray-50)' : '#fff',
+                      border: paraConselho ? '1px solid #c7d2fe' : '1px solid var(--gray-200)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap' }}>
+                        <span style={{ fontSize:12, fontWeight:700, color: paraConselho ? '#4338ca' : ehEquipe ? 'var(--navy)' : 'var(--gray-700)' }}>
+                          {paraConselho ? '📩 Mensagem ao conselho' : ehEquipe ? `${n.autor_nome||'Equipe'} (síndico/equipe)` : `${n.autor_nome||'Morador'}`}
+                        </span>
+                        <span style={{ fontSize:10, color:'var(--gray-400)' }}>{fmtDate(n.criado_em)}</span>
+                      </div>
+                      <div style={{ fontSize:13, color:'var(--gray-600)', lineHeight:1.5, whiteSpace:'pre-wrap' }}>{texto}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Orçamentos */}
           {orcamentos.length > 0 && (
@@ -481,6 +530,7 @@ export default function Conselheiro({ view, onToast }) {
                   <div style={{ fontSize:13, color:'var(--gray-500)' }}>{t.categoria} · {t.nome_solicitante}</div>
                 </div>
                 <div style={{ textAlign:'right' }}>
+                  <div style={{ fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, color:'var(--gray-400)' }}>#{ticketNumber(t.id)}</div>
                   <div style={{ fontSize:12, color:'var(--gray-400)' }}>{fmtDate(t.criado_em)}</div>
                   <div style={{ fontSize:12, color:'var(--blue)', fontWeight:600, marginTop:4 }}>{podeVotar ? (jaVotei ? 'Ver/alterar voto →' : 'Votar →') : 'Ver →'}</div>
                 </div>
@@ -553,6 +603,9 @@ export default function Conselheiro({ view, onToast }) {
 
                     {/* Linha 1: categoria + badges + status + data */}
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+                      <span style={{ fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, color:'var(--gray-400)' }}>
+                        #{ticketNumber(t.id)}
+                      </span>
                       <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
                         background:'var(--gray-100)', color:'var(--gray-600)' }}>
                         {t.categoria_personalizada || t.categoria}

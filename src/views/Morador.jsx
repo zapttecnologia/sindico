@@ -94,6 +94,19 @@ export default function Morador({ view, onToast }) {
 
   useEffect(() => { carregar() }, [])
 
+  // Recarrega ao trocar de view e quando a aba volta ao foco
+  useEffect(() => { carregar() }, [view])
+  useEffect(() => {
+    const onFocus = () => carregar()
+    const onVisible = () => { if (!document.hidden) carregar() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
+
   // Resetar seleção ao mudar de view
   useEffect(() => {
     setPasso(1); setCatSel(null); setSubCatSel(null)
