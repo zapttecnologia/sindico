@@ -29,21 +29,66 @@ export default function Equipe({ view, onToast }) {
   const [novoResponsavel, setNovoResponsavel] = useState('')  // pessoa destino (opcional)
   const [equipeCondo, setEquipeCondo] = useState([])    // membros da equipe do condomínio escolhido
   const [salvando, setSalvando] = useState(false)
+
+  // ── Novo fluxo de abertura (interno/externo) ──
+  const [tipoChamado, setTipoChamado] = useState('')       // 'interno' | 'externo'
+  const [passoNovo, setPassoNovo] = useState(1)            // etapa do fluxo
+  const [equipeInterna, setEquipeInterna] = useState([])   // equipe/admin da empresa do síndico
+  const [destinoInterno, setDestinoInterno] = useState('') // perfil interno escolhido
+  const [tipoDestino, setTipoDestino] = useState('')       // 'morador' | 'departamento' | 'conselho'
+  const [moradoresCondo, setMoradoresCondo] = useState([]) // moradores do condomínio
+  const [conselhoCondo, setConselhoCondo] = useState([])   // conselheiros do condomínio
+  const [destinoFinal, setDestinoFinal] = useState('')     // id do morador/conselheiro OU chave do departamento
+  const [subcatsNovo, setSubcatsNovo] = useState([])       // subcategorias da categoria escolhida
+  const [subSelNovo, setSubSelNovo] = useState(null)       // subcategoria escolhida
+
   const ehAdmin = perfil?.papel === 'admin'
 
   // Resetar subTela quando muda de view
   useEffect(() => { setSubTela('lista'); setTicketSel(null) }, [view])
 
-  // Carrega os membros da equipe/departamentos do condomínio escolhido (para direcionar)
+  // Carrega equipe, moradores e conselho do condomínio escolhido (para direcionar)
   useEffect(() => {
-    if (!novaCondo) { setEquipeCondo([]); return }
+    if (!novaCondo) { setEquipeCondo([]); setMoradoresCondo([]); setConselhoCondo([]); return }
     supabase.from('perfis')
       .select('id, nome, papel')
       .eq('condominio_id', novaCondo)
       .in('papel', ['equipe','admin','manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros'])
       .order('nome')
       .then(({ data }) => setEquipeCondo(data || []))
+    supabase.from('perfis')
+      .select('id, nome, bloco, apartamento')
+      .eq('condominio_id', novaCondo).eq('papel', 'morador')
+      .order('nome')
+      .then(({ data }) => setMoradoresCondo(data || []))
+    supabase.from('perfis')
+      .select('id, nome')
+      .eq('condominio_id', novaCondo).eq('papel', 'conselheiro')
+      .order('nome')
+      .then(({ data }) => setConselhoCondo(data || []))
   }, [novaCondo])
+
+  // Carrega a equipe interna (equipe/admin da mesma empresa do síndico)
+  useEffect(() => {
+    if (!showModalNovo || !perfil?.empresa_id) return
+    supabase.from('perfis')
+      .select('id, nome, papel')
+      .eq('empresa_id', perfil.empresa_id)
+      .in('papel', ['equipe','admin'])
+      .neq('id', perfil.id)   // não a si mesmo
+      .order('nome')
+      .then(({ data }) => setEquipeInterna(data || []))
+  }, [showModalNovo, perfil?.empresa_id])
+
+  // Carrega subcategorias quando escolhe categoria (fluxo externo)
+  useEffect(() => {
+    if (!novaCategoria) { setSubcatsNovo([]); return }
+    const cat = categoriasSistema.find(c => c.nome === novaCategoria)
+    if (!cat?.id) { setSubcatsNovo([]); return }
+    supabase.from('subcategorias_sistema')
+      .select('id, nome, icone').eq('categoria_id', cat.id).eq('ativo', true).order('ordem')
+      .then(({ data }) => setSubcatsNovo(data || []))
+  }, [novaCategoria])
 
   const carregarCondos = async () => {
     if (ehAdmin) {
@@ -61,7 +106,7 @@ export default function Equipe({ view, onToast }) {
       .select('*, condominios(nome)').order('criado_em', { ascending:false })
     if (data) setTickets(data)
     const { data:cats } = await supabase.from('categorias_sistema')
-      .select('nome, icone').eq('ativo', true).order('ordem')
+      .select('id, nome, icone').eq('ativo', true).order('ordem')
     if (cats) setCategoriasSistema(cats)
   }
 
@@ -104,22 +149,71 @@ export default function Equipe({ view, onToast }) {
     aprovacao: ticketsFiltrados.filter(t => t.aprovacao_status === 'aguardando').length,
   }
 
+  const resetNovo = () => {
+    setTipoChamado(''); setPassoNovo(1)
+    setNovaCategoria(null); setSubSelNovo(null); setSubcatsNovo([]); setNovaDescricao('')
+    setNovaCondo(''); setNovoBloco(''); setNovoApto(''); setNovoNome('')
+    setNovoDpto(''); setNovoResponsavel('')
+    setDestinoInterno(''); setTipoDestino(''); setDestinoFinal('')
+  }
+
+  const abrirModalNovo = () => { resetNovo(); setShowModalNovo(true) }
+  const fecharModalNovo = () => { setShowModalNovo(false); resetNovo() }
+
   const salvarNovo = async () => {
-    if (!novaCategoria || !novaDescricao.trim() || !novaCondo) { onToast('Preencha categoria, condominio e descricao.'); return }
+    if (!novaDescricao.trim()) { onToast('Escreva a descrição do chamado.'); return }
+
+    let dados = {
+      autor_id: perfil?.id,
+      categoria: novaCategoria,
+      subcategoria: subSelNovo?.nome || null,
+      subcategoria_id: subSelNovo?.id || null,
+      descricao: novaDescricao.trim(),
+      origem: novaOrigem,
+    }
+
+    if (tipoChamado === 'interno') {
+      if (!destinoInterno) { onToast('Selecione para quem da equipe interna.'); return }
+      if (!novaCategoria) { onToast('Selecione a categoria.'); return }
+      // Chamado interno: vai para uma pessoa da equipe da empresa.
+      // Usa o condomínio do próprio síndico como referência (ou o primeiro atribuído).
+      const condoRef = perfil?.condominio_id || novaCondo || (condominios[0]?.id)
+      if (!condoRef) { onToast('Nenhum condomínio de referência disponível para o chamado interno.'); return }
+      dados = {
+        ...dados,
+        condominio_id: condoRef,
+        atribuido_para: destinoInterno,
+        tipo_chamado: 'interno',
+      }
+    } else if (tipoChamado === 'externo') {
+      if (!novaCondo) { onToast('Selecione o condomínio.'); return }
+      if (!tipoDestino) { onToast('Selecione o tipo de destinatário.'); return }
+      if (!novaCategoria) { onToast('Selecione a categoria.'); return }
+      dados = { ...dados, condominio_id: novaCondo, tipo_chamado: 'externo' }
+
+      if (tipoDestino === 'departamento') {
+        if (!destinoFinal) { onToast('Selecione o departamento.'); return }
+        dados.departamento = destinoFinal
+      } else if (tipoDestino === 'morador') {
+        if (!destinoFinal) { onToast('Selecione o morador.'); return }
+        dados.atribuido_para = destinoFinal
+        const m = moradoresCondo.find(x => x.id === destinoFinal)
+        if (m) { dados.nome_solicitante = m.nome; dados.bloco = m.bloco; dados.apartamento = m.apartamento }
+      } else if (tipoDestino === 'conselho') {
+        // Direciona ao conselho: se escolheu um conselheiro específico, usa; senão marca destino conselho
+        if (destinoFinal) dados.atribuido_para = destinoFinal
+        dados.destino_conselho = true
+      }
+    } else {
+      onToast('Selecione se o chamado é interno ou externo.'); return
+    }
+
     setSalvando(true)
-    const { error } = await supabase.from('solicitacoes').insert({
-      condominio_id:novaCondo, autor_id:perfil?.id, categoria:novaCategoria,
-      descricao:novaDescricao.trim(), origem:novaOrigem,
-      bloco:novoBloco, apartamento:novoApto, nome_solicitante:novoNome,
-      departamento: novoDpto || null,
-      atribuido_para: novoResponsavel || null,
-    })
+    const { error } = await supabase.from('solicitacoes').insert(dados)
     setSalvando(false)
     if (error) { onToast('Erro: '+error.message); return }
     onToast('Chamado registrado.')
-    setShowModalNovo(false)
-    setNovaCategoria(null); setNovaDescricao(''); setNovoBloco(''); setNovoApto(''); setNovoNome('')
-    setNovoDpto(''); setNovoResponsavel('')
+    fecharModalNovo()
     await carregar()
   }
 
@@ -151,7 +245,7 @@ export default function Equipe({ view, onToast }) {
             style={subTela!=='aprovacao'&&globalStats.aprovacao>0?{borderColor:'var(--amber)',color:'var(--amber)'}:{}}>
             Ag. aprovacao {globalStats.aprovacao > 0 && `(${globalStats.aprovacao})`}
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowModalNovo(true)}>+ Novo</button>
+          <button className="btn btn-primary btn-sm" onClick={abrirModalNovo}>+ Novo</button>
         </div>
       </div>
 
@@ -359,68 +453,149 @@ export default function Equipe({ view, onToast }) {
 
       {/* Modal novo chamado */}
       {showModalNovo && (
-        <div className="modal-overlay" onClick={e => e.target===e.currentTarget&&setShowModalNovo(false)}>
-          <div className="modal">
+        <div className="modal-overlay" onClick={e => e.target===e.currentTarget&&fecharModalNovo()}>
+          <div className="modal" style={{ maxHeight:'90vh', overflowY:'auto' }}>
             <div className="modal-header">
               <h3 className="modal-title">Novo chamado</h3>
-              <button className="modal-close" onClick={() => setShowModalNovo(false)}>✕</button>
+              <button className="modal-close" onClick={fecharModalNovo}>✕</button>
             </div>
-            <div className="field"><label>Origem</label>
-              <select className="input" value={novaOrigem} onChange={e => setNovaOrigem(e.target.value)}>
-                {['E-mail','Telefone','Presencial','WhatsApp','Outro'].map(o=><option key={o}>{o}</option>)}
-              </select>
+
+            {/* PASSO 1: Interno ou Externo */}
+            <div className="field"><label>Tipo de chamado</label>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div className={`cat-card${tipoChamado==='interno'?' selected':''}`} onClick={()=>{ setTipoChamado('interno'); setNovaCondo(''); setTipoDestino(''); setDestinoFinal('') }} style={{ padding:'16px 8px' }}>
+                  <div className="cat-card-icon" style={{ fontSize:26 }}>🏢</div>
+                  <div className="cat-card-nome">Interno</div>
+                  <div style={{ fontSize:10, color:'var(--gray-400)', marginTop:2 }}>Para a equipe interna</div>
+                </div>
+                <div className={`cat-card${tipoChamado==='externo'?' selected':''}`} onClick={()=>{ setTipoChamado('externo'); setDestinoInterno('') }} style={{ padding:'16px 8px' }}>
+                  <div className="cat-card-icon" style={{ fontSize:26 }}>🏘️</div>
+                  <div className="cat-card-nome">Externo</div>
+                  <div style={{ fontSize:10, color:'var(--gray-400)', marginTop:2 }}>Para um condomínio</div>
+                </div>
+              </div>
             </div>
-            <div className="field"><label>Condominio</label>
-              <select className="input" value={novaCondo} onChange={e => setNovaCondo(e.target.value)}>
-                <option value="">Selecione...</option>
-                {condominios.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
-            </div>
-            <div className="row2">
-              <div className="field"><label>Bloco</label><input className="input" value={novoBloco} onChange={e=>setNovoBloco(e.target.value)}/></div>
-              <div className="field"><label>Apartamento</label><input className="input" value={novoApto} onChange={e=>setNovoApto(e.target.value)}/></div>
-            </div>
-            <div className="field"><label>Solicitante</label><input className="input" value={novoNome} onChange={e=>setNovoNome(e.target.value)}/></div>
-            <div className="field"><label>Categoria</label>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px, 1fr))', gap:8 }}>
-                {categoriasSistema.map(c=>(
-                  <div key={c.nome} className={`cat-card${novaCategoria===c.nome?' selected':''}`}
-                    onClick={()=>setNovaCategoria(c.nome)} style={{ padding:'14px 8px' }}>
-                    <div className="cat-card-icon" style={{ fontSize:24 }}>{c.icone||'📋'}</div>
-                    <div className="cat-card-nome" style={{ fontSize:12 }}>{c.nome}</div>
+
+            {/* ───────── FLUXO INTERNO ───────── */}
+            {tipoChamado === 'interno' && (
+              <>
+                <div className="field"><label>Direcionar para (equipe interna)</label>
+                  <select className="input" value={destinoInterno} onChange={e=>setDestinoInterno(e.target.value)}>
+                    <option value="">Selecione a pessoa...</option>
+                    {equipeInterna.map(m=><option key={m.id} value={m.id}>{m.nome}{m.papel==='admin'?' (admin)':''}</option>)}
+                  </select>
+                  {equipeInterna.length===0 && <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:2 }}>Nenhuma outra pessoa na equipe interna.</div>}
+                </div>
+                <div className="field"><label>Categoria</label>
+                  <select className="input" value={novaCategoria||''} onChange={e=>setNovaCategoria(e.target.value||null)}>
+                    <option value="">Selecione...</option>
+                    {categoriasSistema.map(c=><option key={c.nome} value={c.nome}>{c.icone?c.icone+' ':''}{c.nome}</option>)}
+                  </select>
+                </div>
+                <div className="field"><label>Origem</label>
+                  <select className="input" value={novaOrigem} onChange={e => setNovaOrigem(e.target.value)}>
+                    {['E-mail','Telefone','Presencial','WhatsApp','Outro'].map(o=><option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div className="field"><label>Descrição</label><textarea className="input" rows={3} value={novaDescricao} onChange={e=>setNovaDescricao(e.target.value)}/></div>
+                <button className="btn btn-primary btn-block" onClick={salvarNovo} disabled={salvando}>{salvando?'Salvando...':'Registrar chamado interno'}</button>
+              </>
+            )}
+
+            {/* ───────── FLUXO EXTERNO ───────── */}
+            {tipoChamado === 'externo' && (
+              <>
+                <div className="field"><label>Condomínio</label>
+                  <select className="input" value={novaCondo} onChange={e => { setNovaCondo(e.target.value); setTipoDestino(''); setDestinoFinal('') }}>
+                    <option value="">Selecione...</option>
+                    {condominios.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+                  </select>
+                </div>
+
+                {novaCondo && (
+                  <div className="field"><label>Este chamado é para</label>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                      {[['morador','👤','Morador'],['departamento','🔧','Departamento'],['conselho','⭐','Conselho']].map(([v,ic,lb])=>(
+                        <div key={v} className={`cat-card${tipoDestino===v?' selected':''}`} onClick={()=>{ setTipoDestino(v); setDestinoFinal('') }} style={{ padding:'12px 6px' }}>
+                          <div className="cat-card-icon" style={{ fontSize:22 }}>{ic}</div>
+                          <div className="cat-card-nome" style={{ fontSize:11 }}>{lb}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-            <div className="field"><label>Descricao</label><textarea className="input" rows={3} value={novaDescricao} onChange={e=>setNovaDescricao(e.target.value)}/></div>
+                )}
 
-            {/* Direcionamento (opcional): departamento OU pessoa da equipe */}
-            <div style={{ borderTop:'1px solid var(--gray-200)', margin:'6px 0 14px', paddingTop:14 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-500)', marginBottom:10, textTransform:'uppercase', letterSpacing:'.04em' }}>
-                Direcionar para (opcional)
-              </div>
-              <div className="row2">
-                <div className="field">
-                  <label>Departamento</label>
-                  <select className="input" value={novoDpto} onChange={e=>{ setNovoDpto(e.target.value); if(e.target.value) setNovoResponsavel('') }}>
-                    <option value="">— Nenhum —</option>
-                    {Object.entries(DEPARTAMENTOS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Pessoa da equipe</label>
-                  <select className="input" value={novoResponsavel} onChange={e=>{ setNovoResponsavel(e.target.value); if(e.target.value) setNovoDpto('') }} disabled={!novaCondo}>
-                    <option value="">— Ninguém —</option>
-                    {equipeCondo.map(m=><option key={m.id} value={m.id}>{m.nome}{m.papel!=='equipe'&&m.papel!=='admin'?` (${DEPARTAMENTOS[m.papel]||m.papel})`:''}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:2 }}>
-                Escolha um departamento <b>ou</b> uma pessoa específica. Deixe em branco para a equipe pegar depois.
-              </div>
-            </div>
+                {/* Destinatário específico conforme o tipo */}
+                {tipoDestino === 'morador' && (
+                  <div className="field"><label>Qual morador</label>
+                    <select className="input" value={destinoFinal} onChange={e=>setDestinoFinal(e.target.value)}>
+                      <option value="">Selecione...</option>
+                      {moradoresCondo.map(m=><option key={m.id} value={m.id}>{m.nome}{m.bloco?` · Bloco ${m.bloco}`:''}{m.apartamento?` · Ap. ${m.apartamento}`:''}</option>)}
+                    </select>
+                    {moradoresCondo.length===0 && <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:2 }}>Nenhum morador cadastrado neste condomínio.</div>}
+                  </div>
+                )}
+                {tipoDestino === 'departamento' && (
+                  <div className="field"><label>Qual departamento</label>
+                    <select className="input" value={destinoFinal} onChange={e=>setDestinoFinal(e.target.value)}>
+                      <option value="">Selecione...</option>
+                      {Object.entries(DEPARTAMENTOS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </div>
+                )}
+                {tipoDestino === 'conselho' && (
+                  <div className="field"><label>Conselho</label>
+                    <select className="input" value={destinoFinal} onChange={e=>setDestinoFinal(e.target.value)}>
+                      <option value="">Todo o conselho</option>
+                      {conselhoCondo.map(m=><option key={m.id} value={m.id}>{m.nome}</option>)}
+                    </select>
+                    <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:2 }}>Deixe em "Todo o conselho" ou escolha um conselheiro específico.</div>
+                  </div>
+                )}
 
-            <button className="btn btn-primary btn-block" onClick={salvarNovo} disabled={salvando}>{salvando?'Salvando...':'Registrar'}</button>
+                {/* Categoria em cards (igual morador) */}
+                {tipoDestino && (
+                  <div className="field"><label>Categoria</label>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(110px, 1fr))', gap:8 }}>
+                      {categoriasSistema.map(c=>(
+                        <div key={c.nome} className={`cat-card${novaCategoria===c.nome?' selected':''}`}
+                          onClick={()=>{ setNovaCategoria(c.nome); setSubSelNovo(null) }} style={{ padding:'14px 8px' }}>
+                          <div className="cat-card-icon" style={{ fontSize:24 }}>{c.icone||'📋'}</div>
+                          <div className="cat-card-nome" style={{ fontSize:12 }}>{c.nome}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Subcategoria em cards (se houver) */}
+                {novaCategoria && subcatsNovo.length > 0 && (
+                  <div className="field"><label>Subcategoria</label>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(110px, 1fr))', gap:8 }}>
+                      {subcatsNovo.map(s=>(
+                        <div key={s.id} className={`cat-card${subSelNovo?.id===s.id?' selected':''}`}
+                          onClick={()=>setSubSelNovo(s)} style={{ padding:'12px 8px' }}>
+                          <div className="cat-card-icon" style={{ fontSize:20 }}>{s.icone||'📄'}</div>
+                          <div className="cat-card-nome" style={{ fontSize:11 }}>{s.nome}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {novaCategoria && (
+                  <>
+                    <div className="field"><label>Origem</label>
+                      <select className="input" value={novaOrigem} onChange={e => setNovaOrigem(e.target.value)}>
+                        {['E-mail','Telefone','Presencial','WhatsApp','Outro'].map(o=><option key={o}>{o}</option>)}
+                      </select>
+                    </div>
+                    <div className="field"><label>Descrição</label><textarea className="input" rows={3} value={novaDescricao} onChange={e=>setNovaDescricao(e.target.value)}/></div>
+                    <button className="btn btn-primary btn-block" onClick={salvarNovo} disabled={salvando}>{salvando?'Salvando...':'Registrar chamado'}</button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
