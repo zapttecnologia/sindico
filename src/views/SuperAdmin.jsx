@@ -163,6 +163,7 @@ export default function SuperAdmin({ onToast }) {
     try { return JSON.parse(localStorage.getItem('sa_branding')||'{}') } catch { return {} }
   })
   const [activeMenu, setActiveMenu] = useState('dashboard')
+  const [menuMobile, setMenuMobile] = useState(false)
   const [subMenu, setSubMenu] = useState(null)
   const [expandidos, setExpandidos] = useState({ clientes:true, financeiro:false })
   const [empresaSel, setEmpresaSel] = useState(null)
@@ -350,6 +351,7 @@ export default function SuperAdmin({ onToast }) {
     setActiveMenu(id)
     setSubMenu(sub)
     setBusca('')
+    setMenuMobile(false)
     if (id==='clientes' && !sub) setSubMenu('todos')
     if (MENU_ITEMS.find(m=>m.id===id)?.hasSubmenu) {
       setExpandidos(prev=>({...prev,[id]:true}))
@@ -361,8 +363,8 @@ export default function SuperAdmin({ onToast }) {
     <div style={{ display:'flex', minHeight:'100vh', background:C.bg, color:C.text, fontFamily:'var(--font-body)' }}>
 
       {/* ── SIDEBAR ── */}
-      <div style={{ width:SIDEBAR_W, background:C.sidebar, borderRight:`1px solid ${C.border}`,
-        display:'flex', flexDirection:'column', position:'fixed', top:0, left:0, height:'100vh', zIndex:40 }}>
+      <div className={`sa-sidebar${menuMobile?' aberta':''}`} style={{ width:SIDEBAR_W, background:C.sidebar, borderRight:`1px solid ${C.border}`,
+        display:'flex', flexDirection:'column', position:'fixed', top:0, left:0, height:'100vh', zIndex:60 }}>
 
         {/* Logo / Branding */}
         <div style={{ padding:'20px 18px', borderBottom:`1px solid ${C.border}` }}>
@@ -453,12 +455,23 @@ export default function SuperAdmin({ onToast }) {
         </div>
       </div>
 
+      {/* Overlay para fechar o menu no mobile */}
+      {menuMobile && (
+        <div onClick={()=>setMenuMobile(false)}
+          style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:50 }} className="sa-overlay"/>
+      )}
+
       {/* ── CONTEÚDO PRINCIPAL ── */}
-      <div style={{ marginLeft:SIDEBAR_W, flex:1, minHeight:'100vh', background:C.bg }}>
+      <div className="sa-main" style={{ marginLeft:SIDEBAR_W, flex:1, minHeight:'100vh', background:C.bg }}>
 
         {/* Topbar */}
         <div style={{ height:52, borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center',
           padding:'0 28px', gap:12, position:'sticky', top:0, background:C.bg, zIndex:30 }}>
+          <button className="sa-hamburguer" onClick={()=>setMenuMobile(true)}
+            style={{ display:'none', background:'none', border:`1px solid ${C.border}`, borderRadius:7,
+              color:C.text, fontSize:18, cursor:'pointer', padding:'2px 10px', lineHeight:1 }}>
+            ☰
+          </button>
           <div style={{ flex:1, fontSize:14, fontWeight:700, color:C.text }}>
             {MENU_ITEMS.find(m=>m.id===activeMenu)?.label}
             {subMenu && subMenu!=='todos' && <span style={{ color:C.muted, fontWeight:400, marginLeft:8 }}>
@@ -630,7 +643,7 @@ export default function SuperAdmin({ onToast }) {
               </div>
 
               <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                <table className="sa-tabela-clientes" style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                   <thead>
                     <tr style={{ background:tema==='dark'?'rgba(255,255,255,.02)':'rgba(0,0,0,.02)', borderBottom:`1px solid ${C.border}` }}>
                       {['Empresa','Plano','Status','Condos','Usuários','Abertos','Vencimento','Ações'].map(h=>(
@@ -654,7 +667,7 @@ export default function SuperAdmin({ onToast }) {
                         <tr key={e.id} style={{ borderBottom:`1px solid ${C.border2}`, background:rowBg, transition:'background .1s' }}
                           onMouseEnter={el=>el.currentTarget.style.background=tema==='dark'?'rgba(124,58,237,.07)':'#f5f3ff'}
                           onMouseLeave={el=>el.currentTarget.style.background=rowBg}>
-                          <td style={{ padding:'12px 14px' }}>
+                          <td data-label="Empresa" style={{ padding:'12px 14px' }}>
                             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                               <div style={{ width:32, height:32, borderRadius:8, background:`${corPrimaria}20`,
                                 display:'flex', alignItems:'center', justifyContent:'center',
@@ -667,13 +680,13 @@ export default function SuperAdmin({ onToast }) {
                               </div>
                             </div>
                           </td>
-                          <td style={{ padding:'12px 14px' }}><Badge label={e.plano_nome} map={PLANO_COR}/></td>
-                          <td style={{ padding:'12px 14px' }}><Badge label={e.status} map={STATUS_COR}/></td>
-                          <td style={{ padding:'12px 14px', textAlign:'center', fontWeight:800, color:C.blue, fontSize:15 }}>{e.total_condominios}</td>
-                          <td style={{ padding:'12px 14px', textAlign:'center', fontWeight:800, color:C.violet, fontSize:15 }}>{e.total_usuarios}</td>
-                          <td style={{ padding:'12px 14px', textAlign:'center', fontWeight:800, fontSize:15,
+                          <td data-label="Plano" style={{ padding:'12px 14px' }}><Badge label={e.plano_nome} map={PLANO_COR}/></td>
+                          <td data-label="Status" style={{ padding:'12px 14px' }}><Badge label={e.status} map={STATUS_COR}/></td>
+                          <td data-label="Condomínios" style={{ padding:'12px 14px', textAlign:'center', fontWeight:800, color:C.blue, fontSize:15 }}>{e.total_condominios}</td>
+                          <td data-label="Usuários" style={{ padding:'12px 14px', textAlign:'center', fontWeight:800, color:C.violet, fontSize:15 }}>{e.total_usuarios}</td>
+                          <td data-label="Abertos" style={{ padding:'12px 14px', textAlign:'center', fontWeight:800, fontSize:15,
                             color:e.chamados_abertos>0?C.amber:C.muted }}>{e.chamados_abertos}</td>
-                          <td style={{ padding:'12px 14px' }}>
+                          <td data-label="Vencimento" style={{ padding:'12px 14px' }}>
                             {vencEm!==null ? (
                               <span style={{ fontSize:12, fontWeight:600,
                                 color:vencEm<=0?C.red:vencEm<=15?C.amber:'rgba(255,255,255,.3)' }}>
@@ -681,7 +694,7 @@ export default function SuperAdmin({ onToast }) {
                               </span>
                             ) : <span style={{ color:C.muted }}>—</span>}
                           </td>
-                          <td style={{ padding:'12px 14px' }}>
+                          <td data-label="Ações" style={{ padding:'12px 14px' }}>
                             <div style={{ display:'flex', gap:6 }}>
                               <Btn sm onClick={()=>setEmpresaSel(e)}>Gerenciar</Btn>
                               <Btn sm variant='ghost' onClick={()=>setModalEditar({...e})}>Editar</Btn>
