@@ -18,6 +18,7 @@ export default function Conselheiro({ view, onToast }) {
   const [arquivosSel, setArquivosSel] = useState([])
   const [equipeCondo, setEquipeCondo] = useState([])       // síndico + equipe do condomínio
   const [destinoEquipe, setDestinoEquipe] = useState('')   // pessoa da equipe destino (opcional)
+  const [paraSindico, setParaSindico] = useState(false)    // checkbox: chamado é para o síndico/equipe
   const [loading, setLoading] = useState(false)
   const [confirmNum, setConfirmNum] = useState(null)
   const [ticketVotando, setTicketVotando] = useState(null)
@@ -28,6 +29,7 @@ export default function Conselheiro({ view, onToast }) {
   const [obsVoto, setObsVoto] = useState('')
   const [salvandoVoto, setSalvandoVoto] = useState(false)
   const [meuVoto, setMeuVoto] = useState(null)
+  const [meusVotos, setMeusVotos] = useState([])   // ids de solicitações que EU já votei
   // Filtros da aba Chamados
   const [fBusca, setFBusca] = useState('')
   const [fCategoria, setFCategoria] = useState('todas')
@@ -38,7 +40,7 @@ export default function Conselheiro({ view, onToast }) {
   const [aStatus, setAStatus] = useState('aguardando')  // aguardando | aprovado | rejeitado | todos
   const [chamadoAberto, setChamadoAberto] = useState(null)
 
-  useEffect(() => { setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([]); setDestinoEquipe(''); setConfirmNum(null) }, [view])
+  useEffect(() => { setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([]); setDestinoEquipe(''); setParaSindico(false); setConfirmNum(null) }, [view])
 
   // Ao escolher categoria no novo chamado, carrega as subcategorias e avança
   const escolherCategoria = async (cat) => {
@@ -54,9 +56,13 @@ export default function Conselheiro({ view, onToast }) {
   }
 
   const carregar = async () => {
+    // O conselho só vê: (a) chamados enviados para votação (aprovacao_status preenchido)
+    // e (b) chamados que o próprio conselho abriu (origem Portal do conselheiro).
+    // Os demais (dia a dia da gestão) ficam só com síndico/equipe.
     const { data } = await supabase.from('solicitacoes')
       .select('*, condominios(nome)')
       .eq('condominio_id', perfil.condominio_id)
+      .or('aprovacao_status.not.is.null,origem.eq."Portal do conselheiro"')
       .order('criado_em', { ascending:false })
     if (data) setTickets(data)
     const { data:cats } = await supabase.from('categorias_sistema')
@@ -69,11 +75,16 @@ export default function Conselheiro({ view, onToast }) {
       .in('papel', ['equipe','admin'])
       .order('nome')
     if (eq) setEquipeCondo(eq)
+    // Chamados que EU (este conselheiro) já votei
+    const { data:mv } = await supabase.from('votos_conselheiros')
+      .select('solicitacao_id')
+      .eq('conselheiro_id', session.user.id)
+    if (mv) setMeusVotos(mv.map(v => v.solicitacao_id))
   }
 
   useEffect(() => { carregar() }, [])
 
-  const pendentes = tickets.filter(t => t.aprovacao_status === 'aguardando').length
+  const pendentes = tickets.filter(t => t.aprovacao_status === 'aguardando' && !meusVotos.includes(t.id)).length
   const kpis = {
     total: tickets.length,
     abertos: tickets.filter(t => t.status !== 'resolvido' && t.status !== 'cancelado').length,
@@ -91,7 +102,7 @@ export default function Conselheiro({ view, onToast }) {
       subcategoria: subSel?.nome || null,
       subcategoria_id: subSel?.id || null,
       descricao: descricao.trim(),
-      atribuido_para: destinoEquipe || null,
+      atribuido_para: (paraSindico && destinoEquipe) ? destinoEquipe : null,
       origem: 'Portal do conselheiro',
       nome_solicitante: perfil.nome,
       bloco: perfil.bloco,
@@ -105,7 +116,7 @@ export default function Conselheiro({ view, onToast }) {
     }
     setLoading(false)
     setConfirmNum(ticketNumber(data.id))
-    setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([]); setDestinoEquipe('')
+    setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([]); setDestinoEquipe(''); setParaSindico(false)
     await carregar()
   }
 
@@ -147,7 +158,7 @@ export default function Conselheiro({ view, onToast }) {
       {pendentes > 0 && (
         <div className="card" style={{ marginBottom:16, borderLeft:'3px solid var(--amber)' }}>
           <h3 className="section-title" style={{ color:'var(--amber)' }}>⏳ Aguardando seu voto ({pendentes})</h3>
-          {tickets.filter(t=>t.aprovacao_status==='aguardando').map(t=>(
+          {tickets.filter(t=>t.aprovacao_status==='aguardando' && !meusVotos.includes(t.id)).map(t=>(
             <div key={t.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
               padding:'10px 0', borderBottom:'1px solid var(--gray-100)', gap:10, flexWrap:'wrap' }}>
               <div>
@@ -252,7 +263,6 @@ export default function Conselheiro({ view, onToast }) {
   ]
 
   if (view === 'aprovacoes') {
-    const pendentes = tickets.filter(t => t.aprovacao_status === 'aguardando')
     const emAprovacao = tickets.filter(t => t.aprovacao_status)  // aguardando, aprovado ou rejeitado
 
     // Tela de votação aberta
@@ -408,10 +418,12 @@ export default function Conselheiro({ view, onToast }) {
       }
       return true
     })
-    const badgeAprov = (st) => {
+    const badgeAprov = (st, jaVotei) => {
       if (st === 'aprovado') return { bg:'var(--mint)', cor:'var(--emerald)', txt:'✅ Aprovado' }
       if (st === 'rejeitado') return { bg:'#fef2f2', cor:'var(--rust)', txt:'❌ Não aprovado' }
-      return { bg:'var(--amber-bg)', cor:'#92400e', txt:'⏳ Aguardando voto' }
+      // aguardando o quórum do conselho
+      if (jaVotei) return { bg:'#eef2ff', cor:'#4338ca', txt:'🗳️ Você já votou · aguardando conselho' }
+      return { bg:'var(--amber-bg)', cor:'#92400e', txt:'⏳ Aguardando seu voto' }
     }
     return (
       <div>
@@ -447,7 +459,8 @@ export default function Conselheiro({ view, onToast }) {
           : aprovFiltrados.length === 0
           ? <div className="empty-state">Nenhum chamado neste filtro.</div>
           : aprovFiltrados.map(t => {
-            const bd = badgeAprov(t.aprovacao_status)
+            const jaVotei = meusVotos.includes(t.id)
+            const bd = badgeAprov(t.aprovacao_status, jaVotei)
             const podeVotar = t.aprovacao_status === 'aguardando'
             return (
             <div key={t.id} onClick={()=>abrirVotacao(t)}
@@ -469,7 +482,7 @@ export default function Conselheiro({ view, onToast }) {
                 </div>
                 <div style={{ textAlign:'right' }}>
                   <div style={{ fontSize:12, color:'var(--gray-400)' }}>{fmtDate(t.criado_em)}</div>
-                  <div style={{ fontSize:12, color:'var(--blue)', fontWeight:600, marginTop:4 }}>{podeVotar ? 'Votar →' : 'Ver →'}</div>
+                  <div style={{ fontSize:12, color:'var(--blue)', fontWeight:600, marginTop:4 }}>{podeVotar ? (jaVotei ? 'Ver/alterar voto →' : 'Votar →') : 'Ver →'}</div>
                 </div>
               </div>
               {t.descricao && (
@@ -717,14 +730,24 @@ export default function Conselheiro({ view, onToast }) {
                   placeholder="Detalhe o que precisa ser resolvido..." />
               </div>
               <div className="field">
-                <label>Direcionar para o síndico / equipe (opcional)</label>
-                <select className="input" value={destinoEquipe} onChange={e=>setDestinoEquipe(e.target.value)}>
-                  <option value="">Síndico e equipe (geral)</option>
-                  {equipeCondo.map(m=><option key={m.id} value={m.id}>{m.nome}{m.papel==='admin'?' (admin)':''}</option>)}
-                </select>
-                <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:2 }}>
-                  Deixe em "geral" para toda a equipe ver, ou escolha uma pessoa específica.
-                </div>
+                <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
+                  <input type="checkbox" checked={paraSindico}
+                    onChange={e=>{ setParaSindico(e.target.checked); if(!e.target.checked) setDestinoEquipe('') }}
+                    style={{ width:16, height:16, cursor:'pointer' }}/>
+                  <span>Este chamado é para o síndico / equipe</span>
+                </label>
+                {paraSindico && (
+                  <div style={{ marginTop:10 }}>
+                    <label>Direcionar para (opcional)</label>
+                    <select className="input" value={destinoEquipe} onChange={e=>setDestinoEquipe(e.target.value)}>
+                      <option value="">Síndico e equipe (geral)</option>
+                      {equipeCondo.map(m=><option key={m.id} value={m.id}>{m.nome}{m.papel==='admin'?' (admin)':''}</option>)}
+                    </select>
+                    <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:2 }}>
+                      Deixe em "geral" para toda a equipe ver, ou escolha uma pessoa específica.
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="field">
                 <label>Anexos — fotos, vídeos ou PDF (opcional)</label>
