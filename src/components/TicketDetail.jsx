@@ -196,6 +196,9 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
               #{ticketNumber(ticket.id)}
             </span>
             <span className={`badge badge-cat`}>{cat}</span>
+            {ticket.subcategoria && (
+              <span className="badge" style={{ background:'#eef2ff', color:'#4338ca' }}>{ticket.subcategoria}</span>
+            )}
             <span className={`status-badge ${statusClass(ticket.status)}`}>{STATUS_LABEL[ticket.status]}</span>
             {ticket.aprovacao_status && (
               <span className={`status-badge ${aprovClass(ticket.aprovacao_status)}`}>
