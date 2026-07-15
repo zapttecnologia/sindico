@@ -21,6 +21,7 @@ export default function Relatorio({ onToast }) {
   const [ano, setAno] = useState(hoje.getFullYear())
   const [condoFiltro, setCondoFiltro] = useState('todos')
   const [catFiltro, setCatFiltro] = useState('todas')
+  const [subFiltro, setSubFiltro] = useState('todas')
   const [statusFiltro, setStatusFiltro] = useState('todos')
   const ehAdmin = perfil?.papel === 'admin'
 
@@ -53,6 +54,7 @@ export default function Relatorio({ onToast }) {
 
     if (condoFiltro !== 'todos') q = q.eq('condominio_id', condoFiltro)
     if (catFiltro !== 'todas') q = q.eq('categoria', catFiltro)
+    if (subFiltro !== 'todas') q = q.eq('subcategoria', subFiltro)
     if (statusFiltro !== 'todos') q = q.eq('status', statusFiltro)
 
     const { data } = await q
@@ -60,7 +62,7 @@ export default function Relatorio({ onToast }) {
     setLoading(false)
   }
 
-  useEffect(() => { buscarDados() }, [mes, ano, condoFiltro, catFiltro, statusFiltro])
+  useEffect(() => { buscarDados() }, [mes, ano, condoFiltro, catFiltro, subFiltro, statusFiltro])
 
   // Stats rápidos
   const stats = {
@@ -141,6 +143,30 @@ export default function Relatorio({ onToast }) {
         y = doc.lastAutoTable.finalY + 8
       }
 
+      // ── Por subcategoria ───────────────────────────────────
+      const subMap = {}
+      tickets.forEach(t => { if (t.subcategoria) subMap[t.subcategoria]=(subMap[t.subcategoria]||0)+1 })
+      const subData = Object.entries(subMap).sort((a,b)=>b[1]-a[1])
+      if (subData.length) {
+        if (y > 240) { doc.addPage(); y = 20 }
+        doc.setFontSize(11)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(40, 67, 173)
+        doc.text('Por Subcategoria', 14, y)
+        y += 4
+        autoTable(doc, {
+          startY: y,
+          head: [['Subcategoria', 'Qtd', '%']],
+          body: subData.map(([sub,qtd])=>[sub, qtd, `${Math.round(qtd/stats.total*100)}%`]),
+          theme:'striped',
+          headStyles:{ fillColor:[67,56,202], textColor:255, fontStyle:'bold', fontSize:9 },
+          bodyStyles:{ fontSize:9 },
+          columnStyles:{ 1:{ halign:'center' }, 2:{ halign:'center' } },
+          margin:{ left:14, right:14 },
+        })
+        y = doc.lastAutoTable.finalY + 8
+      }
+
       // ── Por condomínio (se geral) ──────────────────────────
       if (condoFiltro === 'todos' && condominios.length > 1) {
         const condoMap = {}
@@ -174,11 +200,12 @@ export default function Relatorio({ onToast }) {
       autoTable(doc, {
         startY: y,
         head: [[
-          condoFiltro==='todos'?'Condomínio':null,'Categoria','Solicitante','Bloco/Ap','Status','Departamento','Data'
+          condoFiltro==='todos'?'Condomínio':null,'Categoria','Subcategoria','Solicitante','Bloco/Ap','Status','Departamento','Data'
         ].filter(Boolean)],
         body: tickets.map(t => [
           condoFiltro==='todos'?t.condominios?.nome||'-':null,
           t.categoria_personalizada||t.categoria,
+          t.subcategoria||'-',
           t.nome_solicitante||'-',
           [t.bloco,t.apartamento].filter(Boolean).join(' / ') || '-',
           STATUS_LABEL[t.status]||t.status,
@@ -246,9 +273,21 @@ export default function Relatorio({ onToast }) {
           </div>
           <div className="field" style={{ margin:0 }}>
             <label>Categoria</label>
-            <select className="input" value={catFiltro} onChange={e=>setCatFiltro(e.target.value)}>
+            <select className="input" value={catFiltro} onChange={e=>{ setCatFiltro(e.target.value); setSubFiltro('todas') }}>
               <option value="todas">Todas</option>
               {categoriasSistema.map(c=><option key={c.nome} value={c.nome}>{c.nome}</option>)}
+            </select>
+          </div>
+          <div className="field" style={{ margin:0 }}>
+            <label>Subcategoria</label>
+            <select className="input" value={subFiltro} onChange={e=>setSubFiltro(e.target.value)}>
+              <option value="todas">Todas</option>
+              {[...new Set([
+                ...(subFiltro!=='todas'?[subFiltro]:[]),
+                ...tickets
+                  .filter(t => catFiltro==='todas' || t.categoria===catFiltro)
+                  .map(t => t.subcategoria).filter(Boolean)
+              ])].sort().map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div className="field" style={{ margin:0 }}>
@@ -308,7 +347,7 @@ export default function Relatorio({ onToast }) {
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
               <thead>
                 <tr style={{ background:'var(--gray-50)', borderBottom:'1px solid var(--gray-200)' }}>
-                  {[condoFiltro==='todos'?'Condomínio':null,'Categoria','Solicitante','Status','Departamento','Data'].filter(Boolean).map(h=>(
+                  {[condoFiltro==='todos'?'Condomínio':null,'Categoria','Subcategoria','Solicitante','Status','Departamento','Data'].filter(Boolean).map(h=>(
                     <th key={h} style={{ padding:'8px 10px', textAlign:'left', fontSize:11, fontWeight:700,
                       color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', whiteSpace:'nowrap' }}>{h}</th>
                   ))}
@@ -319,6 +358,7 @@ export default function Relatorio({ onToast }) {
                   <tr key={t.id} style={{ borderBottom:'1px solid var(--gray-100)', background:i%2===0?'#fff':'var(--gray-50)' }}>
                     {condoFiltro==='todos' && <td style={{ padding:'8px 10px', color:'var(--gray-700)', maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.condominios?.nome||'-'}</td>}
                     <td style={{ padding:'8px 10px', color:'var(--gray-700)' }}>{t.categoria_personalizada||t.categoria}</td>
+                    <td style={{ padding:'8px 10px', color:'var(--gray-500)' }}>{t.subcategoria||'-'}</td>
                     <td style={{ padding:'8px 10px', color:'var(--gray-500)' }}>{t.nome_solicitante||'-'}</td>
                     <td style={{ padding:'8px 10px' }}>
                       <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:5,

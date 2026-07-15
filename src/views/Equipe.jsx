@@ -14,6 +14,7 @@ export default function Equipe({ view, onToast }) {
   const [categoriasSistema, setCategoriasSistema] = useState([])
   const [condoFiltro, setCondoFiltro] = useState('todos')
   const [catFiltro, setCatFiltro] = useState('todas')
+  const [subFiltro, setSubFiltro] = useState('todas')
   const [statusFiltro, setStatusFiltro] = useState('todos')
   const [ticketSel, setTicketSel] = useState(null)
   const [showModalNovo, setShowModalNovo] = useState(false)
@@ -77,6 +78,7 @@ export default function Equipe({ view, onToast }) {
   const ticketsFiltrados = tickets.filter(t => {
     if (condoFiltro !== 'todos' && t.condominio_id !== condoFiltro) return false
     if (catFiltro !== 'todas' && t.categoria !== catFiltro) return false
+    if (subFiltro !== 'todas' && t.subcategoria !== subFiltro) return false
     if (statusFiltro === 'pendentes' && !ehPendente(t)) return false
     if (statusFiltro === 'aprovacao' && t.aprovacao_status !== 'aguardando') return false
     if (!['todos','pendentes','aprovacao'].includes(statusFiltro) && t.status !== statusFiltro) return false
@@ -155,9 +157,19 @@ export default function Equipe({ view, onToast }) {
               </div>
               <div>
                 <label style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', display:'block', marginBottom:4 }}>Categoria</label>
-                <select className="input" style={{ fontSize:13 }} value={catFiltro} onChange={e => setCatFiltro(e.target.value)}>
+                <select className="input" style={{ fontSize:13 }} value={catFiltro} onChange={e => { setCatFiltro(e.target.value); setSubFiltro('todas') }}>
                   <option value="todas">Todas</option>
                   {categoriasSistema.map(c => <option key={c.nome} value={c.nome}>{c.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', display:'block', marginBottom:4 }}>Subcategoria</label>
+                <select className="input" style={{ fontSize:13 }} value={subFiltro} onChange={e => setSubFiltro(e.target.value)}>
+                  <option value="todas">Todas</option>
+                  {[...new Set(tickets
+                    .filter(t => catFiltro==='todas' || t.categoria===catFiltro)
+                    .map(t => t.subcategoria).filter(Boolean))]
+                    .sort().map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
@@ -206,6 +218,12 @@ export default function Equipe({ view, onToast }) {
                         background:'var(--gray-100)', color:'var(--gray-600)' }}>
                         {t.categoria_personalizada || t.categoria}
                       </span>
+                      {t.subcategoria && (
+                        <span style={{ fontSize:10, fontWeight:600, padding:'3px 8px', borderRadius:'var(--r-full)',
+                          background:'#eef2ff', color:'#4338ca' }}>
+                          {t.subcategoria}
+                        </span>
+                      )}
                       {prio && (
                         <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:'var(--r-full)',
                           background:prio.bg, color:prio.cor }}>
@@ -283,6 +301,12 @@ export default function Equipe({ view, onToast }) {
                       background:'var(--gray-100)', color:'var(--gray-600)' }}>
                       {t.categoria_personalizada || t.categoria}
                     </span>
+                    {t.subcategoria && (
+                      <span style={{ fontSize:10, fontWeight:600, padding:'3px 8px', borderRadius:'var(--r-full)',
+                        background:'#eef2ff', color:'#4338ca' }}>
+                        {t.subcategoria}
+                      </span>
+                    )}
                     <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:'var(--r-full)',
                       background:'var(--amber-bg)', color:'#92400e' }}>
                       ⏳ Aguardando votação
