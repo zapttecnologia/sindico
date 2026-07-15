@@ -19,6 +19,9 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
   const [addOrcamento, setAddOrcamento] = useState(false)
   const [fornecedores, setFornecedores] = useState([])
   const [modalForn, setModalForn] = useState(null)   // { idx, razao_social, ... } cadastro rápido; idx = qual orçamento receberá
+  const [statusPendente, setStatusPendente] = useState(null)  // status escolhido, aguardando confirmação/mensagem
+  const [msgStatus, setMsgStatus] = useState('')              // mensagem opcional ao mudar status
+  const [fechando, setFechando] = useState(false)             // em processo de fechar chamado
 
   // Carrega fornecedores da empresa (para o seletor)
   useEffect(() => {
@@ -70,13 +73,44 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
     if (data) setTicket(data)
   }
 
-  const atualizarStatus = async (novoStatus) => {
+  const STATUS_FINAIS = ['resolvido', 'cancelado']
+
+  // Clique num status: abre o painel de confirmação com campo de mensagem
+  const escolherStatus = (novoStatus) => {
+    if (ticket.status === novoStatus) return
+    setStatusPendente(novoStatus)
+    setMsgStatus('')
+  }
+
+  // Confirma a mudança de status (com mensagem opcional)
+  const confirmarStatus = async () => {
+    if (!statusPendente) return
+    const ehFinal = STATUS_FINAIS.includes(statusPendente)
     setSalvando(true)
     const { error } = await supabase.from('solicitacoes')
-      .update({ status: novoStatus, atualizado_em: new Date().toISOString() }).eq('id', ticket.id)
+      .update({
+        status: statusPendente,
+        atualizado_em: new Date().toISOString(),
+        ...(ehFinal ? { fechado_em: new Date().toISOString() } : {}),
+      }).eq('id', ticket.id)
+    if (error) { setSalvando(false); onToast('Erro: ' + error.message); return }
+
+    // Registra a mensagem como nota (se houver)
+    if (msgStatus.trim()) {
+      await supabase.from('notas_internas').insert({
+        solicitacao_id: ticket.id, autor_id: perfil.id,
+        autor_tipo: 'equipe', autor_nome: perfil.nome,
+        texto: `[Status: ${STATUS_LABEL[statusPendente]}] ${msgStatus.trim()}`,
+      })
+    }
+
+    // Se fechou o chamado (resolvido/cancelado), o e-mail para morador + equipe
+    // é enviado automaticamente pelo webhook de banco (notify-new-ticket),
+    // acionado pelo próprio UPDATE de status acima. Nada a fazer aqui.
+
     setSalvando(false)
-    if (error) { onToast('Erro: ' + error.message); return }
-    onToast('Status atualizado.')
+    onToast(ehFinal ? 'Chamado fechado.' : 'Status atualizado.')
+    setStatusPendente(null); setMsgStatus('')
     await recarregar()
   }
 
@@ -195,6 +229,12 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
             <span style={{ fontFamily:'var(--font-mono)', fontSize:12, color:'var(--gray-400)' }}>
               #{ticketNumber(ticket.id)}
             </span>
+            {ticket.origem === 'Portal do conselheiro' && (
+              <span style={{ fontSize:11, fontWeight:800, padding:'3px 10px', borderRadius:'var(--r-full)',
+                background:'#4338ca', color:'#fff', letterSpacing:'.02em' }}>
+                ⭐ CHAMADO DO CONSELHO
+              </span>
+            )}
             <span className={`badge badge-cat`}>{cat}</span>
             {ticket.subcategoria && (
               <span className="badge" style={{ background:'#eef2ff', color:'#4338ca' }}>{ticket.subcategoria}</span>
@@ -280,16 +320,48 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {STATUS_ORDER.map(s=>(
               <button key={s} disabled={salvando}
-                onClick={()=>{ if (ticket.status!==s) atualizarStatus(s) }}
+                onClick={()=>escolherStatus(s)}
                 className={`status-badge ${statusClass(s)}`}
                 style={{ padding:'8px 14px', borderRadius:'var(--r-md)', fontWeight:700, fontSize:12,
                   cursor: ticket.status===s ? 'default' : 'pointer',
-                  border: ticket.status===s ? '2px solid currentColor' : '2px solid transparent',
-                  opacity: ticket.status===s ? 1 : .75 }}>
+                  border: (statusPendente||ticket.status)===s ? '2px solid currentColor' : '2px solid transparent',
+                  opacity: (statusPendente||ticket.status)===s ? 1 : .75 }}>
                 {STATUS_LABEL[s]}
               </button>
             ))}
           </div>
+
+          {/* Painel de confirmação com mensagem opcional */}
+          {statusPendente && (
+            <div style={{ marginTop:14, padding:'14px', background:'var(--gray-50)', borderRadius:'var(--r-md)', border:'1px solid var(--gray-200)' }}>
+              {STATUS_FINAIS.includes(statusPendente) ? (
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--navy)', marginBottom:8 }}>
+                  {statusPendente==='resolvido' ? '✅ Fechar como resolvido' : '🚫 Fechar como cancelado'}
+                  <div style={{ fontSize:12, fontWeight:400, color:'var(--gray-500)', marginTop:2 }}>
+                    Ao fechar, morador e equipe serão notificados por e-mail.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--navy)', marginBottom:8 }}>
+                  Alterar status para "{STATUS_LABEL[statusPendente]}"
+                </div>
+              )}
+              <textarea className="input" rows={3} value={msgStatus} onChange={e=>setMsgStatus(e.target.value)}
+                placeholder={STATUS_FINAIS.includes(statusPendente)
+                  ? 'Mensagem para o morador (opcional) — ex.: o que foi feito, observações...'
+                  : 'Adicionar uma mensagem/observação (opcional)'}
+                style={{ marginBottom:10 }}/>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <button className="btn btn-primary" disabled={salvando} onClick={confirmarStatus}
+                  style={{ background: STATUS_FINAIS.includes(statusPendente) ? (statusPendente==='cancelado'?'var(--rust)':'var(--emerald)') : undefined }}>
+                  {salvando ? 'Salvando...' : STATUS_FINAIS.includes(statusPendente) ? '🔒 Fechar chamado' : 'Confirmar'}
+                </button>
+                <button className="btn btn-ghost" disabled={salvando} onClick={()=>{ setStatusPendente(null); setMsgStatus('') }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
