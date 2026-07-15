@@ -293,18 +293,49 @@ export default function Conselheiro({ view, onToast }) {
         <div className="card">
           {/* Cabeçalho do chamado */}
           <div style={{ marginBottom:16 }}>
-            <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
-              background:'var(--gray-100)', color:'var(--gray-600)' }}>
-              {ticketVotando.categoria}
-            </span>
-            <span style={{ fontFamily:'var(--font-mono)', fontSize:12, fontWeight:700, color:'var(--gray-400)', marginLeft:8 }}>
-              #{ticketNumber(ticketVotando.id)}
-            </span>
-            <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'10px 0 4px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:10 }}>
+              <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
+                background:'var(--gray-100)', color:'var(--gray-600)' }}>
+                {ticketVotando.categoria}{ticketVotando.subcategoria ? ' · ' + ticketVotando.subcategoria : ''}
+              </span>
+              <span style={{ fontFamily:'var(--font-mono)', fontSize:12, fontWeight:700, color:'var(--gray-400)' }}>
+                #{ticketNumber(ticketVotando.id)}
+              </span>
+            </div>
+            <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 12px' }}>
               {ticketVotando.condominios?.nome}
             </h2>
-            <p style={{ fontSize:13, color:'var(--gray-500)', margin:'0 0 4px' }}>{ticketVotando.descricao}</p>
-            <div style={{ fontSize:11, color:'var(--gray-400)' }}>{ticketVotando.nome_solicitante} · {fmtDate(ticketVotando.criado_em)}</div>
+
+            {/* Resumo estruturado */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))', gap:8, marginBottom:12,
+              padding:'12px 14px', background:'var(--gray-50)', borderRadius:'var(--r-md)', border:'1px solid var(--gray-200)' }}>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em' }}>Solicitante</div>
+                <div style={{ fontSize:13, color:'var(--gray-700)', fontWeight:600 }}>{ticketVotando.nome_solicitante || '-'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em' }}>Bloco</div>
+                <div style={{ fontSize:13, color:'var(--gray-700)', fontWeight:600 }}>{ticketVotando.bloco || '-'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em' }}>Unidade</div>
+                <div style={{ fontSize:13, color:'var(--gray-700)', fontWeight:600 }}>{ticketVotando.apartamento || '-'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em' }}>Aberto em</div>
+                <div style={{ fontSize:13, color:'var(--gray-700)', fontWeight:600 }}>{fmtDate(ticketVotando.criado_em)}</div>
+              </div>
+            </div>
+
+            {/* Descrição do morador */}
+            <div style={{ padding:'12px 14px', background:'#fff', borderRadius:'var(--r-md)', border:'1px solid var(--gray-200)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', marginBottom:4 }}>
+                Descrição do chamado
+              </div>
+              <div style={{ fontSize:14, color:'var(--gray-700)', lineHeight:1.5, whiteSpace:'pre-wrap' }}>
+                {ticketVotando.descricao || 'Sem descrição.'}
+              </div>
+            </div>
           </div>
 
           {/* Histórico de mensagens do chamado */}
