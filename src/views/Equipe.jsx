@@ -203,7 +203,8 @@ export default function Equipe({ view, onToast }) {
             : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {ticketsFiltrados.map(t => {
                 const prio = t.prioridade && t.prioridade !== 'rotina' ? PRIORIDADES[t.prioridade] : null
-                const accentColor = prio?.cor || (t.status==='resolvido' ? 'var(--emerald)' : t.aprovacao_status==='aguardando' ? 'var(--amber)' : 'var(--blue)')
+                const ehConselho = t.origem === 'Portal do conselheiro'
+                const accentColor = ehConselho ? '#4338ca' : (prio?.cor || (t.status==='resolvido' ? 'var(--emerald)' : t.aprovacao_status==='aguardando' ? 'var(--amber)' : 'var(--blue)'))
                 return (
                   <div key={t.id} onClick={() => setTicketSel(t)}
                     style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
@@ -214,6 +215,12 @@ export default function Equipe({ view, onToast }) {
 
                     {/* Linha 1: categoria + badges + status + data */}
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+                      {t.origem === 'Portal do conselheiro' && (
+                        <span style={{ fontSize:10, fontWeight:800, padding:'3px 9px', borderRadius:'var(--r-full)',
+                          background:'#4338ca', color:'#fff', letterSpacing:'.02em' }}>
+                          ⭐ CONSELHO
+                        </span>
+                      )}
                       <span style={{ fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:'var(--r-full)',
                         background:'var(--gray-100)', color:'var(--gray-600)' }}>
                         {t.categoria_personalizada || t.categoria}
