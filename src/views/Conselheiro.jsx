@@ -54,6 +54,7 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
     // filtra as subcategorias cuja categoria bate pelo nome
     const doCat = (data || []).filter(s => s.categorias_sistema?.nome === cat)
     setSubcategorias(doCat)
+    setPasso(doCat.length > 0 ? 2 : 3)   // sem subcategoria, pula para descrição
   }
 
   const carregar = async () => {
@@ -723,52 +724,81 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
           <br/>
           <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
             <button className="btn" style={{ background:'var(--gray-100)', color:'var(--gray-600)', border:'none' }} onClick={()=>{ setConfirmNum(null); setCatSel(null); setSubSel(null); setSubcategorias([]); setDescricao(''); setArquivosSel([]); setParaSindico(false); setDestinoEquipe(''); onNavigate?.('painel') }}>Voltar ao início</button>
-            <button className="btn btn-primary" onClick={()=>{ setConfirmNum(null); setCatSel(null); setSubSel(null); setSubcategorias([]); setDescricao(''); setArquivosSel([]); setParaSindico(false); setDestinoEquipe('') }}>Abrir outro</button>
+            <button className="btn btn-primary" onClick={()=>{ setConfirmNum(null); setCatSel(null); setSubSel(null); setSubcategorias([]); setDescricao(''); setArquivosSel([]); setParaSindico(false); setDestinoEquipe(''); setPasso(1) }}>Abrir outro</button>
           </div>
         </div>
       ) : (
         <div>
-          <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 20px' }}>Selecione o tipo de chamado</p>
-
-          {/* ETAPA 1 — Categoria */}
-          <div style={{ marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>Categoria</div>
-            {categoriasSistema.length === 0
-              ? <div className="empty-state">Nenhuma categoria disponível.</div>
-              : <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
-                  {categoriasSistema.map(c=>(
-                    <div key={c.nome} className={`cat-card${catSel===c.nome?' selected':''}`} onClick={()=>escolherCategoria(c.nome)}>
-                      <div className="cat-card-icon">{c.icone||'📋'}</div>
-                      <div className="cat-card-nome">{c.nome}</div>
-                    </div>
-                  ))}
-                </div>}
+          {/* Cabeçalho: voltar + progresso */}
+          <div style={{ marginBottom:18 }}>
+            {passo > 1 && (
+              <button onClick={()=>setPasso(passo===3 && subcategorias.length===0 ? 1 : passo-1)}
+                style={{ background:'var(--gray-100)', border:'none', borderRadius:'var(--r-md)', padding:'6px 12px',
+                  fontSize:13, fontWeight:600, color:'var(--gray-600)', cursor:'pointer', marginBottom:14,
+                  display:'inline-flex', alignItems:'center', gap:6 }}>
+                ← Voltar
+              </button>
+            )}
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              {[1,2,3].map(n => (
+                <div key={n} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:24, height:24, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:11, fontWeight:700,
+                    background: passo>=n ? 'var(--blue)' : 'var(--gray-200)', color: passo>=n ? '#fff' : 'var(--gray-400)' }}>{n}</div>
+                  {n<3 && <div style={{ width:20, height:2, background: passo>n ? 'var(--blue)' : 'var(--gray-200)' }}/>}
+                </div>
+              ))}
+              <span style={{ fontSize:12, color:'var(--gray-400)', marginLeft:6 }}>
+                {passo===1?'Categoria':passo===2?'Subcategoria':'Descrição'}
+              </span>
+            </div>
           </div>
 
-          {/* ETAPA 2 — Subcategoria (aparece após escolher categoria, se houver) */}
-          {catSel && subcategorias.length > 0 && (
-            <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>Subcategoria</div>
+          {/* ETAPA 1 — Categoria */}
+          {passo === 1 && (
+            <>
+              <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 16px' }}>Selecione o tipo de chamado</p>
+              {categoriasSistema.length === 0
+                ? <div className="empty-state">Nenhuma categoria disponível.</div>
+                : <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
+                    {categoriasSistema.map(c=>(
+                      <div key={c.nome} className={`cat-card${catSel===c.nome?' selected':''}`} onClick={()=>escolherCategoria(c.nome)}>
+                        <div className="cat-card-icon">{c.icone||'📋'}</div>
+                        <div className="cat-card-nome">{c.nome}</div>
+                      </div>
+                    ))}
+                  </div>}
+            </>
+          )}
+
+          {/* ETAPA 2 — Subcategoria */}
+          {passo === 2 && (
+            <>
+              <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 16px' }}>Escolha a subcategoria de <b>{catSel}</b></p>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
                 {subcategorias.map(s=>(
                   <div key={s.id} className={`cat-card${subSel?.id===s.id?' selected':''}`}
-                    onClick={()=>setSubSel(s)}>
+                    onClick={()=>{ setSubSel(s); setPasso(3) }}>
                     <div className="cat-card-icon">{s.icone||'📄'}</div>
                     <div className="cat-card-nome">{s.nome}</div>
                   </div>
                 ))}
-                <div className={`cat-card${subSel==='geral'?' selected':''}`} onClick={()=>setSubSel('geral')}
-                  style={{ border:'1.5px dashed var(--gray-300)' }}>
+                <div className={`cat-card${subSel==='geral'?' selected':''}`}
+                  onClick={()=>{ setSubSel('geral'); setPasso(3) }} style={{ border:'1.5px dashed var(--gray-300)' }}>
                   <div className="cat-card-icon">📝</div>
                   <div className="cat-card-nome" style={{ color:'var(--gray-400)' }}>Outro / Geral</div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
-          {/* ETAPA 3 — Descrição (aparece após categoria e, se houver, subcategoria) */}
-          {catSel && (subcategorias.length === 0 || subSel) && (
+          {/* ETAPA 3 — Descrição */}
+          {passo === 3 && (
             <>
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:16, fontSize:13, color:'var(--gray-500)' }}>
+                <span style={{ fontWeight:600, color:'var(--navy)' }}>{catSel}</span>
+                {subSel && subSel!=='geral' && <><span>›</span><span style={{ fontWeight:600, color:'var(--navy)' }}>{subSel.nome}</span></>}
+              </div>
               <div className="field">
                 <label>Descreva o chamado</label>
                 <textarea className="input" rows={4} value={descricao} onChange={e=>setDescricao(e.target.value)}

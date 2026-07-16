@@ -97,6 +97,8 @@ export default function Morador({ view, onNavigate, onToast }) {
 
   // Recarrega ao trocar de view e quando a aba volta ao foco
   useEffect(() => { carregar() }, [view])
+  // Ao abrir a tela de novo chamado, começa sempre na etapa 1
+  useEffect(() => { if (view === 'novo-chamado') { setPasso(1); setCatSel(null); setSubCatSel(null); setSubcategorias([]) } }, [view])
   useEffect(() => {
     const onFocus = () => carregar()
     const onVisible = () => { if (!document.hidden) carregar() }
@@ -414,7 +416,7 @@ export default function Morador({ view, onNavigate, onToast }) {
             <button className="btn" style={{ background:'var(--gray-100)', color:'var(--gray-600)', border:'none' }} onClick={()=>{ setTicketCriado(null); setCatSel(null); setSubCatSel(null); setSubcategorias([]); setDescricao(''); onNavigate?.('painel') }}>
               Voltar ao início
             </button>
-            <button className="btn btn-primary" onClick={()=>{ setTicketCriado(null); setCatSel(null); setSubCatSel(null); setSubcategorias([]); setDescricao('') }}>
+            <button className="btn btn-primary" onClick={()=>{ setTicketCriado(null); setCatSel(null); setSubCatSel(null); setSubcategorias([]); setDescricao(''); setPasso(1) }}>
               Novo chamado
             </button>
           </div>
@@ -422,52 +424,91 @@ export default function Morador({ view, onNavigate, onToast }) {
       </Modal>
     )
 
-    // Formato revelado dentro de um Modal (janela sobreposta)
+    // Fluxo por etapas dentro do Modal (uma tela por vez)
+    const irParaSub = async (cat) => {
+      setCatSel(cat); setSubCatSel(null); setTicketCriado(null)
+      const { data:subs } = await supabase.from('subcategorias_sistema')
+        .select('*').eq('categoria_id', cat.id).eq('ativo', true).order('ordem')
+      setSubcategorias(subs||[])
+      setPasso((subs && subs.length > 0) ? 2 : 3)   // sem subcategoria, pula p/ descrição
+    }
+    const tituloEtapa = passo===1 ? 'Nova solicitação' : passo===2 ? catSel?.nome : 'Detalhes do chamado'
+
+    // Cabeçalho: voltar + trilha
+    const Cabecalho = () => (
+      <div style={{ marginBottom:18 }}>
+        {passo > 1 && (
+          <button onClick={()=>setPasso(passo===3 && subcategorias.length===0 ? 1 : passo-1)}
+            style={{ background:'var(--gray-100)', border:'none', borderRadius:'var(--r-md)', padding:'6px 12px',
+              fontSize:13, fontWeight:600, color:'var(--gray-600)', cursor:'pointer', marginBottom:14,
+              display:'inline-flex', alignItems:'center', gap:6 }}>
+            ← Voltar
+          </button>
+        )}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          {[1,2,3].map(n => (
+            <div key={n} style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{ width:24, height:24, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:11, fontWeight:700,
+                background: passo>=n ? 'var(--blue)' : 'var(--gray-200)', color: passo>=n ? '#fff' : 'var(--gray-400)' }}>{n}</div>
+              {n<3 && <div style={{ width:20, height:2, background: passo>n ? 'var(--blue)' : 'var(--gray-200)' }}/>}
+            </div>
+          ))}
+          <span style={{ fontSize:12, color:'var(--gray-400)', marginLeft:6 }}>
+            {passo===1?'Categoria':passo===2?'Subcategoria':'Descrição'}
+          </span>
+        </div>
+      </div>
+    )
+
     return (
-      <Modal open onClose={()=>onNavigate?.('painel')} title="Nova solicitação" size="lg">
-        <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 20px' }}>Selecione o tipo de chamado</p>
+      <Modal open onClose={()=>{ setPasso(1); onNavigate?.('painel') }} title={tituloEtapa} size="lg">
+        <Cabecalho />
 
         {/* ETAPA 1 — Categoria */}
-        <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>Categoria</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
-            {categorias.map(cat => (
-              <div key={cat.id} className={`cat-card${catSel?.id===cat.id?' selected':''}`} onClick={async ()=>{
-                setCatSel(cat); setSubCatSel(null); setTicketCriado(null)
-                const { data:subs } = await supabase.from('subcategorias_sistema')
-                  .select('*').eq('categoria_id', cat.id).eq('ativo', true).order('ordem')
-                setSubcategorias(subs||[])
-              }}>
-                <div className="cat-card-icon">{cat.icone}</div>
-                <div className="cat-card-nome">{cat.nome}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {passo === 1 && (
+          <>
+            <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 16px' }}>Selecione o tipo de chamado</p>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
+              {categorias.map(cat => (
+                <div key={cat.id} className={`cat-card${catSel?.id===cat.id?' selected':''}`} onClick={()=>irParaSub(cat)}>
+                  <div className="cat-card-icon">{cat.icone}</div>
+                  <div className="cat-card-nome">{cat.nome}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
-        {/* ETAPA 2 — Subcategoria (aparece após escolher categoria, se houver) */}
-        {catSel && subcategorias.length > 0 && (
-          <div style={{ marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>Subcategoria</div>
+        {/* ETAPA 2 — Subcategoria */}
+        {passo === 2 && (
+          <>
+            <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 16px' }}>Escolha a subcategoria de <b>{catSel?.nome}</b></p>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
               {subcategorias.map(s => (
-                <div key={s.id} className={`cat-card${subCatSel?.id===s.id?' selected':''}`} onClick={()=>setSubCatSel(s)}>
+                <div key={s.id} className={`cat-card${subCatSel?.id===s.id?' selected':''}`}
+                  onClick={()=>{ setSubCatSel(s); setPasso(3) }}>
                   <div className="cat-card-icon">{s.icone}</div>
                   <div className="cat-card-nome">{s.nome}</div>
                 </div>
               ))}
-              <div className={`cat-card${subCatSel==='geral'?' selected':''}`} onClick={()=>setSubCatSel('geral')}
-                style={{ border:'1.5px dashed var(--gray-300)' }}>
+              <div className={`cat-card${subCatSel==='geral'?' selected':''}`}
+                onClick={()=>{ setSubCatSel('geral'); setPasso(3) }} style={{ border:'1.5px dashed var(--gray-300)' }}>
                 <div className="cat-card-icon">📝</div>
                 <div className="cat-card-nome" style={{ color:'var(--gray-400)' }}>Outro / Geral</div>
               </div>
             </div>
-          </div>
+          </>
         )}
 
-        {/* ETAPA 3 — Formulário (aparece após categoria e, se houver, subcategoria) */}
-        {catSel && (subcategorias.length === 0 || subCatSel) && (
-          <div className="card">
+        {/* ETAPA 3 — Descrição */}
+        {passo === 3 && (
+          <div>
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:16, fontSize:13, color:'var(--gray-500)' }}>
+              <span style={{ fontSize:20 }}>{catSel?.icone}</span>
+              <span style={{ fontWeight:600, color:'var(--navy)' }}>{catSel?.nome}</span>
+              {subCatSel && subCatSel!=='geral' && <><span>›</span><span style={{ fontWeight:600, color:'var(--navy)' }}>{subCatSel.icone} {subCatSel.nome}</span></>}
+            </div>
             <div className="field">
               <label>Descreva o problema *</label>
               <textarea className="input" rows={5} value={descricao} onChange={e=>setDescricao(e.target.value)}
