@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { ticketNumber, fmtDate, STATUS_LABEL, statusClass } from '../lib/constants'
 import AnexosPanel from '../components/AnexosPanel'
+import Modal from '../components/Modal'
 
 const CAT_ICONS = {
   'Manutencao':       { bg:'#fff3dc', color:'#8a5a00', svg:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg> },
@@ -48,7 +49,7 @@ function TicketRow({ ticket, onClick }) {
   )
 }
 
-export default function Morador({ view, onToast }) {
+export default function Morador({ view, onNavigate, onToast }) {
   const { perfil, session, logout } = useAuth()
   const [tickets, setTickets] = useState([])
   const [condoInfo, setCondoInfo] = useState(null)
@@ -396,9 +397,8 @@ export default function Morador({ view, onToast }) {
 
     // Sucesso
     if (ticketCriado) return (
-      <div>
-        {header}
-        <div className="card" style={{ textAlign:'center', padding:'40px 20px' }}>
+      <Modal open onClose={()=>{ setTicketCriado(null); setCatSel(null); setSubCatSel(null); setSubcategorias([]); setDescricao(''); onNavigate?.('painel') }} title="Chamado registrado" size="md">
+        <div style={{ textAlign:'center', padding:'20px 4px' }}>
           <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
           <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, color:'var(--navy)', margin:'0 0 8px' }}>
             Chamado registrado!
@@ -410,20 +410,21 @@ export default function Morador({ view, onToast }) {
             Protocolo <b style={{ fontFamily:'var(--font-mono)' }}>#{ticketCriado.id.slice(-6).toUpperCase()}</b>
           </p>
           {anonimo && <div style={{ padding:'8px 16px', background:'#f5f3ff', borderRadius:'var(--r-md)', fontSize:13, color:'#6d28d9', marginBottom:16 }}>🔒 Chamado enviado anonimamente</div>}
-          <button className="btn btn-primary" onClick={()=>{ setTicketCriado(null); setCatSel(null); setSubCatSel(null); setSubcategorias([]); setDescricao('') }}>
-            Novo chamado
-          </button>
+          <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+            <button className="btn" style={{ background:'var(--gray-100)', color:'var(--gray-600)', border:'none' }} onClick={()=>{ setTicketCriado(null); setCatSel(null); setSubCatSel(null); setSubcategorias([]); setDescricao(''); onNavigate?.('painel') }}>
+              Voltar ao início
+            </button>
+            <button className="btn btn-primary" onClick={()=>{ setTicketCriado(null); setCatSel(null); setSubCatSel(null); setSubcategorias([]); setDescricao('') }}>
+              Novo chamado
+            </button>
+          </div>
         </div>
-      </div>
+      </Modal>
     )
 
-    // Formato revelado: uma tela, etapas aparecem conforme escolhe
+    // Formato revelado dentro de um Modal (janela sobreposta)
     return (
-      <div>
-        {header}
-        <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, color:'var(--navy)', margin:'0 0 6px' }}>
-          Nova solicitação
-        </h2>
+      <Modal open onClose={()=>onNavigate?.('painel')} title="Nova solicitação" size="lg">
         <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 20px' }}>Selecione o tipo de chamado</p>
 
         {/* ETAPA 1 — Categoria */}
@@ -550,7 +551,7 @@ export default function Morador({ view, onToast }) {
             </div>
           </div>
         )}
-      </div>
+      </Modal>
     )
   }
 

@@ -3,10 +3,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { ticketNumber, fmtDate, STATUS_LABEL, statusClass, APROVACAO_LABEL, aprovClass, PRIORIDADES } from '../lib/constants'
 import TicketCard from '../components/TicketCard'
+import Modal from '../components/Modal'
 
 const MAX_BYTES = 10 * 1024 * 1024  // 10MB por arquivo
 
-export default function Conselheiro({ view, onToast }) {
+export default function Conselheiro({ view, onNavigate, onToast }) {
   const { perfil, session } = useAuth()
   const [tickets, setTickets] = useState([])
   const [categoriasSistema, setCategoriasSistema] = useState([])
@@ -709,13 +710,9 @@ export default function Conselheiro({ view, onToast }) {
 
   // ── NOVO CHAMADO ───────────────────────────────────────────
   if (view === 'novo-chamado') return (
-    <div>
-      {header}
-      <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 20px' }}>
-        Novo chamado
-      </h2>
+    <Modal open onClose={()=>onNavigate?.('painel')} title="Novo chamado" size="lg">
       {confirmNum ? (
-        <div className="card" style={{ textAlign:'center' }}>
+        <div style={{ textAlign:'center', padding:'10px 4px' }}>
           <div style={{ fontSize:40, marginBottom:8 }}>✅</div>
           <h3 style={{ fontFamily:'var(--font-display)', color:'var(--navy)', margin:'0 0 6px' }}>Chamado aberto!</h3>
           <div style={{ fontFamily:'var(--font-mono)', fontSize:22, fontWeight:700, color:'var(--emerald)',
@@ -724,13 +721,13 @@ export default function Conselheiro({ view, onToast }) {
             #{confirmNum}
           </div>
           <br/>
-          <button className="btn btn-ghost" onClick={()=>{ setConfirmNum(null); setCatSel(null); setSubSel(null); setSubcategorias([]); setDescricao(''); setArquivosSel([]); setParaSindico(false); setDestinoEquipe('') }}>Abrir outro</button>
+          <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+            <button className="btn" style={{ background:'var(--gray-100)', color:'var(--gray-600)', border:'none' }} onClick={()=>{ setConfirmNum(null); setCatSel(null); setSubSel(null); setSubcategorias([]); setDescricao(''); setArquivosSel([]); setParaSindico(false); setDestinoEquipe(''); onNavigate?.('painel') }}>Voltar ao início</button>
+            <button className="btn btn-primary" onClick={()=>{ setConfirmNum(null); setCatSel(null); setSubSel(null); setSubcategorias([]); setDescricao(''); setArquivosSel([]); setParaSindico(false); setDestinoEquipe('') }}>Abrir outro</button>
+          </div>
         </div>
       ) : (
-        <div className="card">
-          <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, color:'var(--navy)', margin:'0 0 6px' }}>
-            Nova solicitação
-          </h2>
+        <div>
           <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 20px' }}>Selecione o tipo de chamado</p>
 
           {/* ETAPA 1 — Categoria */}
@@ -832,7 +829,7 @@ export default function Conselheiro({ view, onToast }) {
           )}
         </div>
       )}
-    </div>
+    </Modal>
   )
 
   return null
