@@ -832,6 +832,16 @@ tr:hover td { background: var(--gray-50); }
   box-shadow: 0 0 0 3px rgba(59,130,246,.1);
   transform: translateY(-2px);
 }
+.cat-card.selected {
+  border-color: var(--blue);
+  border-width: 2px;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.18);
+}
+.cat-card.selected .cat-card-nome {
+  color: var(--blue);
+  font-weight: 700;
+}
 .cat-card-icon {
   font-size: 30px;
   line-height: 1;
