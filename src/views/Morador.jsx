@@ -70,6 +70,7 @@ export default function Morador({ view, onNavigate, onToast }) {
   const [ticketCriado, setTicketCriado] = useState(null)
   const [arquivosSel, setArquivosSel] = useState([])
   const [ticketDetalhe, setTicketDetalhe] = useState(null)
+  const [filtroStatus, setFiltroStatus] = useState('todos')
   const [subTela, setSubTela] = useState(null)
   const MAX_BYTES = 10 * 1024 * 1024
 
@@ -120,10 +121,13 @@ export default function Morador({ view, onNavigate, onToast }) {
     setSubTela(null); setAnonimo(false); setPrioridade('media')
   }, [view])
 
+  const FECHADOS = ['resolvido', 'cancelado']
+  const estaFechado = (t) => FECHADOS.includes(t.status)
+
   const kpis = {
     total:    tickets.length,
-    abertos:  tickets.filter(t => t.status !== 'concluido').length,
-    concluidos: tickets.filter(t => t.status === 'concluido').length,
+    abertos:  tickets.filter(t => !estaFechado(t)).length,
+    concluidos: tickets.filter(t => estaFechado(t)).length,
   }
 
   const handleSelecionarArquivos = (e) => {
@@ -604,16 +608,43 @@ export default function Morador({ view, onNavigate, onToast }) {
 
   // ── VIEW: MEUS CHAMADOS ────────────────────────────────────
   if (view === 'meus-chamados') {
-    const abertos = tickets.filter(t => t.status !== 'concluido')
+    const STATUS_FILTROS = [
+      { v:'todos',    l:'Todos' },
+      { v:'abertos',  l:'Em aberto' },
+      { v:'aberto',   l:'Aberto' },
+      { v:'em_analise', l:'Em análise' },
+      { v:'em_andamento', l:'Em andamento' },
+      { v:'resolvido', l:'Resolvido' },
+      { v:'cancelado', l:'Cancelado' },
+    ]
+    const filtrados = tickets.filter(t => {
+      if (filtroStatus === 'todos') return true
+      if (filtroStatus === 'abertos') return !estaFechado(t)
+      return t.status === filtroStatus
+    })
     return (
       <div>
         {header}
         <h2 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, color:'var(--navy)', margin:'0 0 16px' }}>
-          Chamados em aberto
+          Meus chamados
         </h2>
-        {abertos.length === 0
-          ? <div className="empty-state">Nenhum chamado em aberto.</div>
-          : abertos.map(t => <TicketRow key={t.id} ticket={t} onClick={()=>setTicketDetalhe(t)} />)
+
+        {/* Filtro por status */}
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16 }}>
+          {STATUS_FILTROS.map(f => (
+            <button key={f.v} onClick={()=>setFiltroStatus(f.v)}
+              style={{ padding:'6px 14px', borderRadius:'var(--r-full)', fontSize:12, fontWeight:600, cursor:'pointer',
+                border:`1.5px solid ${filtroStatus===f.v?'var(--blue)':'var(--gray-200)'}`,
+                background: filtroStatus===f.v?'#eff6ff':'#fff',
+                color: filtroStatus===f.v?'var(--blue)':'var(--gray-500)' }}>
+              {f.l}
+            </button>
+          ))}
+        </div>
+
+        {filtrados.length === 0
+          ? <div className="empty-state">Nenhum chamado nesse filtro.</div>
+          : filtrados.map(t => <TicketRow key={t.id} ticket={t} onClick={()=>setTicketDetalhe(t)} />)
         }
       </div>
     )

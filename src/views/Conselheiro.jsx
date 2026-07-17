@@ -44,6 +44,7 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
   const [aBusca, setABusca] = useState('')
   const [aStatus, setAStatus] = useState('aguardando')  // aguardando | aprovado | rejeitado | todos
   const [chamadoAberto, setChamadoAberto] = useState(null)
+  const [condoInfo, setCondoInfo] = useState(null)
 
   useEffect(() => { setCatSel(null); setSubSel(null); setPasso(1); setDescricao(''); setArquivosSel([]); setDestinoEquipe(''); setParaSindico(false); setConfirmNum(null) }, [view])
 
@@ -85,6 +86,13 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
       .select('solicitacao_id')
       .eq('conselheiro_id', session.user.id)
     if (mv) setMeusVotos(mv.map(v => v.solicitacao_id))
+    // Dados do condomínio (nome + documentos) para o header e o painel
+    if (perfil.condominio_id) {
+      const { data: ci } = await supabase.from('condominios')
+        .select('id, nome, regulamento_pdf_url, convencao_pdf_url')
+        .eq('id', perfil.condominio_id).single()
+      if (ci) setCondoInfo(ci)
+    }
   }
 
   useEffect(() => { carregar() }, [])
@@ -148,7 +156,9 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
       <div>
         <div className="condo-header-name">{perfil?.nome}</div>
         <div className="condo-header-sub">
-          Conselheiro{pendentes > 0 ? ` · ${pendentes} voto${pendentes>1?'s':''} pendente${pendentes>1?'s':''}` : ''}
+          {condoInfo?.nome || 'Conselheiro'}
+          {(perfil?.bloco || perfil?.apartamento) ? ` · ${perfil?.bloco ? 'Bloco '+perfil.bloco : ''}${perfil?.bloco && perfil?.apartamento ? ' · ' : ''}${perfil?.apartamento ? 'Ap. '+perfil.apartamento : ''}` : ''}
+          {pendentes > 0 ? ` · ${pendentes} voto${pendentes>1?'s':''} pendente${pendentes>1?'s':''}` : ''}
         </div>
       </div>
     </div>
@@ -171,6 +181,27 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
           </div>
         ))}
       </div>
+
+      {/* Documentos do condomínio (convenção e regulamento) */}
+      {(condoInfo?.regulamento_pdf_url || condoInfo?.convencao_pdf_url) && (
+        <div className="card" style={{ marginBottom:16 }}>
+          <h3 className="section-title">Documentos do condomínio</h3>
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            {condoInfo.convencao_pdf_url && (
+              <a href={condoInfo.convencao_pdf_url} target="_blank" rel="noopener noreferrer"
+                className="btn btn-ghost btn-sm" style={{ textDecoration:'none', display:'inline-flex', gap:6 }}>
+                📋 Convenção
+              </a>
+            )}
+            {condoInfo.regulamento_pdf_url && (
+              <a href={condoInfo.regulamento_pdf_url} target="_blank" rel="noopener noreferrer"
+                className="btn btn-ghost btn-sm" style={{ textDecoration:'none', display:'inline-flex', gap:6 }}>
+                📄 Regulamento Interno
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Comunicados recentes */}
       <ComunicadosRecentes onVerTodos={()=>onNavigate?.('comunicados')} />
