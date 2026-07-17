@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtDate } from '../lib/constants'
 
 const BUCKET = 'anexos-comunicados'
+
+// Data e hora fixas: "16/07 14:30"
+const fmtDataHora = (d) => {
+  if (!d) return '—'
+  const dt = new Date(d)
+  return dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) + ' ' +
+         dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+}
 
 /**
  * ComunicadosLista — visualização (somente leitura) dos comunicados.
@@ -56,7 +63,7 @@ export default function ComunicadosLista({ onToast }) {
                   <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:'var(--r-full)', background:bd.bg, color:bd.cor }}>
                     {bd.txt}
                   </span>
-                  <span style={{ fontSize:11, color:'var(--gray-400)', marginLeft:'auto' }}>{fmtDate(c.criado_em)}</span>
+                  <span style={{ fontSize:11, color:'var(--gray-400)', marginLeft:'auto' }}>{fmtDataHora(c.criado_em)}</span>
                 </div>
                 <div style={{ fontSize:16, fontWeight:700, color:'var(--navy)', marginBottom:4 }}>{c.titulo}</div>
                 <div style={{ fontSize:14, color:'var(--gray-600)', lineHeight:1.5, whiteSpace:'pre-wrap' }}>{c.mensagem}</div>
