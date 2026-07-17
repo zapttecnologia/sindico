@@ -11,6 +11,7 @@ const ICONS = {
   report: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
   logout: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   bell:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
+  agenda: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
   dots:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
 }
@@ -36,6 +37,7 @@ export default function Navigation({ activeView, onNavigate }) {
       { id:'novo-chamado',  label:'Novo chamado',   icon:ICONS.plus },
       { id:'meus-chamados', label:'Meus chamados',  icon:ICONS.list },
       { id:'comunicados',   label:'Comunicados',    icon:ICONS.bell },
+      { id:'agenda',        label:'Agenda',         icon:ICONS.agenda },
       { id:'historico',     label:'Histórico',      icon:ICONS.clock },
     ]
     if (perfil.papel === 'conselheiro') return [
@@ -44,12 +46,14 @@ export default function Navigation({ activeView, onNavigate }) {
       { id:'chamados',      label:'Chamados',       icon:ICONS.list },
       { id:'novo-chamado',  label:'Novo chamado',   icon:ICONS.plus },
       { id:'comunicados',   label:'Comunicados',    icon:ICONS.bell },
+      { id:'agenda',        label:'Agenda',         icon:ICONS.agenda },
     ]
     if (perfil.papel === 'equipe' || perfil.papel === 'admin') return [
       { id:'dashboard',  label:'Painel',         icon:ICONS.home,   section:'Principal' },
       { id:'chamados',   label:'Chamados',       icon:ICONS.list },
       { id:'admin',      label:'Condomínios',    icon:ICONS.condo,  section:'Gestão' },
       { id:'comunicados',label:'Comunicados',    icon:ICONS.bell },
+      { id:'agenda',     label:'Agenda',         icon:ICONS.agenda },
       { id:'relatorio',  label:'Relatórios',     icon:ICONS.report },
       { id:'perfil',     label:'Minha empresa',  icon:ICONS.user,   section:'Empresa' },
     ]
@@ -64,7 +68,7 @@ export default function Navigation({ activeView, onNavigate }) {
   const PAGE_LABEL = {
     dashboard:'Painel', chamados:'Chamados', admin:'Condomínios',
     relatorio:'Relatórios', perfil:'Minha empresa', painel:'Painel',
-    comunicados:'Comunicados',
+    comunicados:'Comunicados', agenda:'Agenda',
     'novo-chamado':'Novo chamado', 'meus-chamados':'Meus chamados',
     historico:'Histórico', aprovacoes:'Aprovações',
   }
