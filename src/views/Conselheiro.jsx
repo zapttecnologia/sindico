@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { ticketNumber, fmtDate, STATUS_LABEL, statusClass, APROVACAO_LABEL, aprovClass, PRIORIDADES } from '../lib/constants'
 import TicketCard from '../components/TicketCard'
 import Modal from '../components/Modal'
+import ComunicadosLista from '../components/ComunicadosLista'
 
 const MAX_BYTES = 10 * 1024 * 1024  // 10MB por arquivo
 
@@ -710,6 +711,8 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
   }
 
   // ── NOVO CHAMADO ───────────────────────────────────────────
+  if (view === 'comunicados') return (<div>{header}<ComunicadosLista onToast={onToast} /></div>)
+
   if (view === 'novo-chamado') return (
     <Modal open onClose={()=>onNavigate?.('painel')} title="Novo chamado" size="lg">
       {confirmNum ? (
