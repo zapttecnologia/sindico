@@ -35,6 +35,7 @@ export default function Navigation({ activeView, onNavigate }) {
       { id:'painel',        label:'Painel',         icon:ICONS.home,   section:'Principal' },
       { id:'novo-chamado',  label:'Novo chamado',   icon:ICONS.plus },
       { id:'meus-chamados', label:'Meus chamados',  icon:ICONS.list },
+      { id:'comunicados',   label:'Comunicados',    icon:ICONS.bell },
       { id:'historico',     label:'Histórico',      icon:ICONS.clock },
     ]
     if (perfil.papel === 'conselheiro') return [
@@ -42,11 +43,13 @@ export default function Navigation({ activeView, onNavigate }) {
       { id:'aprovacoes',    label:'Aprovações',     icon:ICONS.vote },
       { id:'chamados',      label:'Chamados',       icon:ICONS.list },
       { id:'novo-chamado',  label:'Novo chamado',   icon:ICONS.plus },
+      { id:'comunicados',   label:'Comunicados',    icon:ICONS.bell },
     ]
     if (perfil.papel === 'equipe' || perfil.papel === 'admin') return [
       { id:'dashboard',  label:'Painel',         icon:ICONS.home,   section:'Principal' },
       { id:'chamados',   label:'Chamados',       icon:ICONS.list },
       { id:'admin',      label:'Condomínios',    icon:ICONS.condo,  section:'Gestão' },
+      { id:'comunicados',label:'Comunicados',    icon:ICONS.bell },
       { id:'relatorio',  label:'Relatórios',     icon:ICONS.report },
       { id:'perfil',     label:'Minha empresa',  icon:ICONS.user,   section:'Empresa' },
     ]
@@ -61,6 +64,7 @@ export default function Navigation({ activeView, onNavigate }) {
   const PAGE_LABEL = {
     dashboard:'Painel', chamados:'Chamados', admin:'Condomínios',
     relatorio:'Relatórios', perfil:'Minha empresa', painel:'Painel',
+    comunicados:'Comunicados',
     'novo-chamado':'Novo chamado', 'meus-chamados':'Meus chamados',
     historico:'Histórico', aprovacoes:'Aprovações',
   }
