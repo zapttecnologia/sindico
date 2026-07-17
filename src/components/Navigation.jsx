@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 const ICONS = {
@@ -29,6 +30,7 @@ function initials(name) {
 
 export default function Navigation({ activeView, onNavigate }) {
   const { perfil, logout } = useAuth()
+  const [maisAberto, setMaisAberto] = useState(false)
 
   const getNavItems = () => {
     if (!perfil) return []
@@ -152,11 +154,46 @@ export default function Navigation({ activeView, onNavigate }) {
             <span>{item.label}</span>
           </button>
         ))}
-        <button className="bottom-nav-item" onClick={logout}>
-          <span style={{ width:22, height:22 }}>{ICONS.logout}</span>
-          <span>Sair</span>
-        </button>
+        {/* Botão "Mais" — só aparece se houver itens além dos 4 primeiros */}
+        {items.length > 4 ? (
+          <button className={`bottom-nav-item${maisAberto ? ' active' : ''}`} onClick={() => setMaisAberto(true)}>
+            <span style={{ width:22, height:22 }}>{ICONS.dots}</span>
+            <span>Mais</span>
+          </button>
+        ) : (
+          <button className="bottom-nav-item" onClick={logout}>
+            <span style={{ width:22, height:22 }}>{ICONS.logout}</span>
+            <span>Sair</span>
+          </button>
+        )}
       </nav>
+
+      {/* ── Painel "Mais" (mobile) ── */}
+      {maisAberto && (
+        <div className="mais-overlay" onClick={() => setMaisAberto(false)}>
+          <div className="mais-sheet" onClick={e => e.stopPropagation()}>
+            <div className="mais-sheet-header">
+              <span>Menu</span>
+              <button className="mais-sheet-close" onClick={() => setMaisAberto(false)}>✕</button>
+            </div>
+            <div className="mais-sheet-grid">
+              {items.slice(4).map(item => (
+                <button
+                  key={item.id}
+                  className={`mais-sheet-item${activeView === item.id ? ' active' : ''}`}
+                  onClick={() => { onNavigate(item.id); setMaisAberto(false) }}>
+                  <span style={{ width:24, height:24 }}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
+              <button className="mais-sheet-item" onClick={() => { setMaisAberto(false); logout() }}>
+                <span style={{ width:24, height:24 }}>{ICONS.logout}</span>
+                <span>Sair</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
