@@ -226,6 +226,7 @@ export default function Equipe({ view, onToast }) {
     <TicketDetail
       ticket={ticketSel}
       onBack={() => { setTicketSel(null); carregar() }}
+      onUpdate={carregar}
       onToast={onToast}
     />
   )
