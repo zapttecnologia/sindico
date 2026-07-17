@@ -6,7 +6,7 @@ import ChatPanel from './ChatPanel'
 import AnexosPanel from './AnexosPanel'
 import VotePanel from './VotePanel'
 
-export default function TicketDetail({ ticket: initialTicket, onBack, onToast }) {
+export default function TicketDetail({ ticket: initialTicket, onBack, onToast, onUpdate }) {
   const { perfil } = useAuth()
   const [ticket, setTicket] = useState(initialTicket)
   const [tab, setTab] = useState('info')
@@ -148,6 +148,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
     )
     setStatusPendente(null); setMsgStatus(''); setEnviarResumoConselho(false)
     await recarregar()
+    onUpdate?.()   // avisa a lista-mãe para recarregar imediatamente
   }
 
   // Converte "1.234,56" (pt-BR) ou "1234.56" ou "500" em número; retorna null se vazio/inválido
@@ -206,6 +207,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
     onToast('Enviado para os conselheiros!')
     setShowEnviarConselheiros(false); setMsgConselheiros('')
     await recarregar()
+    onUpdate?.()
   }
 
   const [showAtribuir, setShowAtribuir] = useState(false)
@@ -241,6 +243,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
     onToast(`Chamado enviado para ${DEPARTAMENTOS[deptSel]}!`)
     setShowAtribuir(false); setDeptSel(''); setUsuarioSel(''); setMsgDept('')
     await recarregar()
+    onUpdate?.()
   }
 
   const decidirAprovacao = async (decisao) => {
@@ -250,6 +253,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
     if (error) { onToast('Erro: ' + error.message); return }
     onToast(decisao === 'cancelar' ? 'Aprovacao cancelada.' : `Marcado como ${decisao}.`)
     await recarregar()
+    onUpdate?.()
   }
 
   const statusIdx = STATUS_ORDER.indexOf(ticket.status)
@@ -316,6 +320,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast })
                     await supabase.from('solicitacoes').update({ prioridade:k }).eq('id',ticket.id)
                     onToast(`Prioridade: ${p.label}`)
                     await recarregar()
+                    onUpdate?.()
                   }}
                   style={{ padding:'7px 12px', borderRadius:'var(--r-md)', fontWeight:700, fontSize:12, cursor:'pointer',
                     border: ticket.prioridade===k ? `2px solid ${p.cor}` : '2px solid var(--gray-200)',
