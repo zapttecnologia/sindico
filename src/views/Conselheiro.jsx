@@ -6,6 +6,7 @@ import TicketCard from '../components/TicketCard'
 import Modal from '../components/Modal'
 import ComunicadosLista from '../components/ComunicadosLista'
 import ComunicadosRecentes from '../components/ComunicadosRecentes'
+import AgendaLista from '../components/AgendaLista'
 
 const MAX_BYTES = 10 * 1024 * 1024  // 10MB por arquivo
 
@@ -716,6 +717,7 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
 
   // ── NOVO CHAMADO ───────────────────────────────────────────
   if (view === 'comunicados') return (<div>{header}<ComunicadosLista onToast={onToast} /></div>)
+  if (view === 'agenda') return (<div>{header}<AgendaLista /></div>)
 
   if (view === 'novo-chamado') return (
     <Modal open onClose={()=>onNavigate?.('painel')} title="Novo chamado" size="lg">
