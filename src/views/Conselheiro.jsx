@@ -5,6 +5,7 @@ import { ticketNumber, fmtDate, STATUS_LABEL, statusClass, APROVACAO_LABEL, apro
 import TicketCard from '../components/TicketCard'
 import Modal from '../components/Modal'
 import ComunicadosLista from '../components/ComunicadosLista'
+import ComunicadosRecentes from '../components/ComunicadosRecentes'
 
 const MAX_BYTES = 10 * 1024 * 1024  // 10MB por arquivo
 
@@ -169,6 +170,9 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
           </div>
         ))}
       </div>
+
+      {/* Comunicados recentes */}
+      <ComunicadosRecentes onVerTodos={()=>onNavigate?.('comunicados')} />
 
       {/* Pendentes de votação */}
       {pendentes > 0 && (
