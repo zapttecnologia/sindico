@@ -223,6 +223,7 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
     setSalvando(true)
     const { error } = await supabase.from('perfis').update({
       nome: modalEditar.nome,
+      papel: modalEditar.papel,
       codigo_acesso: modalEditar.codigo_acesso?.toUpperCase(),
       bloco: modalEditar.bloco, apartamento: modalEditar.apartamento,
       tipo_ocupacao: modalEditar.tipo_ocupacao,
@@ -524,6 +525,24 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
               <button className="modal-close" onClick={()=>setModalEditar(null)}>✕</button>
             </div>
             <div className="field"><label>Nome</label><input className="input" value={modalEditar.nome||''} onChange={e=>setModalEditar(m=>({...m,nome:e.target.value}))}/></div>
+
+            <div className="field"><label>Papel / função</label>
+              <div className="chip-row" style={{ marginBottom:6 }}>
+                {['morador','conselheiro','equipe'].map(p=>(
+                  <button key={p} className={`chip${modalEditar.papel===p?' selected':''}`}
+                    onClick={()=>setModalEditar(m=>({...m,papel:p}))}>{PAPEL_LABEL[p]}</button>
+                ))}
+              </div>
+              <div className="chip-row">
+                {['manutencao','limpeza','administradora','portaria','seguranca','zeladoria','terceiros'].map(p=>(
+                  <button key={p} className={`chip${modalEditar.papel===p?' selected':''}`}
+                    onClick={()=>setModalEditar(m=>({...m,papel:p}))}>{PAPEL_LABEL[p]}</button>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:6 }}>
+                Alterar o papel muda o acesso da pessoa no sistema (ex.: de Conselheiro para Morador).
+              </div>
+            </div>
             <div className="row2">
               <div className="field"><label>Bloco</label><input className="input" value={modalEditar.bloco||''} onChange={e=>setModalEditar(m=>({...m,bloco:e.target.value}))}/></div>
               <div className="field"><label>Apartamento</label><input className="input" value={modalEditar.apartamento||''} onChange={e=>setModalEditar(m=>({...m,apartamento:e.target.value}))}/></div>
