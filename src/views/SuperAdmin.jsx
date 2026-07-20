@@ -1472,6 +1472,10 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
   const [novaConta, setNovaConta] = useState({ nome:'', email:'', codigo:'', senha:'mudar123', papel:'morador' })
   const [salvando, setSalvando] = useState(false)
   const [nomeEdit, setNomeEdit] = useState(condo.nome)
+  const [modalSindicos, setModalSindicos] = useState(false)
+  const [sindicosEmpresa, setSindicosEmpresa] = useState([])
+  const [sindicosDoCondo, setSindicosDoCondo] = useState([])
+  const [salvandoSindicos, setSalvandoSindicos] = useState(false)
   const PAPEIS = ['morador','conselheiro','equipe','admin']
   const PAPEL_LABEL = { morador:'Morador', conselheiro:'Conselheiro', equipe:'Síndico', admin:'Admin' }
 
@@ -1502,6 +1506,47 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
     onToast('Salvo.'); setModalUsuario(null); onRefresh()
   }
 
+  // Abre o gerenciador de síndicos deste condomínio
+  const abrirSindicos = async () => {
+    // Síndicos (equipe) e admins da mesma empresa
+    const { data: sinds } = await supabase.from('perfis')
+      .select('id, nome, email, papel')
+      .eq('empresa_id', empresa.id)
+      .in('papel', ['equipe','admin'])
+      .order('nome')
+    // Quem já administra ESTE condomínio
+    const { data: vinc } = await supabase.from('sindico_condominios')
+      .select('perfil_id').eq('condominio_id', condo.id)
+    setSindicosEmpresa(sinds || [])
+    setSindicosDoCondo((vinc || []).map(v => v.perfil_id))
+    setModalSindicos(true)
+  }
+
+  const toggleSindico = (perfilId) => {
+    setSindicosDoCondo(cur => cur.includes(perfilId) ? cur.filter(x=>x!==perfilId) : [...cur, perfilId])
+  }
+
+  const salvarSindicos = async () => {
+    setSalvandoSindicos(true)
+    try {
+      const { data: atuais } = await supabase.from('sindico_condominios')
+        .select('perfil_id').eq('condominio_id', condo.id)
+      const idsAtuais = (atuais || []).map(a => a.perfil_id)
+      const aInserir = sindicosDoCondo.filter(id => !idsAtuais.includes(id))
+      const aRemover = idsAtuais.filter(id => !sindicosDoCondo.includes(id))
+      if (aInserir.length) {
+        await supabase.from('sindico_condominios').insert(aInserir.map(pid => ({ perfil_id:pid, condominio_id:condo.id })))
+      }
+      if (aRemover.length) {
+        await supabase.from('sindico_condominios').delete().eq('condominio_id', condo.id).in('perfil_id', aRemover)
+      }
+      onToast('Síndicos do condomínio atualizados!')
+      setModalSindicos(false)
+      onRefresh()
+    } catch(e) { onToast('Erro: '+e.message) }
+    setSalvandoSindicos(false)
+  }
+
   return (
     <>
       <div style={{ background:C.surface, border:`2px solid ${expandido?C.purple:C.border}`, borderRadius:12, marginBottom:10, overflow:'hidden', transition:'border-color .15s' }}>
@@ -1512,6 +1557,7 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
           <div style={{ display:'flex', gap:6 }}>
             <Btn sm onClick={()=>onSaveCondo(nomeEdit)}>Salvar</Btn>
             <Btn sm variant='ghost' onClick={onEditCondo}>✏️ Dados</Btn>
+            <Btn sm variant='ghost' onClick={abrirSindicos}>👥 Síndicos</Btn>
             <Btn sm variant='ghost' onClick={()=>setExpandido(!expandido)} style={{ color:expandido?'#a855f7':C.muted }}>{expandido?'▲':'▼ Usuários'}</Btn>
             <Btn sm variant='danger' onClick={onDeleteCondo}>Excluir</Btn>
           </div>
@@ -1571,6 +1617,38 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
           </G2>
           <Fld label="Papel"><DS value={novaConta.papel} onChange={v=>setNovaConta(x=>({...x,papel:v}))}>{['morador','conselheiro'].map(p=><option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}</DS></Fld>
           <Btn onClick={criarConta} disabled={salvando} style={{ width:'100%' }}>{salvando?'Criando...':'Criar usuário'}</Btn>
+        </Modal>
+      )}
+
+      {/* Modal: gerenciar síndicos deste condomínio */}
+      {modalSindicos && (
+        <Modal title={`Síndicos — ${condo.nome}`} onClose={()=>setModalSindicos(false)} maxWidth={460}>
+          <div style={{ fontSize:13, color:C.muted, marginBottom:12 }}>
+            Marque quais síndicos administram este condomínio. Eles recebem os e-mails
+            e avisos <b>apenas</b> dos condomínios marcados — nunca de outros.
+          </div>
+          {sindicosEmpresa.length === 0 && (
+            <div style={{ fontSize:13, color:C.muted, padding:'10px 0' }}>
+              Nenhum síndico (equipe) cadastrado nesta empresa ainda.
+            </div>
+          )}
+          <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:280, overflow:'auto' }}>
+            {sindicosEmpresa.map(s => {
+              const on = sindicosDoCondo.includes(s.id)
+              return (
+                <label key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', border:`1px solid ${on?C.purple:C.border}`, borderRadius:8, cursor:'pointer', background: on?'rgba(168,85,247,.08)':'transparent' }}>
+                  <input type="checkbox" checked={on} onChange={()=>toggleSindico(s.id)}/>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{s.nome} {s.papel==='admin' ? '(Admin)' : ''}</div>
+                    <div style={{ fontSize:12, color:C.muted, overflow:'hidden', textOverflow:'ellipsis' }}>{s.email}</div>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+          <Btn onClick={salvarSindicos} disabled={salvandoSindicos} style={{ width:'100%', marginTop:14 }}>
+            {salvandoSindicos ? 'Salvando...' : 'Salvar síndicos'}
+          </Btn>
         </Modal>
       )}
     </>
