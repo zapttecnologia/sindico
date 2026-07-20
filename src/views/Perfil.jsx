@@ -115,8 +115,21 @@ export default function Perfil({ onToast }) {
         codigo_acesso:novaConta.codigo.toUpperCase() }),
     })
     const json = await resp.json()
+    if (!resp.ok) { setCriando(false); onToast('Erro: '+(json.error||'falha')); return }
+
+    // Se o novo usuário é síndico/equipe, vincula aos MESMOS condomínios
+    // que o criador administra — isolamento: a equipe recebe só desses
+    // condomínios, nunca de outros. (conselheiro/morador usam condominio_id
+    // do próprio perfil e não entram aqui.)
+    if (json.user_id && (novaConta.papel === 'equipe')) {
+      const { data: meus } = await supabase.from('sindico_condominios')
+        .select('condominio_id').eq('perfil_id', perfil?.id)
+      const vinculos = (meus || []).map(m => ({ perfil_id: json.user_id, condominio_id: m.condominio_id }))
+      if (vinculos.length) {
+        await supabase.from('sindico_condominios').insert(vinculos).then(()=>{}, ()=>{})
+      }
+    }
     setCriando(false)
-    if (!resp.ok) { onToast('Erro: '+(json.error||'falha')); return }
     onToast('Usuário criado!')
     setModalNovo(false); setNovaConta({ nome:'', email:'', codigo:'', senha:'mudar123', papel:'equipe' })
     await carregar()

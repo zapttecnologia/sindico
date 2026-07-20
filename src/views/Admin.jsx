@@ -161,8 +161,17 @@ export default function Admin({ onToast }) {
     dados.ano_construcao = novoCondo.ano_construcao ? Number(novoCondo.ano_construcao) : null
 
     const { data:novoCond, error } = await supabase.from('condominios').insert(dados).select().single()
+    if (error) { setSalvando(false); onToast('Erro: '+error.message); return }
+
+    // Vincula automaticamente o síndico que criou ao novo condomínio,
+    // para que ele receba os e-mails/avisos desse condomínio.
+    // (isolamento: o síndico só passa a receber DESTE condomínio)
+    if (novoCond && perfil?.id && (perfil.papel === 'equipe' || perfil.papel === 'admin')) {
+      await supabase.from('sindico_condominios')
+        .insert({ perfil_id: perfil.id, condominio_id: novoCond.id })
+        .then(() => {}, () => {})   // se já existir, ignora
+    }
     setSalvando(false)
-    if (error) { onToast('Erro: '+error.message); return }
 
     // Salvar categorias selecionadas
     if (novoCond && catsSelecionadas.length > 0) {
