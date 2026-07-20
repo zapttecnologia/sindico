@@ -324,7 +324,7 @@ export default function SuperAdmin({ onToast }) {
   // Se empresa selecionada → vai para EmpresaPanel
   if (empresaSel) return (
     <TemaCtx.Provider value={tema}>
-      <EmpresaPanel empresa={empresaSel} planos={planos}
+      <EmpresaPanel empresa={empresaSel} planos={planos} empresas={empresas}
         onBack={()=>{ setEmpresaSel(null); carregar() }} onToast={onToast} />
     </TemaCtx.Provider>
   )
@@ -1227,7 +1227,7 @@ function AdminCodigoEditor({ empresaId, onToast }) {
 }
 
 // ── EmpresaPanel ──────────────────────────────────────────
-function EmpresaPanel({ empresa, planos, onBack, onToast }) {
+function EmpresaPanel({ empresa, planos, empresas, onBack, onToast }) {
   const { tema, C } = useTema()
   const [aba, setAba] = useState('condominios')
   const [condominios, setCondominios] = useState([])
@@ -1456,7 +1456,28 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
               ))}
             </div>
           ))}
-          <Btn onClick={async()=>{ await supabase.from('condominios').update(modalCondo).eq('id',modalCondo.id); onToast('Salvo.'); setModalCondo(null); await carregar() }} style={{ width:'100%' }}>Salvar</Btn>
+          {/* Mover para outra empresa */}
+          <Fld label="Empresa (dona do condomínio)" style={{ margin:'4px 0 10px' }}>
+            <DS value={modalCondo.empresa_id||''} onChange={v=>setModalCondo(m=>({...m,empresa_id:v}))}>
+              {(empresas||[]).map(e=><option key={e.id} value={e.id}>{e.nome}</option>)}
+            </DS>
+            {modalCondo.empresa_id !== empresa.id && (
+              <div style={{ fontSize:11, color:C.amber, marginTop:6 }}>
+                ⚠️ Você está movendo este condomínio para outra empresa. Os moradores, chamados,
+                comunicados e agenda vão junto. Revise os síndicos depois de mover.
+              </div>
+            )}
+          </Fld>
+
+          <Btn onClick={async()=>{
+            const empresaMudou = modalCondo.empresa_id !== empresa.id
+            await supabase.from('condominios').update(modalCondo).eq('id',modalCondo.id)
+            if (empresaMudou) {
+              await supabase.from('perfis').update({ empresa_id: modalCondo.empresa_id }).eq('condominio_id', modalCondo.id)
+            }
+            onToast(empresaMudou ? 'Condomínio movido para a nova empresa.' : 'Salvo.')
+            setModalCondo(null); await carregar()
+          }} style={{ width:'100%' }}>Salvar</Btn>
         </Modal>
       )}
     </div>
