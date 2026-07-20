@@ -190,6 +190,46 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
 
   useEffect(() => { carregar() }, [carregar])
 
+  // Rótulos amigáveis de papel para o arquivo exportado
+  const PAPEL_EXPORT = {
+    morador:'Morador', conselheiro:'Conselheiro', equipe:'Síndico', admin:'Admin',
+    manutencao:'Manutenção', limpeza:'Limpeza', administradora:'Administradora',
+    portaria:'Portaria', seguranca:'Segurança', zeladoria:'Zeladoria', terceiros:'Terceiros',
+  }
+
+  const exportarCSV = () => {
+    // Escapa um valor para CSV (aspas se tiver vírgula, aspas ou quebra de linha)
+    const esc = (v) => {
+      const s = (v ?? '').toString()
+      return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const cabecalho = ['Nome','E-mail','Papel','Codigo de acesso','Bloco','Apartamento','Tipo de ocupacao','Primeiro acesso']
+    const linhas = usuarios.map(u => [
+      u.nome || '',
+      // Oculta o e-mail placeholder interno na exportação
+      (u.email && u.email.endsWith('@sem-email.local')) ? '' : (u.email || ''),
+      PAPEL_EXPORT[u.papel] || u.papel || '',
+      u.codigo_acesso || '',
+      u.bloco || '',
+      u.apartamento || '',
+      u.tipo_ocupacao === 'inquilino' ? 'Inquilino' : u.tipo_ocupacao === 'proprietario' ? 'Proprietário' : '',
+      u.primeiro_acesso === false ? 'Já acessou' : 'Ainda não acessou',
+    ].map(esc).join(','))
+
+    // BOM para o Excel abrir com acentos corretos
+    const conteudo = '\uFEFF' + [cabecalho.join(','), ...linhas].join('\r\n')
+    const blob = new Blob([conteudo], { type:'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const nomeArq = (condominio.nome || 'condominio').replace(/[^\w]+/g,'_').toLowerCase()
+    const data = new Date().toISOString().slice(0,10)
+    a.href = url
+    a.download = `usuarios_${nomeArq}_${data}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    onToast(`${usuarios.length} usuários exportados.`)
+  }
+
   const api = async (body) => {
     const { data:s } = await supabase.auth.getSession()
     const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
@@ -349,6 +389,9 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
             <input placeholder="Buscar por nome ou código..." value={busca} onChange={e=>setBusca(e.target.value)}
               className="input" style={{ maxWidth:240 }}/>
             <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={exportarCSV} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                ⬇️ Exportar
+              </button>
               {grupoAba==='moradores' && (
                 <button className="btn btn-ghost btn-sm" onClick={()=>setModalImportar(true)} style={{ display:'flex', alignItems:'center', gap:6 }}>
                   📊 Importar Excel
