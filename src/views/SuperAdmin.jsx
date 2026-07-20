@@ -1208,9 +1208,22 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
     setNovoCondNome(''); onToast('Condomínio adicionado.'); await carregar()
   }
   const excluirCondo = async (id) => {
-    if (!window.confirm('Excluir condomínio?')) return
-    await supabase.from('condominios').delete().eq('id',id)
-    onToast('Excluído.'); await carregar()
+    const condo = condominios.find(c => c.id === id)
+    const nome = condo?.nome || ''
+    const digitado = window.prompt(
+      `⚠️ ATENÇÃO: isto vai excluir o condomínio "${nome}" e TODOS os seus dados ` +
+      `(moradores, conselheiros, chamados, comunicados, agenda) de forma permanente e irreversível.\n\n` +
+      `Para confirmar, digite o nome exato do condomínio:`
+    )
+    if (digitado === null) return                     // cancelou
+    if (digitado.trim() !== nome.trim()) { onToast('Nome não confere. Exclusão cancelada.'); return }
+    try {
+      const res = await api({ action:'delete_condominio_cascade', condominio_id:id, confirmacao_nome:digitado })
+      onToast(`Excluído. ${res.contasRemovidas||0} conta(s) removida(s).`)
+      await carregar()
+    } catch (e) {
+      onToast('Erro: ' + e.message)
+    }
   }
 
   const api = async (body) => {
