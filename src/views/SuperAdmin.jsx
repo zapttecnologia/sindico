@@ -979,6 +979,7 @@ function PainelAdmins({ empresas, onToast }) {
   const [admins, setAdmins] = useState([])
   const [loading, setLoading] = useState(true)
   const [editando, setEditando] = useState(null)
+  const [condosEmpresa, setCondosEmpresa] = useState([])
   const [salvando, setSalvando] = useState(false)
   const [busca, setBusca] = useState('')
   const [filtroEmpresa, setFiltroEmpresa] = useState('todas')
@@ -1001,9 +1002,28 @@ function PainelAdmins({ empresas, onToast }) {
   const salvar = async () => {
     if (!editando) return
     setSalvando(true)
-    const { error } = await supabase.from('perfis').update({ nome:editando.nome, codigo_acesso:editando.codigo_acesso?.toUpperCase(), empresa_id:editando.empresa_id||null }).eq('id',editando.id)
+    const { error } = await supabase.from('perfis').update({
+      nome:editando.nome,
+      papel:editando.papel,
+      codigo_acesso:editando.codigo_acesso?.toUpperCase(),
+      empresa_id:editando.empresa_id||null
+    }).eq('id',editando.id)
+    if (error) { setSalvando(false); onToast('Erro: '+error.message); return }
+
+    // Sincroniza vínculos de condomínio conforme o papel
+    if (editando.papel === 'equipe') {
+      const desejados = editando.condosVinculados || []
+      const { data:atuais } = await supabase.from('sindico_condominios').select('condominio_id').eq('perfil_id', editando.id)
+      const idsAtuais = (atuais||[]).map(a=>a.condominio_id)
+      const aInserir = desejados.filter(id=>!idsAtuais.includes(id))
+      const aRemover = idsAtuais.filter(id=>!desejados.includes(id))
+      if (aInserir.length) await supabase.from('sindico_condominios').insert(aInserir.map(cid=>({ perfil_id:editando.id, condominio_id:cid })))
+      if (aRemover.length) await supabase.from('sindico_condominios').delete().eq('perfil_id', editando.id).in('condominio_id', aRemover)
+    } else {
+      await supabase.from('sindico_condominios').delete().eq('perfil_id', editando.id)
+    }
+
     setSalvando(false)
-    if (error) { onToast('Erro: '+error.message); return }
     onToast('Salvo.'); setEditando(null); await carregar()
   }
 
@@ -1061,7 +1081,15 @@ function PainelAdmins({ empresas, onToast }) {
                     : <span style={{ fontSize:11, color:C.green }}>✓ Ativo</span>}
                 </td>
                 <td style={{ padding:'11px 14px' }}>
-                  <Btn sm variant='ghost' onClick={()=>setEditando({...a})}>Editar</Btn>
+                  <Btn sm variant='ghost' onClick={async()=>{
+                    // Carrega condomínios da empresa e vínculos atuais do usuário
+                    const [{ data:conds },{ data:vinc }] = await Promise.all([
+                      a.empresa_id ? supabase.from('condominios').select('id,nome').eq('empresa_id',a.empresa_id).order('nome') : Promise.resolve({data:[]}),
+                      supabase.from('sindico_condominios').select('condominio_id').eq('perfil_id',a.id),
+                    ])
+                    setCondosEmpresa(conds||[])
+                    setEditando({ ...a, condosVinculados:(vinc||[]).map(v=>v.condominio_id) })
+                  }}>Editar</Btn>
                 </td>
               </tr>
             ))}
@@ -1071,6 +1099,13 @@ function PainelAdmins({ empresas, onToast }) {
       {editando&&(
         <Modal title="Editar usuário" onClose={()=>setEditando(null)} maxWidth={420}>
           <Fld label="Nome"><DI value={editando.nome||''} onChange={v=>setEditando(m=>({...m,nome:v}))}/></Fld>
+          <Fld label="Papel">
+            <DS value={editando.papel||'morador'} onChange={v=>setEditando(m=>({...m,papel:v}))}>
+              {[['morador','Morador'],['conselheiro','Conselheiro'],['equipe','Síndico'],['admin','Admin']].map(([v,l])=>(
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </DS>
+          </Fld>
           <Fld label="Código de acesso"><DI value={editando.codigo_acesso||''} onChange={v=>setEditando(m=>({...m,codigo_acesso:v.toUpperCase()}))}/></Fld>
           <Fld label="Empresa">
             <DS value={editando.empresa_id||''} onChange={v=>setEditando(m=>({...m,empresa_id:v}))}>
@@ -1078,6 +1113,26 @@ function PainelAdmins({ empresas, onToast }) {
               {empresas.map(e=><option key={e.id} value={e.id}>{e.nome}</option>)}
             </DS>
           </Fld>
+          {editando.papel==='equipe' && (
+            <Fld label="Condomínios que este síndico administra">
+              <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:150, overflow:'auto', border:`1px solid ${C.border}`, borderRadius:8, padding:10 }}>
+                {(condosEmpresa||[]).length===0 && <span style={{ fontSize:12, color:C.muted }}>Selecione a empresa e salve para ver os condomínios.</span>}
+                {(condosEmpresa||[]).map(c=>{
+                  const on = (editando.condosVinculados||[]).includes(c.id)
+                  return (
+                    <label key={c.id} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:C.text, cursor:'pointer' }}>
+                      <input type="checkbox" checked={on}
+                        onChange={()=>setEditando(m=>{
+                          const cur = m.condosVinculados||[]
+                          return { ...m, condosVinculados: on ? cur.filter(x=>x!==c.id) : [...cur, c.id] }
+                        })}/>
+                      {c.nome}
+                    </label>
+                  )
+                })}
+              </div>
+            </Fld>
+          )}
           <Btn onClick={salvar} disabled={salvando} style={{ width:'100%' }}>{salvando?'Salvando...':'Salvar'}</Btn>
         </Modal>
       )}
