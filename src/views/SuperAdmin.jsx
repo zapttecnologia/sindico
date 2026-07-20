@@ -1240,6 +1240,25 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
   const salvarUsuario = async () => {
     const { error } = await supabase.from('perfis').update({ nome:modalUsuario.nome, papel:modalUsuario.papel, codigo_acesso:modalUsuario.codigo_acesso?.toUpperCase() }).eq('id',modalUsuario.id)
     if (error) { onToast('Erro: '+error.message); return }
+
+    // Se virou síndico, sincroniza os vínculos de condomínio
+    if (modalUsuario.papel === 'equipe') {
+      const desejados = modalUsuario.condosVinculados || []
+      const { data:atuais } = await supabase.from('sindico_condominios').select('condominio_id').eq('perfil_id', modalUsuario.id)
+      const idsAtuais = (atuais||[]).map(a=>a.condominio_id)
+      const aInserir = desejados.filter(id=>!idsAtuais.includes(id))
+      const aRemover = idsAtuais.filter(id=>!desejados.includes(id))
+      if (aInserir.length) {
+        await supabase.from('sindico_condominios').insert(aInserir.map(cid=>({ perfil_id:modalUsuario.id, condominio_id:cid })))
+      }
+      if (aRemover.length) {
+        await supabase.from('sindico_condominios').delete().eq('perfil_id', modalUsuario.id).in('condominio_id', aRemover)
+      }
+    } else {
+      // Se deixou de ser síndico, remove todos os vínculos
+      await supabase.from('sindico_condominios').delete().eq('perfil_id', modalUsuario.id)
+    }
+
     onToast('Salvo.'); setModalUsuario(null); await carregar()
   }
   const resetarSenha = async () => {
@@ -1328,6 +1347,30 @@ function EmpresaPanel({ empresa, planos, onBack, onToast }) {
               </DS>
             </Fld>
           </G2>
+          {modalUsuario.papel==='equipe' && (
+            <Fld label="Condomínios que este síndico administra">
+              <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:160, overflow:'auto', border:`1px solid ${C.border}`, borderRadius:8, padding:10 }}>
+                {condominios.length===0 && <span style={{ fontSize:12, color:C.muted }}>Nenhum condomínio nesta empresa.</span>}
+                {condominios.map(c=>{
+                  const marcados = modalUsuario.condosVinculados || []
+                  const on = marcados.includes(c.id)
+                  return (
+                    <label key={c.id} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:C.text, cursor:'pointer' }}>
+                      <input type="checkbox" checked={on}
+                        onChange={()=>setModalUsuario(m=>{
+                          const cur = m.condosVinculados || []
+                          return { ...m, condosVinculados: on ? cur.filter(x=>x!==c.id) : [...cur, c.id] }
+                        })}/>
+                      {c.nome}
+                    </label>
+                  )
+                })}
+              </div>
+              <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>
+                Marque os condomínios deste síndico. Ele só verá os que estiverem marcados.
+              </div>
+            </Fld>
+          )}
           <Btn onClick={salvarUsuario} style={{ width:'100%', marginBottom:14 }}>Salvar dados</Btn>
           <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
             <div style={{ display:'flex', gap:8 }}>
@@ -1440,7 +1483,11 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
                         <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{u.nome||'—'}</div>
                         <div style={{ fontSize:11, color:C.muted }}>{u.codigo_acesso?`Cod: ${u.codigo_acesso}`:''}</div>
                       </div>
-                      <Btn sm variant='ghost' onClick={()=>setModalUsuario({...u,novaSenha:''})}>Editar</Btn>
+                      <Btn sm variant='ghost' onClick={async()=>{
+                        // Carrega os condomínios já vinculados a este síndico
+                        const { data:vinc } = await supabase.from('sindico_condominios').select('condominio_id').eq('perfil_id', u.id)
+                        setModalUsuario({ ...u, novaSenha:'', condosVinculados: (vinc||[]).map(v=>v.condominio_id) })
+                      }}>Editar</Btn>
                     </div>
                   ))}
                 </div>
