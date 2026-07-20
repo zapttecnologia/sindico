@@ -81,17 +81,30 @@ export default function Dashboard({ onToast }) {
 
   useEffect(() => { carregar() }, [])
 
+  // Recarrega quando a aba volta ao foco (ex.: após fechar um chamado em outra tela)
+  useEffect(() => {
+    const onFocus = () => carregar()
+    const onVisible = () => { if (!document.hidden) carregar() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
+
   // Aplicar filtro de condomínio
   const base = condoFiltro === 'todos' ? tickets : tickets.filter(t => t.condominio_id === condoFiltro)
 
   // KPIs
+  const FECHADOS = ['resolvido', 'cancelado']
   const kpis = {
     total:     base.length,
-    recebido:  base.filter(t => t.status === 'recebido').length,
-    andamento: base.filter(t => t.status === 'andamento').length,
-    concluido: base.filter(t => t.status === 'concluido').length,
+    recebido:  base.filter(t => t.status === 'aberto').length,
+    andamento: base.filter(t => t.status === 'em_andamento').length,
+    concluido: base.filter(t => FECHADOS.includes(t.status)).length,
     aprovacao: base.filter(t => t.aprovacao_status === 'aguardando').length,
-    pendentes: base.filter(t => t.status !== 'concluido').length,
+    pendentes: base.filter(t => !FECHADOS.includes(t.status)).length,
   }
 
   // Gráfico de barras: por condomínio
@@ -100,8 +113,8 @@ export default function Dashboard({ onToast }) {
     return {
       nome: c.nome.length > 18 ? c.nome.slice(0, 16) + '…' : c.nome,
       nomeCompleto: c.nome,
-      Abertos: t.filter(tk => tk.status !== 'concluido').length,
-      Concluidos: t.filter(tk => tk.status === 'concluido').length,
+      Abertos: t.filter(tk => !FECHADOS.includes(tk.status)).length,
+      Concluidos: t.filter(tk => FECHADOS.includes(tk.status)).length,
       Total: t.length,
     }
   }).filter(c => c.Total > 0).sort((a, b) => b.Total - a.Total)
@@ -118,7 +131,7 @@ export default function Dashboard({ onToast }) {
 
   // Pizza: por status
   const porStatus = [
-    { name:'Recebido', value:kpis.recebido, color:'#f4a340' },
+    { name:'Aberto', value:kpis.recebido, color:'#f4a340' },
     { name:'Em andamento', value:kpis.andamento, color:'#2843ad' },
     { name:'Concluido', value:kpis.concluido, color:'#22c55e' },
   ].filter(s => s.value > 0)
@@ -133,7 +146,7 @@ export default function Dashboard({ onToast }) {
     const d = new Date(t.criado_em)
     const entry = ultimos6.find(m => m.ano===d.getFullYear() && m.mesNum===d.getMonth())
     if (!entry) return
-    if (t.status !== 'concluido') entry.abertos++; else entry.concluidos++
+    if (!FECHADOS.includes(t.status)) entry.abertos++; else entry.concluidos++
   })
 
   // Ranking: top condominios por abertos
@@ -167,7 +180,7 @@ export default function Dashboard({ onToast }) {
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px,1fr))', gap:12, marginBottom:8 }}>
         <KPI label="Total" value={kpis.total} color="var(--navy)" />
-        <KPI label="Pendentes" value={kpis.pendentes} color="#f4a340" sub={`${kpis.recebido} recebidos`} />
+        <KPI label="Pendentes" value={kpis.pendentes} color="#f4a340" sub={`${kpis.recebido} abertos`} />
         <KPI label="Em andamento" value={kpis.andamento} color="#2843ad" />
         <KPI label="Ag. aprovacao" value={kpis.aprovacao} color="#8a5a00" />
         <KPI label="Concluidos" value={kpis.concluido} color="#22c55e" />
