@@ -24,6 +24,8 @@ export default function Perfil({ onToast }) {
   const [salvando, setSalvando] = useState(false)
   const [salvandoBrand, setSalvandoBrand] = useState(false)
   const [salvandoEmail, setSalvandoEmail] = useState(false)
+  const [testandoEmail, setTestandoEmail] = useState(false)
+  const [emailTeste, setEmailTeste] = useState('')
   const [loading, setLoading] = useState(true)
   const [usuarios, setUsuarios] = useState([])
   const [tab, setTab] = useState('empresa')
@@ -135,6 +137,35 @@ export default function Perfil({ onToast }) {
     setSalvandoEmail(false)
     if (error) { onToast('Erro: '+error.message); return }
     onToast('✅ Configuração de e-mail salva!')
+  }
+
+  const testarEmail = async () => {
+    if (!perfil?.empresa_id) return
+    const destino = (emailTeste || perfil?.email || '').trim()
+    if (!destino) { onToast('Informe um e-mail para receber o teste.'); return }
+    if (emailConfig.provider !== 'smtp') { onToast('O teste está disponível para SMTP. Salve o SMTP primeiro.'); return }
+    // Garante que a config mais recente está salva antes de testar
+    await supabase.from('empresas').update({ email_config: emailConfig }).eq('id', perfil.empresa_id)
+
+    setTestandoEmail(true)
+    try {
+      const sess = (await supabase.auth.getSession()).data.session
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-new-ticket`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${sess?.access_token}` },
+        body: JSON.stringify({ evento:'testar_email', empresa_id:perfil.empresa_id, destino }),
+      })
+      const json = await resp.json()
+      if (json.ok) {
+        onToast(`✅ E-mail de teste enviado para ${destino}! Verifique a caixa de entrada (e o spam).`)
+      } else {
+        onToast(`❌ Falhou: ${json.erro || 'erro desconhecido'}`)
+      }
+    } catch (e) {
+      onToast('❌ Erro ao testar: ' + e.message)
+    } finally {
+      setTestandoEmail(false)
+    }
   }
 
   const ec = emailConfig
@@ -546,6 +577,30 @@ export default function Perfil({ onToast }) {
               </button>
             </div>
           )}
+
+          {/* Teste de envio (SMTP) */}
+          {ec.provider === 'smtp' && (
+            <div style={{ marginTop:16, padding:16, background:'#f8f9fb', borderRadius:'var(--r-lg)', border:'1px solid var(--gray-200)' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--navy)', marginBottom:6 }}>
+                Testar envio
+              </div>
+              <div style={{ fontSize:12, color:'var(--gray-400)', marginBottom:10 }}>
+                Envia um e-mail de teste pelo servidor configurado, para confirmar se está tudo certo.
+              </div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+                <input className="input" style={{ maxWidth:260 }} type="email"
+                  value={emailTeste} onChange={e=>setEmailTeste(e.target.value)}
+                  placeholder={perfil?.email || 'seu@email.com'}/>
+                <button className="btn btn-ghost" onClick={testarEmail} disabled={testandoEmail}>
+                  {testandoEmail ? 'Enviando teste...' : '✉️ Enviar teste'}
+                </button>
+              </div>
+              <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:8 }}>
+                Dica: salve a configuração antes de testar. Se não receber, verifique também a pasta de spam.
+              </div>
+            </div>
+          )}
+
           {ec.provider === 'sistema' && (
             <button className="btn btn-ghost" onClick={salvarEmailConfig} disabled={salvandoEmail} style={{ marginTop:8 }}>
               {salvandoEmail ? 'Salvando...' : '💾 Confirmar uso do e-mail do sistema'}
