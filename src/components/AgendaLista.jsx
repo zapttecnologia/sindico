@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
@@ -25,6 +26,7 @@ const fmtEvento = (inicio, fim, diaInteiro) => {
  * eventos). A RLS já limita o que cada papel vê.
  */
 export default function AgendaLista() {
+  const { perfil } = useAuth()
   const [eventos, setEventos] = useState([])
   const [loading, setLoading] = useState(true)
   const [modo, setModo] = useState('lista')   // 'lista' | 'calendario'
@@ -32,11 +34,13 @@ export default function AgendaLista() {
   const [diaSel, setDiaSel] = useState(null)
 
   useEffect(() => {
-    supabase.from('eventos')
+    // Defesa em profundidade: além da RLS, filtra pelo condomínio do usuário.
+    let q = supabase.from('eventos')
       .select('*, condominios(nome)')
       .order('inicio', { ascending:true })
-      .then(({ data }) => { setEventos(data||[]); setLoading(false) })
-  }, [])
+    if (perfil?.condominio_id) q = q.eq('condominio_id', perfil.condominio_id)
+    q.then(({ data }) => { setEventos(data||[]); setLoading(false) })
+  }, [perfil?.condominio_id])
 
   const badge = (p) => p === 'conselho'
     ? { txt:'⭐ Conselho', bg:'#eef2ff', cor:'#4338ca' }

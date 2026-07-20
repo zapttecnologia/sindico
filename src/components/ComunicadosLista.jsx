@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 const BUCKET = 'anexos-comunicados'
 
@@ -17,19 +18,24 @@ const fmtDataHora = (d) => {
  * o que cada papel enxerga (morador vê 'moradores'; conselho vê ambos).
  */
 export default function ComunicadosLista({ onToast }) {
+  const { perfil } = useAuth()
   const [comunicados, setComunicados] = useState([])
   const [loading, setLoading] = useState(true)
 
   const carregar = async () => {
     setLoading(true)
-    const { data } = await supabase.from('comunicados')
+    // Defesa em profundidade: além da RLS, filtra explicitamente pelo
+    // condomínio do usuário, para nunca mostrar comunicado de outro condomínio.
+    let q = supabase.from('comunicados')
       .select('*, condominios(nome), comunicado_anexos(id, nome, caminho)')
       .order('criado_em', { ascending:false })
+    if (perfil?.condominio_id) q = q.eq('condominio_id', perfil.condominio_id)
+    const { data } = await q
     if (data) setComunicados(data)
     setLoading(false)
   }
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregar() }, [perfil?.condominio_id])
 
   const baixarAnexo = async (caminho) => {
     const { data } = await supabase.storage.from(BUCKET).createSignedUrl(caminho, 60)
