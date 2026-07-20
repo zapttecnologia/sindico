@@ -64,12 +64,25 @@ export default function Relatorio({ onToast }) {
 
   useEffect(() => { buscarDados() }, [mes, ano, condoFiltro, catFiltro, subFiltro, statusFiltro])
 
+  // Recarrega quando a aba volta ao foco (ex.: após fechar um chamado em outra tela)
+  useEffect(() => {
+    const onFocus = () => buscarDados()
+    const onVisible = () => { if (!document.hidden) buscarDados() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [mes, ano, condoFiltro, catFiltro, subFiltro, statusFiltro])
+
   // Stats rápidos
+  const FECHADOS = ['resolvido', 'cancelado']
   const stats = {
     total:     tickets.length,
-    recebido:  tickets.filter(t=>t.status==='recebido').length,
-    andamento: tickets.filter(t=>t.status==='andamento').length,
-    concluido: tickets.filter(t=>t.status==='concluido').length,
+    pendente:  tickets.filter(t=>!FECHADOS.includes(t.status)).length,
+    andamento: tickets.filter(t=>t.status==='em_andamento').length,
+    concluido: tickets.filter(t=>FECHADOS.includes(t.status)).length,
   }
 
   const nomeCondo = condominios.find(c=>c.id===condoFiltro)?.nome || 'Todos os condomínios'
@@ -100,7 +113,7 @@ export default function Relatorio({ onToast }) {
       doc.setTextColor(30, 30, 30)
       const kpiItems = [
         { l:'Total', v:stats.total, c:[40,67,173] },
-        { l:'Recebidos', v:stats.recebido, c:[244,163,64] },
+        { l:'Pendentes', v:stats.pendente, c:[244,163,64] },
         { l:'Em andamento', v:stats.andamento, c:[40,67,173] },
         { l:'Concluídos', v:stats.concluido, c:[34,197,94] },
       ]
@@ -294,9 +307,12 @@ export default function Relatorio({ onToast }) {
             <label>Status</label>
             <select className="input" value={statusFiltro} onChange={e=>setStatusFiltro(e.target.value)}>
               <option value="todos">Todos</option>
-              <option value="recebido">Recebido</option>
-              <option value="andamento">Em andamento</option>
-              <option value="concluido">Concluído</option>
+              <option value="aberto">Aberto</option>
+              <option value="em_analise">Em análise</option>
+              <option value="em_andamento">Em andamento</option>
+              <option value="aguardando_terceiro">Aguardando terceiro</option>
+              <option value="resolvido">Resolvido</option>
+              <option value="cancelado">Cancelado</option>
             </select>
           </div>
         </div>
@@ -306,7 +322,7 @@ export default function Relatorio({ onToast }) {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))', gap:10, marginBottom:20 }}>
         {[
           { l:'Total',        v:stats.total,     c:'var(--navy)' },
-          { l:'Recebidos',    v:stats.recebido,  c:'var(--amber)' },
+          { l:'Pendentes',    v:stats.pendente,  c:'var(--amber)' },
           { l:'Em andamento', v:stats.andamento, c:'var(--emerald)' },
           { l:'Concluídos',   v:stats.concluido, c:'#22c55e' },
         ].map(k=>(
@@ -362,8 +378,8 @@ export default function Relatorio({ onToast }) {
                     <td style={{ padding:'8px 10px', color:'var(--gray-500)' }}>{t.nome_solicitante||'-'}</td>
                     <td style={{ padding:'8px 10px' }}>
                       <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:5,
-                        background: t.status==='concluido'?'#dcfce7':t.status==='andamento'?'#dbeafe':'#fef3c7',
-                        color: t.status==='concluido'?'#16a34a':t.status==='andamento'?'#1d4ed8':'#b45309' }}>
+                        background: FECHADOS.includes(t.status)?'#dcfce7':t.status==='em_andamento'?'#dbeafe':'#fef3c7',
+                        color: FECHADOS.includes(t.status)?'#16a34a':t.status==='em_andamento'?'#1d4ed8':'#b45309' }}>
                         {STATUS_LABEL[t.status]||t.status}
                       </span>
                     </td>
