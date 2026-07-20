@@ -52,28 +52,34 @@ export default function Agenda({ onToast }) {
   const [diaInteiro, setDiaInteiro] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [excluindo, setExcluindo] = useState(null)
+  const [meusCondoIds, setMeusCondoIds] = useState(null)
 
   const carregarCondos = async () => {
     if (ehAdmin) {
       const { data } = await supabase.from('condominios').select('id, nome').order('nome')
       if (data) setCondominios(data)
+      return null
     } else {
       const { data } = await supabase.from('sindico_condominios')
         .select('condominio_id, condominios(nome)').eq('perfil_id', perfil?.id)
-      if (data) setCondominios(data.map(r => ({ id:r.condominio_id, nome:r.condominios?.nome||'' })))
+      const lista = (data || []).map(r => ({ id:r.condominio_id, nome:r.condominios?.nome||'' }))
+      setCondominios(lista)
+      return lista.map(c => c.id)
     }
   }
 
-  const carregar = async () => {
+  const carregar = async (condoIds) => {
     setLoading(true)
-    const { data } = await supabase.from('eventos')
+    let q = supabase.from('eventos')
       .select('*, condominios(nome)')
       .order('inicio', { ascending:true })
+    if (Array.isArray(condoIds) && condoIds.length > 0) q = q.in('condominio_id', condoIds)
+    const { data } = await q
     if (data) setEventos(data)
     setLoading(false)
   }
 
-  useEffect(() => { carregarCondos(); carregar() }, [])
+  useEffect(() => { (async () => { const ids = await carregarCondos(); setMeusCondoIds(ids); await carregar(ids) })() }, [])
 
   const abrirNovo = () => {
     setEditando(null); setPasso(1)
@@ -121,7 +127,7 @@ export default function Agenda({ onToast }) {
     setSalvando(false)
     onToast(editando ? 'Evento atualizado.' : 'Evento publicado.')
     fechar()
-    await carregar()
+    await carregar(meusCondoIds)
   }
 
   const excluir = async () => {
@@ -130,7 +136,7 @@ export default function Agenda({ onToast }) {
     if (error) { onToast('Erro: '+error.message); return }
     onToast('Evento excluído.')
     setExcluindo(null)
-    await carregar()
+    await carregar(meusCondoIds)
   }
 
   const listaFiltrada = eventos.filter(e => filtroCondo === 'todos' || e.condominio_id === filtroCondo)
