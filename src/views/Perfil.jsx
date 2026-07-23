@@ -156,7 +156,8 @@ export default function Perfil({ onToast }) {
     if (!perfil?.empresa_id) return
     const destino = (emailTeste || perfil?.email || '').trim()
     if (!destino) { onToast('Informe um e-mail para receber o teste.'); return }
-    if (emailConfig.provider !== 'smtp') { onToast('O teste está disponível para SMTP. Salve o SMTP primeiro.'); return }
+    if (emailConfig.provider === 'sistema') { onToast('Escolha um provedor de e-mail próprio para testar.'); return }
+    if (!emailConfig.email_remetente) { onToast('Informe o e-mail remetente antes de testar.'); return }
     // Garante que a config mais recente está salva antes de testar
     await supabase.from('empresas').update({ email_config: emailConfig }).eq('id', perfil.empresa_id)
 
@@ -592,13 +593,13 @@ export default function Perfil({ onToast }) {
           )}
 
           {/* Teste de envio (SMTP) */}
-          {ec.provider === 'smtp' && (
+          {ec.provider !== 'sistema' && (
             <div style={{ marginTop:16, padding:16, background:'#f8f9fb', borderRadius:'var(--r-lg)', border:'1px solid var(--gray-200)' }}>
               <div style={{ fontSize:13, fontWeight:700, color:'var(--navy)', marginBottom:6 }}>
                 Testar envio
               </div>
               <div style={{ fontSize:12, color:'var(--gray-400)', marginBottom:10 }}>
-                Envia um e-mail de teste pelo servidor configurado, para confirmar se está tudo certo.
+                Envia um e-mail de teste pelo e-mail configurado ({PROVEDORES[ec.provider]?.label}), para confirmar se está tudo certo.
               </div>
               <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
                 <input className="input" style={{ maxWidth:260 }} type="email"
@@ -610,6 +611,10 @@ export default function Perfil({ onToast }) {
               </div>
               <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:8 }}>
                 Dica: salve a configuração antes de testar. Se não receber, verifique também a pasta de spam.
+                {['gmail','workspace','outlook'].includes(ec.provider) && (
+                  <> Importante: {PROVEDORES[ec.provider]?.label} não aceita a senha normal da conta —
+                  é preciso gerar uma <b>senha de app</b> nas configurações de segurança da conta.</>
+                )}
               </div>
             </div>
           )}
