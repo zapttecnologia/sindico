@@ -1494,6 +1494,7 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
   const [salvando, setSalvando] = useState(false)
   const [nomeEdit, setNomeEdit] = useState(condo.nome)
   const [modalSindicos, setModalSindicos] = useState(false)
+  const [recebeEmail, setRecebeEmail] = useState({})
   const [sindicosEmpresa, setSindicosEmpresa] = useState([])
   const [sindicosDoCondo, setSindicosDoCondo] = useState([])
   const [salvandoSindicos, setSalvandoSindicos] = useState(false)
@@ -1535,11 +1536,15 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
       .eq('empresa_id', empresa.id)
       .in('papel', ['equipe','admin'])
       .order('nome')
-    // Quem já administra ESTE condomínio
+    // Quem já administra ESTE condomínio (e quem recebe e-mail)
     const { data: vinc } = await supabase.from('sindico_condominios')
-      .select('perfil_id').eq('condominio_id', condo.id)
+      .select('perfil_id, recebe_email').eq('condominio_id', condo.id)
     setSindicosEmpresa(sinds || [])
     setSindicosDoCondo((vinc || []).map(v => v.perfil_id))
+    // Mapa perfil_id -> recebe e-mail (padrão: recebe)
+    const mapa = {}
+    ;(vinc || []).forEach(v => { mapa[v.perfil_id] = v.recebe_email !== false })
+    setRecebeEmail(mapa)
     setModalSindicos(true)
   }
 
@@ -1556,12 +1561,21 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
       const aInserir = sindicosDoCondo.filter(id => !idsAtuais.includes(id))
       const aRemover = idsAtuais.filter(id => !sindicosDoCondo.includes(id))
       if (aInserir.length) {
-        await supabase.from('sindico_condominios').insert(aInserir.map(pid => ({ perfil_id:pid, condominio_id:condo.id })))
+        await supabase.from('sindico_condominios').insert(aInserir.map(pid => ({
+          perfil_id:pid, condominio_id:condo.id, recebe_email: recebeEmail[pid] !== false
+        })))
       }
       if (aRemover.length) {
         await supabase.from('sindico_condominios').delete().eq('condominio_id', condo.id).in('perfil_id', aRemover)
       }
-      onToast('Síndicos do condomínio atualizados!')
+      // Atualiza a preferência de e-mail de quem permaneceu vinculado
+      const aAtualizar = sindicosDoCondo.filter(id => idsAtuais.includes(id))
+      for (const pid of aAtualizar) {
+        await supabase.from('sindico_condominios')
+          .update({ recebe_email: recebeEmail[pid] !== false })
+          .eq('condominio_id', condo.id).eq('perfil_id', pid)
+      }
+      onToast('Notificações do condomínio atualizadas!')
       setModalSindicos(false)
       onRefresh()
     } catch(e) { onToast('Erro: '+e.message) }
@@ -1647,6 +1661,8 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
           <div style={{ fontSize:13, color:C.muted, marginBottom:12 }}>
             Marque quais síndicos administram este condomínio. Eles recebem os e-mails
             e avisos <b>apenas</b> dos condomínios marcados — nunca de outros.
+            Use o botão 🔔 para escolher quem recebe as notificações por e-mail
+            (chamados, comunicados e agenda) deste condomínio.
           </div>
           {sindicosEmpresa.length === 0 && (
             <div style={{ fontSize:13, color:C.muted, padding:'10px 0' }}>
@@ -1656,14 +1672,27 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
           <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:280, overflow:'auto' }}>
             {sindicosEmpresa.map(s => {
               const on = sindicosDoCondo.includes(s.id)
+              const recebe = recebeEmail[s.id] !== false
               return (
-                <label key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', border:`1px solid ${on?C.purple:C.border}`, borderRadius:8, cursor:'pointer', background: on?'rgba(168,85,247,.08)':'transparent' }}>
-                  <input type="checkbox" checked={on} onChange={()=>toggleSindico(s.id)}/>
-                  <div style={{ minWidth:0 }}>
+                <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', border:`1px solid ${on?C.purple:C.border}`, borderRadius:8, background: on?'rgba(168,85,247,.08)':'transparent' }}>
+                  <input type="checkbox" checked={on} onChange={()=>toggleSindico(s.id)} style={{ cursor:'pointer' }}/>
+                  <div style={{ minWidth:0, flex:1, cursor:'pointer' }} onClick={()=>toggleSindico(s.id)}>
                     <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{s.nome} {s.papel==='admin' ? '(Admin)' : ''}</div>
                     <div style={{ fontSize:12, color:C.muted, overflow:'hidden', textOverflow:'ellipsis' }}>{s.email}</div>
                   </div>
-                </label>
+                  {on && (
+                    <button
+                      type="button"
+                      onClick={()=>setRecebeEmail(m=>({ ...m, [s.id]: !recebe }))}
+                      title={recebe ? 'Recebe e-mails deste condomínio (clique para desligar)' : 'Não recebe e-mails (clique para ligar)'}
+                      style={{ flexShrink:0, display:'flex', alignItems:'center', gap:5, padding:'5px 9px', borderRadius:6, cursor:'pointer',
+                        border:`1px solid ${recebe?C.blue:C.border}`,
+                        background: recebe?'rgba(88,166,255,.12)':'transparent',
+                        color: recebe?C.blue:C.muted, fontSize:11, fontWeight:600 }}>
+                      {recebe ? '🔔 Recebe' : '🔕 Não recebe'}
+                    </button>
+                  )}
+                </div>
               )
             })}
           </div>
