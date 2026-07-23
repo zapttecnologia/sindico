@@ -146,6 +146,11 @@ function TabelaUsuarios({ lista, onEditar, mostrarBlocoApto=true, mostrarTipo=tr
 export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
   const { perfil } = useAuth()
   const [aba, setAba] = useState('usuarios')
+  // Notificações: equipe da empresa, quem está vinculado e quem recebe e-mail
+  const [equipeEmpresa, setEquipeEmpresa] = useState([])
+  const [vinculados, setVinculados] = useState([])
+  const [recebeEmail, setRecebeEmail] = useState({})
+  const [salvandoNotif, setSalvandoNotif] = useState(false)
   const [grupoAba, setGrupoAba] = useState('moradores')  // moradores | conselheiros | departamentos
   const [usuarios, setUsuarios] = useState([])
   const [blocos, setBlocos] = useState([])
@@ -179,16 +184,69 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
 
   const carregar = useCallback(async () => {
     setLoading(true)
-    const [{ data:u }, { data:b }] = await Promise.all([
+    const [{ data:u }, { data:b }, { data:eq }, { data:vc }] = await Promise.all([
       supabase.from('perfis').select('id,nome,email,papel,codigo_acesso,bloco,apartamento,tipo_ocupacao,primeiro_acesso')
         .eq('condominio_id', condominio.id).order('papel').order('nome'),
       supabase.from('blocos').select('*').eq('condominio_id', condominio.id).order('nome'),
+      // Equipe da empresa (síndicos/admins) — candidatos a receber avisos
+      supabase.from('perfis').select('id,nome,email,papel')
+        .eq('empresa_id', perfil?.empresa_id).in('papel', ['equipe','admin']).order('nome'),
+      // Quem está vinculado a ESTE condomínio e se recebe e-mail
+      supabase.from('sindico_condominios').select('perfil_id, recebe_email')
+        .eq('condominio_id', condominio.id),
     ])
     setUsuarios(u||[]); setBlocos(b||[])
+    setEquipeEmpresa(eq||[])
+    setVinculados((vc||[]).map(v => v.perfil_id))
+    const mapa = {}
+    ;(vc||[]).forEach(v => { mapa[v.perfil_id] = v.recebe_email !== false })
+    setRecebeEmail(mapa)
     setLoading(false)
-  }, [condominio.id])
+  }, [condominio.id, perfil?.empresa_id])
 
   useEffect(() => { carregar() }, [carregar])
+
+  // ── Notificações: vincular/desvincular e definir quem recebe ──
+  const alternarVinculo = (perfilId) => {
+    setVinculados(cur => cur.includes(perfilId) ? cur.filter(x=>x!==perfilId) : [...cur, perfilId])
+  }
+  const alternarRecebe = (perfilId) => {
+    setRecebeEmail(m => ({ ...m, [perfilId]: m[perfilId] === false }))
+  }
+
+  const salvarNotificacoes = async () => {
+    setSalvandoNotif(true)
+    try {
+      const { data: atuais } = await supabase.from('sindico_condominios')
+        .select('perfil_id').eq('condominio_id', condominio.id)
+      const idsAtuais = (atuais||[]).map(a => a.perfil_id)
+      const aInserir = vinculados.filter(id => !idsAtuais.includes(id))
+      const aRemover = idsAtuais.filter(id => !vinculados.includes(id))
+
+      if (aInserir.length) {
+        const { error } = await supabase.from('sindico_condominios').insert(
+          aInserir.map(pid => ({ perfil_id:pid, condominio_id:condominio.id, recebe_email: recebeEmail[pid] !== false }))
+        )
+        if (error) throw error
+      }
+      if (aRemover.length) {
+        const { error } = await supabase.from('sindico_condominios')
+          .delete().eq('condominio_id', condominio.id).in('perfil_id', aRemover)
+        if (error) throw error
+      }
+      // Atualiza a preferência de quem permaneceu
+      for (const pid of vinculados.filter(id => idsAtuais.includes(id))) {
+        await supabase.from('sindico_condominios')
+          .update({ recebe_email: recebeEmail[pid] !== false })
+          .eq('condominio_id', condominio.id).eq('perfil_id', pid)
+      }
+      onToast('Notificações atualizadas!')
+      await carregar()
+    } catch (e) {
+      onToast('Erro: ' + (e.message || 'não foi possível salvar'))
+    }
+    setSalvandoNotif(false)
+  }
 
   // Rótulos amigáveis de papel para o arquivo exportado
   const PAPEL_EXPORT = {
@@ -343,7 +401,7 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
 
       {/* Tabs */}
       <div style={{ display:'flex', borderBottom:'2px solid var(--gray-200)', marginBottom:20 }}>
-        {[['usuarios','👥 Usuários'],['blocos','🏢 Blocos'],['configuracoes','⚙️ Dados do condomínio']].map(([id,label]) => (
+        {[['usuarios','👥 Usuários'],['blocos','🏢 Blocos'],['notificacoes','🔔 Notificações'],['configuracoes','⚙️ Dados do condomínio']].map(([id,label]) => (
           <button key={id} onClick={() => setAba(id)} style={{
             padding:'10px 18px', background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:600,
             color:aba===id?'var(--emerald)':'var(--gray-400)',
@@ -468,6 +526,62 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
       )}
 
       {/* ── ABA CONFIGURAÇÕES ── */}
+      {/* ── ABA NOTIFICAÇÕES ── */}
+      {aba==='notificacoes' && (
+        <div>
+          <h3 className="section-title">Quem recebe os avisos deste condomínio</h3>
+          <p style={{ fontSize:13, color:'var(--gray-400)', margin:'0 0 16px', lineHeight:1.6 }}>
+            Marque quem faz parte da equipe deste condomínio e use o sino para escolher
+            quem recebe as notificações por e-mail (chamados, comunicados e agenda).
+            Quem está sem o sino continua com acesso normal ao sistema, só não recebe e-mails.
+          </p>
+
+          {equipeEmpresa.length === 0 && (
+            <div className="empty-state">Nenhum síndico ou membro de equipe cadastrado na empresa.</div>
+          )}
+
+          <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+            {equipeEmpresa.map(p => {
+              const on = vinculados.includes(p.id)
+              const recebe = recebeEmail[p.id] !== false
+              const souEu = p.id === perfil?.id
+              return (
+                <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px',
+                  border:`1px solid ${on?'var(--blue)':'var(--gray-200)'}`, borderRadius:'var(--r-lg)',
+                  background: on?'#eff6ff':'#fff' }}>
+                  <input type="checkbox" checked={on} disabled={souEu}
+                    onChange={()=>alternarVinculo(p.id)}
+                    title={souEu ? 'Você não pode se remover deste condomínio' : ''}
+                    style={{ cursor: souEu ? 'not-allowed' : 'pointer' }}/>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'var(--navy)' }}>
+                      {p.nome} {souEu && <span style={{ fontSize:11, color:'var(--gray-400)' }}>(você)</span>}
+                    </div>
+                    <div style={{ fontSize:12, color:'var(--gray-400)', overflow:'hidden', textOverflow:'ellipsis' }}>{p.email}</div>
+                  </div>
+                  {on && (
+                    <button type="button" onClick={()=>alternarRecebe(p.id)}
+                      title={recebe ? 'Recebe e-mails (clique para desligar)' : 'Não recebe e-mails (clique para ligar)'}
+                      style={{ flexShrink:0, padding:'6px 10px', borderRadius:'var(--r-md)', cursor:'pointer', fontSize:12, fontWeight:600,
+                        border:`1.5px solid ${recebe?'var(--blue)':'var(--gray-200)'}`,
+                        background: recebe?'#dbeafe':'#fff',
+                        color: recebe?'var(--blue)':'var(--gray-400)' }}>
+                      {recebe ? '🔔 Recebe' : '🔕 Não recebe'}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {equipeEmpresa.length > 0 && (
+            <button className="btn btn-primary" onClick={salvarNotificacoes} disabled={salvandoNotif}>
+              {salvandoNotif ? 'Salvando...' : '💾 Salvar notificações'}
+            </button>
+          )}
+        </div>
+      )}
+
       {aba==='configuracoes' && (
         <div className="card">
           <h3 className="section-title">Dados do condomínio</h3>
