@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { STATUS_LABEL } from '../lib/constants'
@@ -139,6 +139,28 @@ export default function DashboardAnalitico({ onToast }) {
   const [loading, setLoading] = useState(true)
   const [condoFiltro, setCondoFiltro] = useState('todos')
   const [periodo, setPeriodo] = useState(90)   // dias
+  const [telaCheia, setTelaCheia] = useState(false)
+  const containerRef = useRef(null)
+
+  // Entra/sai da tela cheia
+  const alternarTelaCheia = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current?.requestFullscreen?.()
+      } else {
+        await document.exitFullscreen?.()
+      }
+    } catch {
+      onToast?.('Seu navegador não permitiu a tela cheia.')
+    }
+  }
+
+  // Mantém o estado sincronizado (inclusive ao sair com Esc)
+  useEffect(() => {
+    const onMudou = () => setTelaCheia(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onMudou)
+    return () => document.removeEventListener('fullscreenchange', onMudou)
+  }, [])
 
   const ehAdmin = perfil?.papel === 'admin'
 
@@ -282,7 +304,9 @@ export default function DashboardAnalitico({ onToast }) {
   )
 
   return (
-    <div style={{ background:C.bg, minHeight:'100vh', margin:-24, padding:24, color:C.txt,
+    <div ref={containerRef} style={{ background:C.bg, minHeight:'100vh',
+      margin: telaCheia ? 0 : -24, padding:24, color:C.txt,
+      overflowY: telaCheia ? 'auto' : 'visible',
       fontFamily:'var(--font-body, system-ui)' }}>
 
       {/* Cabeçalho */}
@@ -307,6 +331,13 @@ export default function DashboardAnalitico({ onToast }) {
             <option value={180}>Últimos 6 meses</option>
             <option value={3650}>Todo o período</option>
           </select>
+          <button onClick={alternarTelaCheia}
+            title={telaCheia ? 'Sair da tela cheia (Esc)' : 'Ver em tela cheia'}
+            style={{ background:C.panel, color:C.txt, border:`1px solid ${C.line}`, borderRadius:10,
+              padding:'9px 14px', fontSize:13, fontWeight:600, cursor:'pointer',
+              display:'flex', alignItems:'center', gap:7 }}>
+            {telaCheia ? '✕ Sair' : '⛶ Tela cheia'}
+          </button>
         </div>
       </div>
 
