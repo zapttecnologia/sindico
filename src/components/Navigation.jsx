@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
 const ICONS = {
@@ -31,6 +33,40 @@ function initials(name) {
 
 export default function Navigation({ activeView, onNavigate }) {
   const { perfil, logout } = useAuth()
+  const [novos, setNovos] = useState(0)
+
+  // Conta chamados em aberto dos condomínios do síndico (para o sino).
+  // Atualiza a cada 2 minutos e quando a aba volta ao foco.
+  useEffect(() => {
+    const ehGestor = perfil?.papel === 'equipe' || perfil?.papel === 'admin'
+    if (!ehGestor || !perfil?.id) return
+
+    const contar = async () => {
+      try {
+        let ids = []
+        if (perfil.papel === 'admin') {
+          const { data } = await supabase.from('condominios').select('id').eq('empresa_id', perfil.empresa_id)
+          ids = (data || []).map(c => c.id)
+        } else {
+          const { data } = await supabase.from('sindico_condominios')
+            .select('condominio_id').eq('perfil_id', perfil.id)
+          ids = (data || []).map(v => v.condominio_id)
+        }
+        if (!ids.length) { setNovos(0); return }
+        const { count } = await supabase.from('solicitacoes')
+          .select('id', { count:'exact', head:true })
+          .in('condominio_id', ids)
+          .not('status', 'in', '("resolvido","cancelado")')
+        setNovos(count || 0)
+      } catch { /* silencioso: o sino é acessório */ }
+    }
+
+    contar()
+    const timer = setInterval(() => { if (!document.hidden) contar() }, 2 * 60 * 1000)
+    const onFoco = () => { if (!document.hidden) contar() }
+    document.addEventListener('visibilitychange', onFoco)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onFoco) }
+  }, [perfil?.id, perfil?.papel, perfil?.empresa_id])
 
   const getNavItems = () => {
     if (!perfil) return []
@@ -136,9 +172,18 @@ export default function Navigation({ activeView, onNavigate }) {
           <input placeholder="Buscar chamados, moradores..." />
         </div>
         <div className="topbar-actions">
-          <div className="topbar-icon-btn">
+          <div className="topbar-icon-btn"
+            onClick={() => novos > 0 && onNavigate('chamados')}
+            title={novos > 0 ? `${novos} chamado(s) em aberto` : 'Nenhum chamado em aberto'}
+            style={{ cursor: novos > 0 ? 'pointer' : 'default', position:'relative' }}>
             {ICONS.bell}
-            <div className="notif-dot" />
+            {novos > 0 && (
+              <span style={{ position:'absolute', top:-4, right:-4, minWidth:17, height:17, padding:'0 4px',
+                borderRadius:9, background:'var(--rust, #ef4444)', color:'#fff', fontSize:10, fontWeight:700,
+                display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>
+                {novos > 99 ? '99+' : novos}
+              </span>
+            )}
           </div>
           <div className="topbar-icon-btn" onClick={logout} title="Sair">
             {ICONS.logout}
