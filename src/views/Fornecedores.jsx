@@ -9,7 +9,31 @@ const VAZIO = {
   cep:'', logradouro:'', bairro:'', cidade:'', uf:'',
   categoria:'', observacoes:'',
   banco:'', agencia:'', conta:'', pix:'',
+  tem_contrato:false, contrato_inicio:'', contrato_fim:'', contrato_valor:'',
+  contrato_arquivo:null, contrato_arquivo_nome:'',
   ativo:true,
+}
+
+const BUCKET_CONTRATO = 'contratos-fornecedores'
+
+// Formata a data (aaaa-mm-dd) para dd/mm/aaaa
+const fmtData = (d) => {
+  if (!d) return ''
+  const [a, m, dia] = String(d).slice(0, 10).split('-')
+  return `${dia}/${m}/${a}`
+}
+
+// Situação do contrato: vigente, vencendo (30 dias) ou vencido
+const statusContrato = (f) => {
+  if (!f.contrato_fim) {
+    return { texto: 'Com contrato', cor: 'var(--gray-500)' }
+  }
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+  const fim = new Date(String(f.contrato_fim).slice(0, 10) + 'T00:00:00')
+  const dias = Math.round((fim - hoje) / 86400000)
+  if (dias < 0)  return { texto: `Contrato vencido em ${fmtData(f.contrato_fim)}`, cor: 'var(--rust)' }
+  if (dias <= 30) return { texto: `Vence em ${dias} dia${dias === 1 ? '' : 's'} (${fmtData(f.contrato_fim)})`, cor: '#d97706' }
+  return { texto: `Vigente até ${fmtData(f.contrato_fim)}`, cor: 'var(--emerald)' }
 }
 
 export default function Fornecedores({ onToast }) {
@@ -20,6 +44,7 @@ export default function Fornecedores({ onToast }) {
   const [modal, setModal] = useState(null)     // objeto (novo/editar) ou null
   const [salvando, setSalvando] = useState(false)
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false)
+  const [arqContrato, setArqContrato] = useState(null)   // File selecionado para upload
 
   // Busca dados na Receita ao completar o CNPJ e preenche os campos vazios
   const onChangeCNPJ = async (valor) => {
@@ -86,18 +111,69 @@ export default function Fornecedores({ onToast }) {
       agencia: modal.agencia?.trim() || null,
       conta: modal.conta?.trim() || null,
       pix: modal.pix?.trim() || null,
+      tem_contrato: !!modal.tem_contrato,
+      contrato_inicio: modal.tem_contrato && modal.contrato_inicio ? modal.contrato_inicio : null,
+      contrato_fim: modal.tem_contrato && modal.contrato_fim ? modal.contrato_fim : null,
+      contrato_valor: modal.tem_contrato && modal.contrato_valor !== '' && modal.contrato_valor != null
+        ? Number(String(modal.contrato_valor).replace(',', '.')) : null,
       ativo: modal.ativo !== false,
       atualizado_em: new Date().toISOString(),
     }
     let error
+    let fornecedorId = modal.id
     if (modal.id) {
       ({ error } = await supabase.from('fornecedores').update(payload).eq('id', modal.id))
     } else {
-      ({ error } = await supabase.from('fornecedores').insert(payload))
+      const res = await supabase.from('fornecedores').insert(payload).select('id').single()
+      error = res.error
+      fornecedorId = res.data?.id
     }
+    if (error) { setSalvando(false); onToast('Erro: ' + error.message); return }
+
+    // Upload do contrato (se um arquivo novo foi escolhido)
+    if (arqContrato && fornecedorId) {
+      const nomeSeguro = arqContrato.name.replace(/[^\w.\-]/g, '_')
+      const caminho = `${fornecedorId}/${Date.now()}_${nomeSeguro}`
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET_CONTRATO).upload(caminho, arqContrato, { upsert: true })
+      if (upErr) {
+        setSalvando(false)
+        onToast('Fornecedor salvo, mas o contrato não subiu: ' + upErr.message)
+        setModal(null); setArqContrato(null); await carregar()
+        return
+      }
+      // Remove o arquivo anterior, se havia
+      if (modal.contrato_arquivo && modal.contrato_arquivo !== caminho) {
+        await supabase.storage.from(BUCKET_CONTRATO).remove([modal.contrato_arquivo])
+      }
+      await supabase.from('fornecedores')
+        .update({ contrato_arquivo: caminho, contrato_arquivo_nome: arqContrato.name })
+        .eq('id', fornecedorId)
+    }
+
     setSalvando(false)
-    if (error) { onToast('Erro: ' + error.message); return }
-    onToast('Fornecedor salvo!'); setModal(null); await carregar()
+    onToast('Fornecedor salvo!'); setModal(null); setArqContrato(null); await carregar()
+  }
+
+  // Abre o contrato numa URL temporária (bucket privado)
+  const abrirContrato = async (caminho) => {
+    const { data } = await supabase.storage.from(BUCKET_CONTRATO).createSignedUrl(caminho, 60)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+    else onToast('Não foi possível abrir o contrato.')
+  }
+
+  // Remove o contrato do fornecedor
+  const removerContrato = async () => {
+    if (!modal?.contrato_arquivo) { setArqContrato(null); return }
+    if (!window.confirm('Remover o arquivo do contrato?')) return
+    await supabase.storage.from(BUCKET_CONTRATO).remove([modal.contrato_arquivo])
+    if (modal.id) {
+      await supabase.from('fornecedores')
+        .update({ contrato_arquivo: null, contrato_arquivo_nome: null }).eq('id', modal.id)
+    }
+    setModal(m => ({ ...m, contrato_arquivo: null, contrato_arquivo_nome: '' }))
+    setArqContrato(null)
+    onToast('Contrato removido.')
   }
 
   const excluir = async (id) => {
@@ -126,7 +202,7 @@ export default function Fornecedores({ onToast }) {
           <h1 className="page-title">Fornecedores</h1>
           <p className="page-sub">Cadastro de fornecedores para orçamentos e aprovações do conselho</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setModal({ ...VAZIO })}>+ Novo fornecedor</button>
+        <button className="btn btn-primary" onClick={() => { setModal({ ...VAZIO }); setArqContrato(null) }}>+ Novo fornecedor</button>
       </div>
 
       <div style={{ margin:'16px 0' }}>
@@ -158,12 +234,21 @@ export default function Fornecedores({ onToast }) {
                   {f.cnpj_cpf && <span>📄 {f.cnpj_cpf}</span>}
                   {f.telefone && <span>📞 {f.telefone}</span>}
                   {(f.cidade || f.uf) && <span>📍 {[f.cidade, f.uf].filter(Boolean).join('/')}</span>}
+                  {f.tem_contrato && (() => {
+                    const st = statusContrato(f)
+                    return (
+                      <span style={{ color: st.cor, fontWeight:600 }}>
+                        📑 {st.texto}
+                        {f.contrato_valor != null && ` · ${Number(f.contrato_valor).toLocaleString('pt-BR', { style:'currency', currency:'BRL' })}`}
+                      </span>
+                    )
+                  })()}
                 </div>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => toggleAtivo(f)} title={f.ativo?'Desativar':'Ativar'}>
                 {f.ativo ? '👁' : '🚫'}
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setModal({ ...f })}>Editar</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setModal({ ...f }); setArqContrato(null) }}>Editar</button>
               <button className="btn btn-ghost btn-sm" style={{ color:'var(--rust)' }} onClick={() => excluir(f.id)}>Excluir</button>
             </div>
           ))}
@@ -172,11 +257,11 @@ export default function Fornecedores({ onToast }) {
 
       {/* Modal de cadastro/edição */}
       {modal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(null)}>
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setModal(null); setArqContrato(null) } }}>
           <div className="modal" style={{ maxWidth:640, width:'100%', maxHeight:'90vh', overflowY:'auto' }}>
             <div className="modal-header">
               <h3 className="modal-title">{modal.id ? 'Editar' : 'Novo'} fornecedor</h3>
-              <button className="modal-close" onClick={() => setModal(null)}>×</button>
+              <button className="modal-close" onClick={() => { setModal(null); setArqContrato(null) }}>×</button>
             </div>
 
             {/* Identificação */}
@@ -269,6 +354,67 @@ export default function Fornecedores({ onToast }) {
               <textarea className="input" rows={2} value={modal.observacoes||''} onChange={e => set('observacoes', e.target.value)} placeholder="Notas internas sobre o fornecedor" />
             </div>
 
+            {/* Contrato */}
+            <div className="section-title">Contrato</div>
+            <div className="field">
+              <label style={{ display:'flex', alignItems:'center', gap:9, cursor:'pointer' }}>
+                <input type="checkbox" checked={!!modal.tem_contrato}
+                  onChange={e => set('tem_contrato', e.target.checked)}
+                  style={{ width:16, height:16, cursor:'pointer' }}/>
+                <span style={{ fontSize:13, color:'var(--gray-600)' }}>Este fornecedor possui contrato</span>
+              </label>
+            </div>
+
+            {modal.tem_contrato && (
+              <div style={{ padding:14, background:'#f8f9fb', borderRadius:'var(--r-lg)', border:'1px solid var(--gray-200)', marginBottom:14 }}>
+                <div className="row2" style={{ display:'flex', gap:12 }}>
+                  <div className="field" style={{ flex:1 }}>
+                    <label>Início da vigência</label>
+                    <input className="input" type="date" value={modal.contrato_inicio||''}
+                      onChange={e => set('contrato_inicio', e.target.value)} />
+                  </div>
+                  <div className="field" style={{ flex:1 }}>
+                    <label>Fim da vigência</label>
+                    <input className="input" type="date" value={modal.contrato_fim||''}
+                      onChange={e => set('contrato_fim', e.target.value)} />
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Valor do contrato (R$)</label>
+                  <input className="input" type="number" step="0.01" min="0"
+                    value={modal.contrato_valor ?? ''}
+                    onChange={e => set('contrato_valor', e.target.value)}
+                    placeholder="Ex.: 1500.00" />
+                </div>
+                <div className="field" style={{ marginBottom:0 }}>
+                  <label>Arquivo do contrato</label>
+                  {modal.contrato_arquivo && !arqContrato ? (
+                    <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                      <button type="button" className="btn btn-ghost btn-sm"
+                        onClick={() => abrirContrato(modal.contrato_arquivo)}>
+                        📄 {modal.contrato_arquivo_nome || 'Ver contrato'}
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm"
+                        style={{ color:'var(--rust)' }} onClick={removerContrato}>
+                        Remover
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input type="file" accept=".pdf,.doc,.docx,image/*"
+                        onChange={e => setArqContrato(e.target.files?.[0] || null)}
+                        style={{ fontSize:13 }} />
+                      {arqContrato && (
+                        <div style={{ fontSize:12, color:'var(--emerald)', marginTop:6 }}>
+                          {arqContrato.name} — será enviado ao salvar
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Dados bancários */}
             <div className="section-title">Dados bancários (opcional)</div>
             <div className="row2" style={{ display:'flex', gap:12 }}>
@@ -291,7 +437,7 @@ export default function Fornecedores({ onToast }) {
             </div>
 
             <div style={{ display:'flex', gap:10, marginTop:16 }}>
-              <button className="btn btn-ghost" style={{ flex:1 }} onClick={() => setModal(null)}>Cancelar</button>
+              <button className="btn btn-ghost" style={{ flex:1 }} onClick={() => { setModal(null); setArqContrato(null) }}>Cancelar</button>
               <button className="btn btn-primary" style={{ flex:1 }} onClick={salvar} disabled={salvando}>
                 {salvando ? 'Salvando...' : 'Salvar fornecedor'}
               </button>
