@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 const ICONS = {
@@ -14,6 +13,7 @@ const ICONS = {
   bell:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
   agenda: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  truck:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="1" y="6" width="13" height="10" rx="1"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>,
   dots:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
 }
 
@@ -30,7 +30,6 @@ function initials(name) {
 
 export default function Navigation({ activeView, onNavigate }) {
   const { perfil, logout } = useAuth()
-  const [maisAberto, setMaisAberto] = useState(false)
 
   const getNavItems = () => {
     if (!perfil) return []
@@ -54,6 +53,7 @@ export default function Navigation({ activeView, onNavigate }) {
       { id:'dashboard',  label:'Painel',         icon:ICONS.home,   section:'Principal' },
       { id:'chamados',   label:'Chamados',       icon:ICONS.list },
       { id:'admin',      label:'Condomínios',    icon:ICONS.condo,  section:'Gestão' },
+      { id:'fornecedores', label:'Fornecedores', icon:ICONS.truck },
       { id:'comunicados',label:'Comunicados',    icon:ICONS.bell },
       { id:'agenda',     label:'Agenda',         icon:ICONS.agenda },
       { id:'relatorio',  label:'Relatórios',     icon:ICONS.report },
@@ -69,6 +69,7 @@ export default function Navigation({ activeView, onNavigate }) {
 
   const PAGE_LABEL = {
     dashboard:'Painel', chamados:'Chamados', admin:'Condomínios',
+    fornecedores:'Fornecedores',
     relatorio:'Relatórios', perfil:'Minha empresa', painel:'Painel',
     comunicados:'Comunicados', agenda:'Agenda',
     'novo-chamado':'Novo chamado', 'meus-chamados':'Meus chamados',
@@ -154,46 +155,11 @@ export default function Navigation({ activeView, onNavigate }) {
             <span>{item.label}</span>
           </button>
         ))}
-        {/* Botão "Mais" — só aparece se houver itens além dos 4 primeiros */}
-        {items.length > 4 ? (
-          <button className={`bottom-nav-item${maisAberto ? ' active' : ''}`} onClick={() => setMaisAberto(true)}>
-            <span style={{ width:22, height:22 }}>{ICONS.dots}</span>
-            <span>Mais</span>
-          </button>
-        ) : (
-          <button className="bottom-nav-item" onClick={logout}>
-            <span style={{ width:22, height:22 }}>{ICONS.logout}</span>
-            <span>Sair</span>
-          </button>
-        )}
+        <button className="bottom-nav-item" onClick={logout}>
+          <span style={{ width:22, height:22 }}>{ICONS.logout}</span>
+          <span>Sair</span>
+        </button>
       </nav>
-
-      {/* ── Painel "Mais" (mobile) ── */}
-      {maisAberto && (
-        <div className="mais-overlay" onClick={() => setMaisAberto(false)}>
-          <div className="mais-sheet" onClick={e => e.stopPropagation()}>
-            <div className="mais-sheet-header">
-              <span>Menu</span>
-              <button className="mais-sheet-close" onClick={() => setMaisAberto(false)}>✕</button>
-            </div>
-            <div className="mais-sheet-grid">
-              {items.slice(4).map(item => (
-                <button
-                  key={item.id}
-                  className={`mais-sheet-item${activeView === item.id ? ' active' : ''}`}
-                  onClick={() => { onNavigate(item.id); setMaisAberto(false) }}>
-                  <span style={{ width:24, height:24 }}>{item.icon}</span>
-                  <span>{item.label}</span>
-                </button>
-              ))}
-              <button className="mais-sheet-item" onClick={() => { setMaisAberto(false); logout() }}>
-                <span style={{ width:24, height:24 }}>{ICONS.logout}</span>
-                <span>Sair</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }
