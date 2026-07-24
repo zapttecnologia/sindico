@@ -119,9 +119,12 @@ export default function Equipe({ view, onToast }) {
     const onVisible = () => { if (!document.hidden) carregar() }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisible)
+    // Atualiza sozinho a cada 2 minutos, sem precisar recarregar a página
+    const timer = setInterval(() => { if (!document.hidden) carregar() }, 2 * 60 * 1000)
     return () => {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisible)
+      clearInterval(timer)
     }
   }, [])
 

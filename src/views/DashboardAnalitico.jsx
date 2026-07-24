@@ -140,6 +140,7 @@ export default function DashboardAnalitico({ onToast }) {
   const [condoFiltro, setCondoFiltro] = useState('todos')
   const [periodo, setPeriodo] = useState(90)   // dias
   const [telaCheia, setTelaCheia] = useState(false)
+  const [atualizadoEm, setAtualizadoEm] = useState(null)
   const containerRef = useRef(null)
 
   // Entra/sai da tela cheia
@@ -188,6 +189,7 @@ export default function DashboardAnalitico({ onToast }) {
     } else {
       setTickets([])
     }
+    setAtualizadoEm(new Date())
     setLoading(false)
   }
 
@@ -197,9 +199,12 @@ export default function DashboardAnalitico({ onToast }) {
     const onFoco = () => { if (!document.hidden) carregar() }
     window.addEventListener('focus', onFoco)
     document.addEventListener('visibilitychange', onFoco)
+    // Atualiza sozinho a cada 5 minutos (útil para deixar num monitor)
+    const timer = setInterval(() => { if (!document.hidden) carregar() }, 5 * 60 * 1000)
     return () => {
       window.removeEventListener('focus', onFoco)
       document.removeEventListener('visibilitychange', onFoco)
+      clearInterval(timer)
     }
   }, [perfil?.id])
 
@@ -316,6 +321,7 @@ export default function DashboardAnalitico({ onToast }) {
           <p style={{ color:C.muted, fontSize:13, margin:'4px 0 0' }}>
             Visão analítica {condoFiltro === 'todos' ? 'de todos os condomínios' : `— ${nomeCondo(condoFiltro)}`}
             {' · '}últimos {periodo} dias
+            {atualizadoEm && <span style={{ opacity:.7 }}>{' · '}atualizado {atualizadoEm.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}</span>}
           </p>
         </div>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
