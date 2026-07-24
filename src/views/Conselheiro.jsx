@@ -33,6 +33,9 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
   const [orcSel, setOrcSel] = useState(null)
   const [obsVoto, setObsVoto] = useState('')
   const [salvandoVoto, setSalvandoVoto] = useState(false)
+  // Confirmações obrigatórias antes de registrar o voto
+  const [confirmaVoto, setConfirmaVoto] = useState(false)
+  const [confirmaDados, setConfirmaDados] = useState(false)
   const [meuVoto, setMeuVoto] = useState(null)
   const [meusVotos, setMeusVotos] = useState([])   // ids de solicitações que EU já votei
   // Filtros da aba Chamados
@@ -244,6 +247,7 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
   const abrirVotacao = async (ticket) => {
     setTicketVotando(ticket)
     setOpcaoVoto(null); setOrcSel(null); setObsVoto('')
+    setConfirmaVoto(false); setConfirmaDados(false)
     const [{ data:orcs }, { data:votos }, { data:notas }] = await Promise.all([
       supabase.from('orcamentos').select('*').eq('solicitacao_id', ticket.id).order('numero'),
       supabase.from('votos_conselheiros').select('*').eq('solicitacao_id', ticket.id),
@@ -278,6 +282,10 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
 
   const registrarVoto = async () => {
     if (!opcaoVoto || !ticketVotando) return
+    if (!confirmaVoto || !confirmaDados) {
+      onToast('Marque as duas confirmações antes de registrar o voto.')
+      return
+    }
     setSalvandoVoto(true)
 
     const payload = {
@@ -464,7 +472,7 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10, marginBottom:14 }}>
                 {OPCOES.map(op => (
-                  <button key={op.v} onClick={()=>setOpcaoVoto(opcaoVoto===op.v?null:op.v)}
+                  <button key={op.v} onClick={()=>{ setOpcaoVoto(opcaoVoto===op.v?null:op.v); setConfirmaVoto(false); setConfirmaDados(false) }}
                     style={{ padding:'14px 10px', borderRadius:'var(--r-md)', fontWeight:700, fontSize:13,
                       cursor:'pointer', transition:'all .15s', textAlign:'center',
                       border:`2px solid ${opcaoVoto===op.v?op.cor:'var(--gray-200)'}`,
@@ -480,8 +488,49 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
                 <textarea className="input" rows={2} value={obsVoto} onChange={e=>setObsVoto(e.target.value)}
                   placeholder="Adicione uma justificativa ou ressalva..."/>
               </div>
+              {/* Confirmações obrigatórias — só aparecem após escolher o voto */}
+              {opcaoVoto && (
+                <div style={{ marginBottom:14, padding:14, background:'#fffbeb', border:'1px solid #fcd34d', borderRadius:'var(--r-lg)' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--navy)', marginBottom:10 }}>
+                    Confirme antes de registrar
+                  </div>
+
+                  {/* 1) Confirmação do voto */}
+                  <label style={{ display:'flex', alignItems:'flex-start', gap:9, marginBottom:12, cursor:'pointer' }}>
+                    <input type="checkbox" checked={confirmaVoto} onChange={e=>setConfirmaVoto(e.target.checked)}
+                      style={{ marginTop:2, cursor:'pointer', width:16, height:16, flexShrink:0 }}/>
+                    <span style={{ fontSize:13, color:'var(--gray-600)', lineHeight:1.5 }}>
+                      Confirmo meu voto <b style={{ color:OPCOES.find(o=>o.v===opcaoVoto)?.cor }}>
+                      {OPCOES.find(o=>o.v===opcaoVoto)?.l}</b> neste chamado e estou ciente de que
+                      ele ficará registrado.
+                    </span>
+                  </label>
+
+                  {/* 2) Confirmação dos dados cadastrais */}
+                  <label style={{ display:'flex', alignItems:'flex-start', gap:9, cursor:'pointer' }}>
+                    <input type="checkbox" checked={confirmaDados} onChange={e=>setConfirmaDados(e.target.checked)}
+                      style={{ marginTop:2, cursor:'pointer', width:16, height:16, flexShrink:0 }}/>
+                    <span style={{ fontSize:13, color:'var(--gray-600)', lineHeight:1.5 }}>
+                      Confirmo que sou <b>{perfil?.nome}</b>
+                      {perfil?.email ? <> ({perfil.email})</> : null}
+                      {condoInfo?.nome ? <>, conselheiro do <b>{condoInfo.nome}</b></> : null}
+                      {(perfil?.bloco || perfil?.apartamento)
+                        ? <> — {perfil?.bloco ? `Bloco ${perfil.bloco}` : ''}{perfil?.bloco && perfil?.apartamento ? ' · ' : ''}{perfil?.apartamento ? `Ap. ${perfil.apartamento}` : ''}</>
+                        : null}
+                      , e que os dados acima estão corretos.
+                    </span>
+                  </label>
+
+                  {(!confirmaVoto || !confirmaDados) && (
+                    <div style={{ fontSize:11, color:'#b45309', marginTop:10 }}>
+                      Marque as duas confirmações para liberar o registro do voto.
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button className="btn btn-primary btn-block" onClick={registrarVoto}
-                disabled={!opcaoVoto||salvandoVoto} style={{ fontSize:15, padding:'13px' }}>
+                disabled={!opcaoVoto||!confirmaVoto||!confirmaDados||salvandoVoto} style={{ fontSize:15, padding:'13px' }}>
                 {salvandoVoto?'Registrando...':`Confirmar: ${OPCOES.find(o=>o.v===opcaoVoto)?.l||'selecione uma opção'}`}
               </button>
             </div>
