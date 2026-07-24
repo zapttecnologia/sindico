@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
@@ -34,6 +34,47 @@ function initials(name) {
 export default function Navigation({ activeView, onNavigate }) {
   const { perfil, logout } = useAuth()
   const [novos, setNovos] = useState(0)
+  const [somLigado, setSomLigado] = useState(() => {
+    // Preferência do usuário (padrão: ligado)
+    try { return localStorage.getItem('alertaSom') !== 'off' } catch { return true }
+  })
+  const anteriorRef = useRef(null)     // contagem da verificação anterior
+  const somRef = useRef(somLigado)
+  useEffect(() => { somRef.current = somLigado }, [somLigado])
+
+  // Toca um bipe curto usando o próprio navegador (sem arquivo de áudio)
+  const tocarAlerta = () => {
+    if (!somRef.current) return
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext
+      if (!Ctx) return
+      const ctx = new Ctx()
+      const tocar = (freq, inicio, duracao) => {
+        const osc = ctx.createOscillator()
+        const vol = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.value = freq
+        osc.connect(vol); vol.connect(ctx.destination)
+        vol.gain.setValueAtTime(0.0001, ctx.currentTime + inicio)
+        vol.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + inicio + 0.02)
+        vol.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + inicio + duracao)
+        osc.start(ctx.currentTime + inicio)
+        osc.stop(ctx.currentTime + inicio + duracao + 0.02)
+      }
+      // Duas notas curtas, discretas
+      tocar(880, 0, 0.15)
+      tocar(1174, 0.16, 0.2)
+      setTimeout(() => ctx.close(), 800)
+    } catch { /* som é acessório: nunca quebra a navegação */ }
+  }
+
+  const alternarSom = () => {
+    setSomLigado(v => {
+      const novo = !v
+      try { localStorage.setItem('alertaSom', novo ? 'on' : 'off') } catch {}
+      return novo
+    })
+  }
 
   // Conta chamados em aberto dos condomínios do síndico (para o sino).
   // Atualiza a cada 2 minutos e quando a aba volta ao foco.
@@ -57,7 +98,11 @@ export default function Navigation({ activeView, onNavigate }) {
           .select('id', { count:'exact', head:true })
           .in('condominio_id', ids)
           .not('status', 'in', '("resolvido","cancelado")')
-        setNovos(count || 0)
+        const total = count || 0
+        // Toca só quando AUMENTA (e não na primeira verificação)
+        if (anteriorRef.current !== null && total > anteriorRef.current) tocarAlerta()
+        anteriorRef.current = total
+        setNovos(total)
       } catch { /* silencioso: o sino é acessório */ }
     }
 
@@ -185,6 +230,13 @@ export default function Navigation({ activeView, onNavigate }) {
               </span>
             )}
           </div>
+          {(perfil?.papel === 'equipe' || perfil?.papel === 'admin') && (
+            <div className="topbar-icon-btn" onClick={alternarSom}
+              title={somLigado ? 'Aviso sonoro ligado (clique para silenciar)' : 'Aviso sonoro desligado'}
+              style={{ cursor:'pointer', fontSize:15, opacity: somLigado ? 1 : .45 }}>
+              {somLigado ? '🔔' : '🔕'}
+            </div>
+          )}
           <div className="topbar-icon-btn" onClick={logout} title="Sair">
             {ICONS.logout}
           </div>
