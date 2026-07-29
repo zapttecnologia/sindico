@@ -337,6 +337,39 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
     catch(e) { onToast('Erro: '+e.message) }
   }
 
+  // Reseta para a senha padrão do sistema e força troca no próximo acesso
+  const resetarPadrao = async () => {
+    if (!window.confirm(`Resetar a senha de ${modalEditar?.nome} para "mudar123"?`)) return
+    try {
+      await api({ action:'reset_password', user_id:modalEditar.id, new_password:'mudar123' })
+      await supabase.from('perfis').update({ primeiro_acesso:true }).eq('id', modalEditar.id)
+      onToast('Senha resetada para mudar123. O morador vai trocá-la no próximo acesso.')
+    } catch(e) { onToast('Erro: '+e.message) }
+  }
+
+  // Envia por e-mail os dados de acesso ao morador
+  const enviarAcesso = async () => {
+    if (!modalEditar?.email) { onToast('Este morador não tem e-mail cadastrado.'); return }
+    if (!window.confirm(`Enviar os dados de acesso para ${modalEditar.email}?`)) return
+    try {
+      const sess = (await supabase.auth.getSession()).data.session
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-new-ticket`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${sess?.access_token}` },
+        body: JSON.stringify({
+          evento:'enviar_acesso',
+          destino: modalEditar.email,
+          nome: modalEditar.nome,
+          codigo_acesso: modalEditar.codigo_acesso,
+          condominio_id: condominio.id,
+        }),
+      })
+      const json = await resp.json()
+      if (json.ok) onToast(`✅ Dados de acesso enviados para ${modalEditar.email}`)
+      else onToast(`❌ Falhou: ${json.erro || 'erro desconhecido'}`)
+    } catch(e) { onToast('❌ Erro ao enviar: '+e.message) }
+  }
+
   const excluirUsuario = async () => {
     if (!window.confirm(`Excluir ${modalEditar?.nome}?`)) return
     try { await api({ action:'delete_user', user_id:modalEditar.id }); onToast('Excluído.'); setModalEditar(null); await carregar() }
@@ -715,11 +748,26 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
             )}
             <button className="btn btn-primary btn-block" onClick={salvarUsuario} disabled={salvando}>{salvando?'Salvando...':'Salvar dados'}</button>
             <div style={{ borderTop:'1px solid var(--gray-100)', paddingTop:16, marginTop:16 }}>
-              <label style={{ fontSize:12, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', display:'block', marginBottom:8 }}>Resetar senha</label>
-              <div style={{ display:'flex', gap:8 }}>
+              <label style={{ fontSize:12, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', display:'block', marginBottom:8 }}>Senha e acesso</label>
+              <div style={{ display:'flex', gap:8, marginBottom:8 }}>
                 <input className="input" type="password" placeholder="Nova senha (mín. 4 caracteres)" value={modalEditar.novaSenha||''} onChange={e=>setModalEditar(m=>({...m,novaSenha:e.target.value}))}/>
                 <button className="btn btn-ghost btn-sm" style={{ whiteSpace:'nowrap' }} onClick={resetarSenha}>Resetar</button>
               </div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <button className="btn btn-ghost btn-sm" style={{ flex:1, whiteSpace:'nowrap' }} onClick={resetarPadrao}>
+                  🔑 Resetar para mudar123
+                </button>
+                <button className="btn btn-ghost btn-sm" style={{ flex:1, whiteSpace:'nowrap' }}
+                  onClick={enviarAcesso} disabled={!modalEditar.email}
+                  title={modalEditar.email ? '' : 'Morador sem e-mail cadastrado'}>
+                  ✉️ Enviar dados de acesso
+                </button>
+              </div>
+              {!modalEditar.email && (
+                <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:6 }}>
+                  O envio por e-mail requer um e-mail cadastrado para este morador.
+                </div>
+              )}
             </div>
             <div style={{ borderTop:'1px solid var(--gray-100)', paddingTop:16, marginTop:12 }}>
               <button className="btn btn-danger btn-block" style={{ border:'1px solid var(--rust)', color:'var(--rust)', background:'none' }} onClick={excluirUsuario}>
