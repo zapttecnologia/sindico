@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES, DEPARTAMENTOS, ticketNumber } from '../lib/constants'
 import TicketDetail from '../components/TicketDetail'
 import Dashboard from './Dashboard'
+import KanbanChamados from './KanbanChamados'
 
 export default function Equipe({ view, onToast }) {
   const { perfil } = useAuth()
@@ -16,6 +17,10 @@ export default function Equipe({ view, onToast }) {
   const [catFiltro, setCatFiltro] = useState('todas')
   const [subFiltro, setSubFiltro] = useState('todas')
   const [statusFiltro, setStatusFiltro] = useState('todos')
+  const [modoExibicao, setModoExibicao] = useState('lista')   // 'lista' | 'kanban'
+  const TODOS_STATUS = ['aberto','em_analise','em_andamento','aguardando_terceiro','resolvido','cancelado']
+  const [colunasKanban, setColunasKanban] = useState(['aberto','em_analise','em_andamento','aguardando_terceiro','resolvido'])
+  const [menuColunas, setMenuColunas] = useState(false)
   const [ticketSel, setTicketSel] = useState(null)
   const [showModalNovo, setShowModalNovo] = useState(false)
   const [novaCategoria, setNovaCategoria] = useState(null)
@@ -111,6 +116,20 @@ export default function Equipe({ view, onToast }) {
   }
 
   useEffect(() => { carregarCondos(); carregar() }, [])
+
+  // Muda o status de um chamado ao arrastar no Kanban
+  const mudarStatusKanban = async (ticket, novoStatus) => {
+    // Atualização otimista: reflete na tela na hora
+    setTickets(ts => ts.map(t => t.id === ticket.id ? { ...t, status: novoStatus } : t))
+    const patch = { status: novoStatus }
+    // Se moveu para resolvido/cancelado, registra o fechamento
+    if ((novoStatus === 'resolvido' || novoStatus === 'cancelado') && !ticket.fechado_em) {
+      patch.fechado_em = new Date().toISOString()
+    }
+    const { error } = await supabase.from('solicitacoes').update(patch).eq('id', ticket.id)
+    if (error) { onToast('Erro ao mover: ' + error.message); carregar() }
+    else { onToast(`Chamado movido para "${STATUS_LABEL[novoStatus]}"`) }
+  }
 
   // Recarrega ao trocar de view (mudar de assunto) e quando a aba volta ao foco
   useEffect(() => { carregar() }, [view])
@@ -295,6 +314,42 @@ export default function Equipe({ view, onToast }) {
             </div>
           </div>
 
+          {/* Alternar Lista / Kanban + seletor de colunas */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:6, background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-md)', padding:4 }}>
+              <button onClick={() => setModoExibicao('lista')}
+                className={`btn btn-sm ${modoExibicao==='lista'?'btn-primary':'btn-ghost'}`}>☰ Lista</button>
+              <button onClick={() => setModoExibicao('kanban')}
+                className={`btn btn-sm ${modoExibicao==='kanban'?'btn-primary':'btn-ghost'}`}>▦ Kanban</button>
+            </div>
+
+            {modoExibicao === 'kanban' && (
+              <div style={{ position:'relative' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setMenuColunas(v => !v)}>
+                  ⚙ Colunas ({colunasKanban.length})
+                </button>
+                {menuColunas && (
+                  <div style={{ position:'absolute', right:0, top:'100%', marginTop:6, zIndex:20,
+                    background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
+                    boxShadow:'0 8px 24px rgba(0,0,0,.12)', padding:10, minWidth:210 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', marginBottom:8 }}>
+                      Colunas visíveis
+                    </div>
+                    {TODOS_STATUS.map(s => (
+                      <label key={s} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', fontSize:13, cursor:'pointer' }}>
+                        <input type="checkbox" checked={colunasKanban.includes(s)}
+                          onChange={() => setColunasKanban(cur =>
+                            cur.includes(s) ? cur.filter(x => x !== s) : [...TODOS_STATUS.filter(t => cur.includes(t) || t === s)]
+                          )}/>
+                        {STATUS_LABEL[s]}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Mini stats */}
           <div className="filtros-row" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
             {[
@@ -309,7 +364,14 @@ export default function Equipe({ view, onToast }) {
             ))}
           </div>
 
-          {ticketsFiltrados.length === 0
+          {modoExibicao === 'kanban' ? (
+            <KanbanChamados
+              tickets={ticketsFiltrados}
+              colunasVisiveis={colunasKanban}
+              onAbrir={t => setTicketSel(t)}
+              onMudarStatus={mudarStatusKanban}
+            />
+          ) : ticketsFiltrados.length === 0
             ? <div className="empty-state">Nenhum chamado encontrado com esses filtros.</div>
             : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {ticketsFiltrados.map(t => {
