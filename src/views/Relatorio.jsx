@@ -69,19 +69,40 @@ export default function Relatorio({ onToast }) {
     const lista = data || []
     setTickets(lista)
 
-    // Busca os votos do conselho dos chamados deste período
-    const ids = lista.map(t => t.id)
+    // Para as VOTAÇÕES, busca os chamados do período/condomínio
+    // SEM aplicar o filtro de status/categoria — assim a seção de
+    // votação aparece mesmo com a tabela filtrada (ex.: "Resolvido").
+    let qv = supabase.from('solicitacoes')
+      .select('id, categoria, categoria_personalizada, aprovacao_status, condominio_id, condominios(nome)')
+      .gte('criado_em', inicioMes)
+      .lte('criado_em', fimMes)
+    if (condoFiltro !== 'todos') qv = qv.eq('condominio_id', condoFiltro)
+    const { data: dadosVot } = await qv
+    const listaVot = dadosVot || []
+
+    // Busca os votos do conselho desses chamados
+    const ids = listaVot.map(t => t.id)
     if (ids.length) {
       const { data: votos } = await supabase.from('votos_conselheiros')
-        .select('solicitacao_id, voto, observacao, conselheiro_id, perfis:conselheiro_id(nome)')
+        .select('solicitacao_id, voto, observacao, conselheiro_id')
         .in('solicitacao_id', ids)
+
+      // Busca os nomes dos conselheiros numa consulta à parte
+      // (não há FK votos->perfis, então o join automático não funciona)
+      const conselheiroIds = [...new Set((votos || []).map(v => v.conselheiro_id).filter(Boolean))]
+      const nomePorId = {}
+      if (conselheiroIds.length) {
+        const { data: perfisVotantes } = await supabase.from('perfis')
+          .select('id, nome').in('id', conselheiroIds)
+        ;(perfisVotantes || []).forEach(p => { nomePorId[p.id] = p.nome })
+      }
 
       // Agrupa por chamado
       const porChamado = {}
       ;(votos || []).forEach(v => {
         if (!porChamado[v.solicitacao_id]) porChamado[v.solicitacao_id] = []
         porChamado[v.solicitacao_id].push({
-          nome: v.perfis?.nome || 'Conselheiro',
+          nome: nomePorId[v.conselheiro_id] || 'Conselheiro',
           voto: v.voto,
           observacao: v.observacao || '',
         })
@@ -89,7 +110,7 @@ export default function Relatorio({ onToast }) {
 
       // Monta a lista de votações, com placar
       const vts = Object.entries(porChamado).map(([sid, votosDoChamado]) => {
-        const t = lista.find(x => x.id === sid)
+        const t = listaVot.find(x => x.id === sid)
         const placar = { deferido:0, deferido_ressalva:0, indeferido:0 }
         votosDoChamado.forEach(v => { if (placar[v.voto] != null) placar[v.voto]++ })
         return {
