@@ -15,6 +15,9 @@ const VOTO_OPCOES = [
 ]
 const hoje = new Date()
 
+// Número curto do chamado (mesmo formato usado nos e-mails)
+const numChamado = (id) => (id ? id.replace(/-/g, '').slice(-6).toUpperCase() : '—')
+
 export default function Relatorio({ onToast }) {
   const { perfil } = useAuth()
   const [condominios, setCondominios] = useState([])
@@ -31,6 +34,7 @@ export default function Relatorio({ onToast }) {
   const [catFiltro, setCatFiltro] = useState('todas')
   const [subFiltro, setSubFiltro] = useState('todas')
   const [statusFiltro, setStatusFiltro] = useState('todos')
+  const [apenasVotacao, setApenasVotacao] = useState(false)
   const ehAdmin = perfil?.papel === 'admin'
 
   useEffect(() => {
@@ -67,7 +71,6 @@ export default function Relatorio({ onToast }) {
 
     const { data } = await q
     const lista = data || []
-    setTickets(lista)
 
     // Para as VOTAÇÕES, busca os chamados do período/condomínio
     // SEM aplicar o filtro de status/categoria — assim a seção de
@@ -115,6 +118,7 @@ export default function Relatorio({ onToast }) {
         votosDoChamado.forEach(v => { if (placar[v.voto] != null) placar[v.voto]++ })
         return {
           id: sid,
+          numero: numChamado(sid),
           titulo: t?.categoria_personalizada || t?.categoria || 'Chamado',
           condominio: t?.condominios?.nome || '-',
           resultado: t?.aprovacao_status || null,
@@ -125,13 +129,19 @@ export default function Relatorio({ onToast }) {
       }).sort((a, b) => b.total - a.total)
 
       setVotacoes(vts)
+
+      // Se o filtro "apenas com votação" estiver ligado, a tabela mostra
+      // só os chamados que passaram pelo conselho.
+      const idsVotados = new Set(vts.map(v => v.id))
+      setTickets(apenasVotacao ? lista.filter(t => idsVotados.has(t.id)) : lista)
     } else {
       setVotacoes([])
+      setTickets(apenasVotacao ? [] : lista)
     }
     setLoading(false)
   }
 
-  useEffect(() => { buscarDados() }, [mes, ano, condoFiltro, catFiltro, subFiltro, statusFiltro])
+  useEffect(() => { buscarDados() }, [mes, ano, condoFiltro, catFiltro, subFiltro, statusFiltro, apenasVotacao])
 
   // Recarrega quando a aba volta ao foco (ex.: após fechar um chamado em outra tela)
   useEffect(() => {
@@ -143,7 +153,7 @@ export default function Relatorio({ onToast }) {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [mes, ano, condoFiltro, catFiltro, subFiltro, statusFiltro])
+  }, [mes, ano, condoFiltro, catFiltro, subFiltro, statusFiltro, apenasVotacao])
 
   // Stats rápidos
   const FECHADOS = ['resolvido', 'cancelado']
@@ -326,7 +336,7 @@ export default function Relatorio({ onToast }) {
 
           autoTable(doc, {
             startY: vy,
-            head: [[`${v.titulo}  —  ${v.condominio}`, `${v.total} voto(s)  ${resultadoTxt ? '· ' + resultadoTxt : ''}`]],
+            head: [[`#${v.numero}  ${v.titulo}  —  ${v.condominio}`, `${v.total} voto(s)  ${resultadoTxt ? '· ' + resultadoTxt : ''}`]],
             body: [
               [{ content: placarTxt || 'Sem votos computados', colSpan:2, styles:{ fontStyle:'bold', textColor:[60,60,60], fillColor:[248,249,251] } }],
               ...v.votos.map(voto => [
@@ -425,6 +435,17 @@ export default function Relatorio({ onToast }) {
               <option value="resolvido">Resolvido</option>
               <option value="cancelado">Cancelado</option>
             </select>
+          </div>
+          <div className="field" style={{ margin:0, display:'flex', alignItems:'flex-end' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', padding:'10px 12px',
+              border:`1px solid ${apenasVotacao ? 'var(--emerald)' : 'var(--gray-200)'}`, borderRadius:'var(--r-md)',
+              background: apenasVotacao ? '#ecfdf5' : '#fff', width:'100%' }}>
+              <input type="checkbox" checked={apenasVotacao} onChange={e=>setApenasVotacao(e.target.checked)}
+                style={{ cursor:'pointer' }}/>
+              <span style={{ fontSize:13, color: apenasVotacao ? 'var(--emerald)' : 'var(--gray-600)', fontWeight:600 }}>
+                Apenas com votação do conselho
+              </span>
+            </label>
           </div>
         </div>
       </div>
@@ -529,7 +550,9 @@ export default function Relatorio({ onToast }) {
                 {/* Cabeçalho do chamado */}
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, flexWrap:'wrap', marginBottom:10 }}>
                   <div>
-                    <div style={{ fontSize:14, fontWeight:700, color:'var(--navy)' }}>{v.titulo}</div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'var(--navy)' }}>
+                      <span style={{ color:'var(--gray-400)', fontWeight:600 }}>#{v.numero}</span> · {v.titulo}
+                    </div>
                     <div style={{ fontSize:12, color:'var(--gray-400)' }}>{v.condominio}</div>
                   </div>
                   <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
