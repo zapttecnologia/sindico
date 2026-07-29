@@ -6,6 +6,13 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+// Rótulos e cores dos votos do conselho (iguais aos do painel do conselheiro)
+const VOTO_OPCOES = [
+  { v:'deferido',          l:'Deferido',              cor:'#16a34a', bg:'#dcfce7', icon:'✅' },
+  { v:'deferido_ressalva', l:'Deferido com ressalva', cor:'#d97706', bg:'#fef3c7', icon:'⚠️' },
+  { v:'indeferido',        l:'Indeferido',            cor:'#dc2626', bg:'#fee2e2', icon:'❌' },
+]
 const hoje = new Date()
 
 export default function Relatorio({ onToast }) {
@@ -13,6 +20,7 @@ export default function Relatorio({ onToast }) {
   const [condominios, setCondominios] = useState([])
   const [categoriasSistema, setCategoriasSistema] = useState([])
   const [tickets, setTickets] = useState([])
+  const [votacoes, setVotacoes] = useState([])   // chamados que tiveram voto do conselho
   const [loading, setLoading] = useState(false)
   const [gerandoPDF, setGerandoPDF] = useState(false)
 
@@ -58,7 +66,47 @@ export default function Relatorio({ onToast }) {
     if (statusFiltro !== 'todos') q = q.eq('status', statusFiltro)
 
     const { data } = await q
-    setTickets(data || [])
+    const lista = data || []
+    setTickets(lista)
+
+    // Busca os votos do conselho dos chamados deste período
+    const ids = lista.map(t => t.id)
+    if (ids.length) {
+      const { data: votos } = await supabase.from('votos_conselheiros')
+        .select('solicitacao_id, voto, observacao, conselheiro_id, perfis:conselheiro_id(nome)')
+        .in('solicitacao_id', ids)
+
+      // Agrupa por chamado
+      const porChamado = {}
+      ;(votos || []).forEach(v => {
+        if (!porChamado[v.solicitacao_id]) porChamado[v.solicitacao_id] = []
+        porChamado[v.solicitacao_id].push({
+          nome: v.perfis?.nome || 'Conselheiro',
+          voto: v.voto,
+          observacao: v.observacao || '',
+        })
+      })
+
+      // Monta a lista de votações, com placar
+      const vts = Object.entries(porChamado).map(([sid, votosDoChamado]) => {
+        const t = lista.find(x => x.id === sid)
+        const placar = { deferido:0, deferido_ressalva:0, indeferido:0 }
+        votosDoChamado.forEach(v => { if (placar[v.voto] != null) placar[v.voto]++ })
+        return {
+          id: sid,
+          titulo: t?.categoria_personalizada || t?.categoria || 'Chamado',
+          condominio: t?.condominios?.nome || '-',
+          resultado: t?.aprovacao_status || null,
+          placar,
+          total: votosDoChamado.length,
+          votos: votosDoChamado,
+        }
+      }).sort((a, b) => b.total - a.total)
+
+      setVotacoes(vts)
+    } else {
+      setVotacoes([])
+    }
     setLoading(false)
   }
 
@@ -233,6 +281,48 @@ export default function Relatorio({ onToast }) {
         styles:{ overflow:'linebreak', cellPadding:2 },
       })
 
+      // ── Votações do conselho ───────────────────────────────
+      if (votacoes.length) {
+        doc.addPage()
+        let vy = 20
+        doc.setFontSize(13); doc.setTextColor(40, 67, 173)
+        doc.text('Votações do Conselho', 14, vy)
+        vy += 6
+        doc.setFontSize(9); doc.setTextColor(120, 120, 120)
+        doc.text(`${votacoes.length} chamado(s) passaram por votação no período.`, 14, vy)
+        vy += 8
+
+        const rotuloVoto = (v) => (VOTO_OPCOES.find(o => o.v === v)?.l) || v
+
+        votacoes.forEach(v => {
+          if (vy > 250) { doc.addPage(); vy = 20 }
+          // Placar em texto
+          const placarTxt = VOTO_OPCOES
+            .filter(o => v.placar[o.v] > 0)
+            .map(o => `${v.placar[o.v]} ${o.l}`).join('  ·  ')
+          const resultadoTxt = v.resultado === 'aprovado' ? 'APROVADO'
+            : v.resultado === 'rejeitado' ? 'REJEITADO' : ''
+
+          autoTable(doc, {
+            startY: vy,
+            head: [[`${v.titulo}  —  ${v.condominio}`, `${v.total} voto(s)  ${resultadoTxt ? '· ' + resultadoTxt : ''}`]],
+            body: [
+              [{ content: placarTxt || 'Sem votos computados', colSpan:2, styles:{ fontStyle:'bold', textColor:[60,60,60], fillColor:[248,249,251] } }],
+              ...v.votos.map(voto => [
+                voto.nome,
+                rotuloVoto(voto.voto) + (voto.observacao ? `  ("${voto.observacao}")` : ''),
+              ]),
+            ],
+            theme:'grid',
+            headStyles:{ fillColor:[99,102,241], textColor:255, fontStyle:'bold', fontSize:8 },
+            bodyStyles:{ fontSize:8 },
+            margin:{ left:14, right:14 },
+            styles:{ overflow:'linebreak', cellPadding:2 },
+          })
+          vy = doc.lastAutoTable.finalY + 6
+        })
+      }
+
       // ── Rodapé ─────────────────────────────────────────────
       const totalPages = doc.internal.getNumberOfPages()
       for (let i=1; i<=totalPages; i++) {
@@ -398,6 +488,69 @@ export default function Relatorio({ onToast }) {
                 Mostrando 20 de {tickets.length}. O PDF incluirá todos os chamados.
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── SEÇÃO: Chamados que passaram por votação do conselho ── */}
+      {!loading && votacoes.length > 0 && (
+        <div className="card" style={{ marginTop:20 }}>
+          <h3 style={{ fontSize:15, fontWeight:700, color:'var(--navy)', margin:'0 0 4px' }}>
+            Votações do conselho
+          </h3>
+          <p style={{ fontSize:12, color:'var(--gray-400)', margin:'0 0 16px' }}>
+            {votacoes.length} chamado(s) passaram por votação neste período.
+          </p>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {votacoes.map(v => (
+              <div key={v.id} style={{ border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', padding:14 }}>
+                {/* Cabeçalho do chamado */}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, flexWrap:'wrap', marginBottom:10 }}>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'var(--navy)' }}>{v.titulo}</div>
+                    <div style={{ fontSize:12, color:'var(--gray-400)' }}>{v.condominio}</div>
+                  </div>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:12, fontWeight:700, padding:'4px 10px', borderRadius:8, background:'var(--gray-100)', color:'var(--gray-600)' }}>
+                      {v.total} voto{v.total === 1 ? '' : 's'}
+                    </span>
+                    {v.resultado && (
+                      <span style={{ fontSize:12, fontWeight:700, padding:'4px 10px', borderRadius:8,
+                        background: v.resultado === 'aprovado' ? '#dcfce7' : v.resultado === 'rejeitado' ? '#fee2e2' : 'var(--gray-100)',
+                        color: v.resultado === 'aprovado' ? '#16a34a' : v.resultado === 'rejeitado' ? '#dc2626' : 'var(--gray-600)' }}>
+                        {v.resultado === 'aprovado' ? 'Aprovado' : v.resultado === 'rejeitado' ? 'Rejeitado' : v.resultado}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Placar */}
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12 }}>
+                  {VOTO_OPCOES.filter(o => v.placar[o.v] > 0).map(o => (
+                    <span key={o.v} style={{ fontSize:12, fontWeight:600, padding:'4px 10px', borderRadius:8, background:o.bg, color:o.cor }}>
+                      {o.icon} {v.placar[o.v]} {o.l}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Lista de conselheiros e seus votos */}
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {v.votos.map((voto, i) => {
+                    const op = VOTO_OPCOES.find(o => o.v === voto.voto)
+                    return (
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:10, fontSize:13, padding:'6px 0', borderTop:i > 0 ? '1px solid var(--gray-100)' : 'none' }}>
+                        <span style={{ flex:1, color:'var(--gray-700)' }}>{voto.nome}</span>
+                        {voto.observacao && <span style={{ fontSize:11, color:'var(--gray-400)', fontStyle:'italic', maxWidth:'40%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={voto.observacao}>"{voto.observacao}"</span>}
+                        <span style={{ fontSize:12, fontWeight:700, padding:'3px 10px', borderRadius:8, background:op?.bg||'var(--gray-100)', color:op?.cor||'var(--gray-600)' }}>
+                          {op?.icon} {op?.l || voto.voto}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
