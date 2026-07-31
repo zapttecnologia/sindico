@@ -94,7 +94,7 @@ function TabelaUsuarios({ lista, onEditar, mostrarBlocoApto=true, mostrarTipo=tr
         </thead>
         <tbody>
           {lista.map((u,i) => (
-            <tr key={u.id} style={{ borderBottom:'1px solid var(--gray-100)', background:i%2===0?'#fff':'var(--gray-50)' }}>
+            <tr key={u.id} style={{ borderBottom:'1px solid var(--gray-100)', background:i%2===0?'#fff':'var(--gray-50)', opacity: u.ativo === false ? 0.55 : 1 }}>
               <td style={{ padding:'10px 12px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                   <div style={{ width:32, height:32, borderRadius:'50%', background:'var(--mint)',
@@ -102,7 +102,13 @@ function TabelaUsuarios({ lista, onEditar, mostrarBlocoApto=true, mostrarTipo=tr
                     {(u.nome||'?')[0].toUpperCase()}
                   </div>
                   <div>
-                    <div style={{ fontWeight:600, color:'var(--gray-800)' }}>{u.nome||'—'}</div>
+                    <div style={{ fontWeight:600, color:'var(--gray-800)' }}>
+                      {u.nome||'—'}
+                      {u.ativo === false && (
+                        <span style={{ fontSize:10, fontWeight:700, marginLeft:8, padding:'2px 7px', borderRadius:10,
+                          background:'var(--rust, #ef4444)', color:'#fff', textTransform:'uppercase' }}>Inativo</span>
+                      )}
+                    </div>
                     <div style={{ fontSize:11, color:'var(--gray-400)' }}>{u.email}</div>
                   </div>
                 </div>
