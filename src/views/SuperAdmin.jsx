@@ -999,6 +999,26 @@ function PainelAdmins({ empresas, onToast }) {
     return true
   })
 
+  const resetarSenhaAdmin = async (padrao) => {
+    if (!editando) return
+    const nova = padrao ? 'mudar123' : (editando.novaSenha || '')
+    if (!padrao && nova.length < 4) { onToast('Senha mínimo 4 caracteres.'); return }
+    if (padrao && !window.confirm(`Resetar a senha de ${editando.nome} para "mudar123"?`)) return
+    try {
+      const sess = (await supabase.auth.getSession()).data.session
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${sess?.access_token}` },
+        body: JSON.stringify({ action:'reset_password', user_id:editando.id, new_password:nova }),
+      })
+      const json = await r.json()
+      if (!r.ok) throw new Error(json.error || 'Erro')
+      if (padrao) await supabase.from('perfis').update({ primeiro_acesso:true }).eq('id', editando.id)
+      onToast(padrao ? 'Senha resetada para mudar123.' : 'Senha alterada!')
+      setEditando(m => ({ ...m, novaSenha:'' }))
+    } catch(e) { onToast('Erro: '+e.message) }
+  }
+
   const salvar = async () => {
     if (!editando) return
     setSalvando(true)
@@ -1134,6 +1154,14 @@ function PainelAdmins({ empresas, onToast }) {
             </Fld>
           )}
           <Btn onClick={salvar} disabled={salvando} style={{ width:'100%' }}>{salvando?'Salvando...':'Salvar'}</Btn>
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14, marginTop:14 }}>
+            <div style={{ fontSize:11, color:C.muted, marginBottom:8, textTransform:'uppercase', letterSpacing:'.04em', fontWeight:700 }}>Senha</div>
+            <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+              <DI value={editando.novaSenha||''} onChange={v=>setEditando(m=>({...m,novaSenha:v}))} placeholder="Nova senha"/>
+              <Btn sm onClick={()=>resetarSenhaAdmin(false)}>Resetar</Btn>
+            </div>
+            <Btn sm variant='ghost' onClick={()=>resetarSenhaAdmin(true)} style={{ width:'100%' }}>🔑 Resetar para mudar123</Btn>
+          </div>
         </Modal>
       )}
     </div>
