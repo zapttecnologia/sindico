@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { STATUS_LABEL, STATUS_ORDER, fmtDate, statusClass, aprovClass, APROVACAO_LABEL, PRIORIDADES, DEPARTAMENTOS, ticketNumber } from '../lib/constants'
 import TicketDetail from '../components/TicketDetail'
+import Modal from '../components/Modal'
 import Dashboard from './Dashboard'
 import KanbanChamados from './KanbanChamados'
 
@@ -243,15 +244,7 @@ export default function Equipe({ view, onToast }) {
   if (view === 'dashboard') return <Dashboard onToast={onToast} />
 
   // ── VIEW: CHAMADOS
-  // Se ticket selecionado → tela de detalhe
-  if (ticketSel) return (
-    <TicketDetail
-      ticket={ticketSel}
-      onBack={() => { setTicketSel(null); carregar() }}
-      onUpdate={carregar}
-      onToast={onToast}
-    />
-  )
+  // O detalhe do chamado abre em um modal por cima da lista (ver final do render)
 
   return (
     <div>
@@ -665,6 +658,18 @@ export default function Equipe({ view, onToast }) {
           </div>
         </div>
       )}
+
+      {/* Detalhe do chamado — abre em modal por cima da lista */}
+      <Modal open={!!ticketSel} onClose={() => { setTicketSel(null); carregar() }} size="xl">
+        {ticketSel && (
+          <TicketDetail
+            ticket={ticketSel}
+            onBack={() => { setTicketSel(null); carregar() }}
+            onUpdate={carregar}
+            onToast={onToast}
+          />
+        )}
+      </Modal>
     </div>
   )
 }
