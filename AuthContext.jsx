@@ -71,10 +71,27 @@ export function AuthProvider({ children }) {
     setIsSuperAdmin(false)
   }
 
+  // Reset de senha: o morador informa o CÓDIGO, o sistema acha o e-mail
+  // dele e envia o link de redefinição para esse e-mail.
+  // Por segurança, NUNCA revela se o código existe ou não.
+  const resetarSenhaPorCodigo = async (codigo) => {
+    try {
+      const { data: email } = await supabase
+        .rpc('buscar_email_por_codigo', { p_codigo: codigo })
+      if (email && !email.endsWith('@sem-email.local')) {
+        await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/redefinir-senha`,
+        })
+      }
+    } catch { /* silencioso: não revela existência do código */ }
+    // Sempre retorna sucesso — mensagem neutra na tela
+    return true
+  }
+
   return (
     <AuthContext.Provider value={{
       session, perfil, isSuperAdmin, loading,
-      login, logout, carregarPerfil,
+      login, logout, carregarPerfil, resetarSenhaPorCodigo,
     }}>
       {children}
     </AuthContext.Provider>
