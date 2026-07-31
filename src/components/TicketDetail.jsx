@@ -261,24 +261,27 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast, o
   const ehEquipe = perfil?.papel === 'equipe' || perfil?.papel === 'admin'
 
   const TABS = [
-    { id: 'info', label: 'Detalhes' },
-    { id: 'mensagens', label: 'Mensagens' },
-    { id: 'anexos', label: 'Anexos' },
+    { id: 'info', label: '📄 Detalhes' },
+    { id: 'mensagens', label: '💬 Mensagens' },
+    { id: 'anexos', label: '📎 Anexos' },
     ...(ticket.aprovacao_status ? [{ id: 'votos', label: 'Votacao' }] : []),
   ]
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:24 }}>
+      {/* Cabeçalho com resumo visual */}
+      <div style={{ marginBottom:20 }}>
         <button onClick={onBack} style={{ background:'var(--gray-100)', border:'none', borderRadius:'var(--r-md)',
           padding:'8px 14px', fontSize:13, fontWeight:600, color:'var(--gray-600)', cursor:'pointer',
-          display:'flex', alignItems:'center', gap:6 }}>
+          display:'inline-flex', alignItems:'center', gap:6, marginBottom:16 }}>
           ← Voltar
         </button>
-        <div style={{ flex:1 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-            <span style={{ fontFamily:'var(--font-mono)', fontSize:12, color:'var(--gray-400)' }}>
+
+        {/* Faixa de identidade do chamado */}
+        <div style={{ background:'linear-gradient(135deg, #f8fafc, #eef2ff)', border:'1px solid var(--gray-200)',
+          borderRadius:'var(--r-lg)', padding:'18px 20px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginBottom:10 }}>
+            <span style={{ fontFamily:'var(--font-mono)', fontSize:13, fontWeight:700, color:'var(--gray-500)' }}>
               #{ticketNumber(ticket.id)}
             </span>
             {ticket.origem === 'Portal do conselheiro' && (
@@ -287,10 +290,6 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast, o
                 ⭐ CHAMADO DO CONSELHO
               </span>
             )}
-            <span className={`badge badge-cat`}>{cat}</span>
-            {ticket.subcategoria && (
-              <span className="badge" style={{ background:'#eef2ff', color:'#4338ca' }}>{ticket.subcategoria}</span>
-            )}
             <span className={`status-badge ${statusClass(ticket.status)}`}>{STATUS_LABEL[ticket.status]}</span>
             {ticket.aprovacao_status && (
               <span className={`status-badge ${aprovClass(ticket.aprovacao_status)}`}>
@@ -298,9 +297,20 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast, o
               </span>
             )}
           </div>
-          <div style={{ fontSize:12, color:'var(--gray-400)', marginTop:4 }}>
-            {ticket.condominios?.nome} {ticket.bloco ? `· Bloco ${ticket.bloco}` : ''} {ticket.apartamento ? `· Ap. ${ticket.apartamento}` : ''}
-            {ticket.nome_solicitante ? ` · ${ticket.nome_solicitante}` : ''}
+
+          {/* Título (categoria) */}
+          <div style={{ fontSize:18, fontWeight:800, color:'var(--navy)', marginBottom:12 }}>
+            📋 {cat}{ticket.subcategoria ? ` · ${ticket.subcategoria}` : ''}
+          </div>
+
+          {/* Metadados em linha, com ícones */}
+          <div style={{ display:'flex', gap:16, flexWrap:'wrap', fontSize:13, color:'var(--gray-600)' }}>
+            <span>🏢 {ticket.condominios?.nome || '—'}</span>
+            {(ticket.bloco || ticket.apartamento) && (
+              <span>📍 {ticket.bloco ? `Bloco ${ticket.bloco}` : ''}{ticket.bloco && ticket.apartamento ? ' · ' : ''}{ticket.apartamento ? `Ap. ${ticket.apartamento}` : ''}</span>
+            )}
+            {ticket.nome_solicitante && <span>👤 {ticket.nome_solicitante}</span>}
+            {ticket.criado_em && <span>🕐 {new Date(ticket.criado_em).toLocaleDateString('pt-BR')}</span>}
           </div>
         </div>
       </div>
@@ -309,7 +319,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast, o
       {ehEquipe && (
         <div className="card" style={{ marginBottom:16, padding:'14px 20px' }}>
           <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
-            Nível de prioridade
+            🎯 Nível de prioridade
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {PRIORIDADE_LIST.map(k=>{
@@ -439,7 +449,7 @@ export default function TicketDetail({ ticket: initialTicket, onBack, onToast, o
       {ehEquipe && (
         <div className="card" style={{ marginBottom:16, padding:'16px 20px' }}>
           <div style={{ fontSize:12, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>
-            Acoes
+            ⚡ Ações do chamado
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {!ticket.aprovacao_status && (
