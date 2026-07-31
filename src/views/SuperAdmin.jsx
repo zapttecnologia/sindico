@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { mascaraCNPJ, cnpjCompleto, consultarCNPJ } from '../lib/cnpj'
 import SAFinanceiro from './SAFinanceiro'
+import SABI from './SABI'
 import SACategorias from './SACategorias'
 
 const TemaCtx = createContext('dark')
@@ -315,8 +316,10 @@ export default function SuperAdmin({ onToast }) {
     inadimplentes: empresas.filter(e=>e.status==='inadimplente').length,
     suspensos: empresas.filter(e=>e.status==='suspensa').length,
     cancelados: empresas.filter(e=>e.status==='cancelada').length,
-    condominios: empresas.reduce((s,e)=>s+(e.total_condominios||0),0),
-    usuarios: empresas.reduce((s,e)=>s+(e.total_usuarios||0),0),
+    condominios: empresas.reduce((s,e)=>s+Number(e.total_condominios||0),0),
+    usuarios: empresas.reduce((s,e)=>s+Number(e.total_usuarios||0),0),
+    chamados: empresas.reduce((s,e)=>s+Number(e.total_chamados||0),0),
+    chamadosAbertos: empresas.reduce((s,e)=>s+Number(e.chamados_abertos||0),0),
   }
 
   const corPrimaria = branding.corPrimaria || '#7c3aed'
@@ -331,6 +334,7 @@ export default function SuperAdmin({ onToast }) {
 
   const MENU_ITEMS = [
     { id:'dashboard',    label:'Dashboard',      icon:'📊', section:null },
+    { id:'bi',           label:'BI · Análise',   icon:'📈', section:null },
     { id:'minha-empresa',label:'Minha empresa',  icon:'🏢', section:null },
     { id:'clientes',     label:'Clientes',       icon:'👥', section:null, hasSubmenu:true,
       submenu:[
@@ -524,7 +528,27 @@ export default function SuperAdmin({ onToast }) {
                 ))}
               </div>
 
-              {/* Empresas recentes */}
+              {/* Faixa operacional */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:12, marginBottom:28 }}>
+                {[
+                  { l:'Total de chamados', v:metricas.chamados,        c:C.text,  ic:'📋' },
+                  { l:'Chamados abertos',  v:metricas.chamadosAbertos, c:metricas.chamadosAbertos>0?C.amber:C.green, ic:'🔔' },
+                  { l:'Condomínios',       v:metricas.condominios,     c:C.blue,  ic:'🏘' },
+                  { l:'Usuários',          v:metricas.usuarios,        c:C.violet,ic:'👥' },
+                ].map(k=>(
+                  <div key={k.l} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'18px 20px' }}>
+                    <div style={{ fontSize:18, marginBottom:10 }}>{k.ic}</div>
+                    <div style={{ fontFamily:'var(--font-display)', fontSize:32, fontWeight:800, color:k.c, lineHeight:1 }}>{k.v}</div>
+                    <div style={{ fontSize:11, color:C.muted, marginTop:6, fontWeight:600, textTransform:'uppercase', letterSpacing:'.05em' }}>{k.l}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Atalho para o BI */}
+              <div onClick={()=>setActiveMenu('bi')} style={{ background:`${corPrimaria}12`, border:`1px solid ${corPrimaria}44`, borderRadius:12, padding:'14px 18px', marginBottom:28, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <span style={{ fontSize:13, color:C.text, fontWeight:600 }}>📈 Ver análise completa (gráficos, evolução, comparativos)</span>
+                <span style={{ color:corPrimaria, fontWeight:700 }}>Abrir BI →</span>
+              </div>
               <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>
                 <div style={{ padding:'16px 20px', borderBottom:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <span style={{ fontWeight:700, color:C.text }}>Clientes recentes</span>
@@ -550,6 +574,10 @@ export default function SuperAdmin({ onToast }) {
                 ))}
               </div>
             </div>
+          )}
+
+          {activeMenu==='bi' && (
+            <SABI empresas={empresas} C={C} />
           )}
 
           {/* ── MINHA EMPRESA ── */}
@@ -999,43 +1027,6 @@ function PainelAdmins({ empresas, onToast }) {
     return true
   })
 
-  const salvarEmail = async () => {
-    if (!editando) return
-    const novo = (editando.email || '').trim()
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(novo)) { onToast('E-mail inválido.'); return }
-    try {
-      const sess = (await supabase.auth.getSession()).data.session
-      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${sess?.access_token}` },
-        body: JSON.stringify({ action:'update_email', user_id:editando.id, new_email:novo }),
-      })
-      const json = await r.json()
-      if (!r.ok) throw new Error(json.error || 'Erro')
-      onToast('E-mail atualizado!')
-    } catch(e) { onToast('Erro: '+e.message) }
-  }
-
-  const resetarSenhaAdmin = async (padrao) => {
-    if (!editando) return
-    const nova = padrao ? 'mudar123' : (editando.novaSenha || '')
-    if (!padrao && nova.length < 4) { onToast('Senha mínimo 4 caracteres.'); return }
-    if (padrao && !window.confirm(`Resetar a senha de ${editando.nome} para "mudar123"?`)) return
-    try {
-      const sess = (await supabase.auth.getSession()).data.session
-      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${sess?.access_token}` },
-        body: JSON.stringify({ action:'reset_password', user_id:editando.id, new_password:nova }),
-      })
-      const json = await r.json()
-      if (!r.ok) throw new Error(json.error || 'Erro')
-      if (padrao) await supabase.from('perfis').update({ primeiro_acesso:true }).eq('id', editando.id)
-      onToast(padrao ? 'Senha resetada para mudar123.' : 'Senha alterada!')
-      setEditando(m => ({ ...m, novaSenha:'' }))
-    } catch(e) { onToast('Erro: '+e.message) }
-  }
-
   const salvar = async () => {
     if (!editando) return
     setSalvando(true)
@@ -1136,12 +1127,6 @@ function PainelAdmins({ empresas, onToast }) {
       {editando&&(
         <Modal title="Editar usuário" onClose={()=>setEditando(null)} maxWidth={420}>
           <Fld label="Nome"><DI value={editando.nome||''} onChange={v=>setEditando(m=>({...m,nome:v}))}/></Fld>
-          <Fld label="E-mail (notificações)">
-            <div style={{ display:'flex', gap:8 }}>
-              <DI value={editando.email||''} onChange={v=>setEditando(m=>({...m,email:v}))} type="email" placeholder="email@exemplo.com"/>
-              <Btn sm onClick={salvarEmail}>Salvar e-mail</Btn>
-            </div>
-          </Fld>
           <Fld label="Papel">
             <DS value={editando.papel||'morador'} onChange={v=>setEditando(m=>({...m,papel:v}))}>
               {[['morador','Morador'],['conselheiro','Conselheiro'],['equipe','Síndico'],['admin','Admin']].map(([v,l])=>(
@@ -1177,14 +1162,6 @@ function PainelAdmins({ empresas, onToast }) {
             </Fld>
           )}
           <Btn onClick={salvar} disabled={salvando} style={{ width:'100%' }}>{salvando?'Salvando...':'Salvar'}</Btn>
-          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14, marginTop:14 }}>
-            <div style={{ fontSize:11, color:C.muted, marginBottom:8, textTransform:'uppercase', letterSpacing:'.04em', fontWeight:700 }}>Senha</div>
-            <div style={{ display:'flex', gap:8, marginBottom:8 }}>
-              <DI value={editando.novaSenha||''} onChange={v=>setEditando(m=>({...m,novaSenha:v}))} placeholder="Nova senha"/>
-              <Btn sm onClick={()=>resetarSenhaAdmin(false)}>Resetar</Btn>
-            </div>
-            <Btn sm variant='ghost' onClick={()=>resetarSenhaAdmin(true)} style={{ width:'100%' }}>🔑 Resetar para mudar123</Btn>
-          </div>
         </Modal>
       )}
     </div>
