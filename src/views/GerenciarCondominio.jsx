@@ -185,7 +185,7 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
   const carregar = useCallback(async () => {
     setLoading(true)
     const [{ data:u }, { data:b }, { data:eq }, { data:vc }] = await Promise.all([
-      supabase.from('perfis').select('id,nome,email,papel,codigo_acesso,bloco,apartamento,tipo_ocupacao,primeiro_acesso')
+      supabase.from('perfis').select('id,nome,email,papel,codigo_acesso,bloco,apartamento,tipo_ocupacao,primeiro_acesso,ativo')
         .eq('condominio_id', condominio.id).order('papel').order('nome'),
       supabase.from('blocos').select('*').eq('condominio_id', condominio.id).order('nome'),
       // Equipe da empresa (síndicos/admins) — candidatos a receber avisos
@@ -381,9 +381,21 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
   }
 
   const excluirUsuario = async () => {
-    if (!window.confirm(`Excluir ${modalEditar?.nome}?`)) return
-    try { await api({ action:'delete_user', user_id:modalEditar.id }); onToast('Excluído.'); setModalEditar(null); await carregar() }
+    if (!window.confirm(`Excluir ${modalEditar?.nome} da base de dados?\n\nOs chamados dele permanecem no histórico, mas o cadastro e o acesso serão apagados. Esta ação não pode ser desfeita.`)) return
+    try { await api({ action:'delete_user', user_id:modalEditar.id }); onToast('Morador excluído. Histórico preservado.'); setModalEditar(null); await carregar() }
     catch(e) { onToast('Erro: '+e.message) }
+  }
+
+  const alternarAtivo = async () => {
+    const desativar = modalEditar?.ativo !== false
+    if (!window.confirm(desativar
+      ? `Desativar ${modalEditar?.nome}? Ele perde o acesso ao sistema, mas os dados e o histórico ficam guardados.`
+      : `Reativar ${modalEditar?.nome}? Ele volta a ter acesso ao sistema.`)) return
+    try {
+      await api({ action: desativar ? 'deactivate_user' : 'reactivate_user', user_id:modalEditar.id })
+      onToast(desativar ? 'Morador desativado.' : 'Morador reativado.')
+      setModalEditar(null); await carregar()
+    } catch(e) { onToast('Erro: '+e.message) }
   }
 
   const adicionarBloco = async () => {
@@ -787,9 +799,24 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
               )}
             </div>
             <div style={{ borderTop:'1px solid var(--gray-100)', paddingTop:16, marginTop:12 }}>
-              <button className="btn btn-danger btn-block" style={{ border:'1px solid var(--rust)', color:'var(--rust)', background:'none' }} onClick={excluirUsuario}>
-                Excluir conta
-              </button>
+              <div style={{ fontSize:11, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', fontWeight:700, marginBottom:8 }}>Gerenciar conta</div>
+              {modalEditar.ativo === false && (
+                <div style={{ fontSize:12, color:'var(--rust)', marginBottom:8, fontWeight:600 }}>
+                  ⚠ Este morador está desativado (sem acesso ao sistema).
+                </div>
+              )}
+              <div style={{ display:'flex', gap:8 }}>
+                <button className="btn btn-ghost btn-sm" style={{ flex:1, border:'1px solid var(--gray-200)' }} onClick={alternarAtivo}>
+                  {modalEditar.ativo === false ? '✅ Reativar' : '⏸ Desativar'}
+                </button>
+                <button className="btn btn-danger btn-sm" style={{ flex:1, border:'1px solid var(--rust)', color:'var(--rust)', background:'none' }} onClick={excluirUsuario}>
+                  🗑 Excluir
+                </button>
+              </div>
+              <div style={{ fontSize:11, color:'var(--gray-400)', marginTop:8, lineHeight:1.5 }}>
+                <b>Desativar:</b> remove o acesso, mas mantém o cadastro (reversível).<br/>
+                <b>Excluir:</b> apaga o cadastro da base. O histórico de chamados é mantido.
+              </div>
             </div>
           </div>
         </div>
