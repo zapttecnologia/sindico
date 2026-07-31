@@ -7,6 +7,7 @@ import Modal from '../components/Modal'
 import ComunicadosLista from '../components/ComunicadosLista'
 import ComunicadosRecentes from '../components/ComunicadosRecentes'
 import AgendaLista from '../components/AgendaLista'
+import ConversaChamado from './ConversaChamado'
 
 const MAX_BYTES = 10 * 1024 * 1024  // 10MB por arquivo
 
@@ -566,6 +567,15 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
               })}
             </div>
           )}
+
+          {/* Discussão do conselho — visível ao síndico e aos conselheiros */}
+          <ConversaChamado
+            solicitacaoId={ticketVotando.id}
+            visibilidade="conselho"
+            autorTipo="conselheiro"
+            titulo="Discussão do conselho"
+            placeholder="Deixe uma mensagem para o síndico e os demais conselheiros..."
+          />
         </div>
       </div>
     )

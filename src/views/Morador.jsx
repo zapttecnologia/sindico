@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { ticketNumber, fmtDate, STATUS_LABEL, statusClass } from '../lib/constants'
 import AnexosPanel from '../components/AnexosPanel'
 import Modal from '../components/Modal'
+import ConversaChamado from './ConversaChamado'
 import ComunicadosLista from '../components/ComunicadosLista'
 import ComunicadosRecentes from '../components/ComunicadosRecentes'
 import AgendaLista from '../components/AgendaLista'
@@ -329,6 +330,13 @@ export default function Morador({ view, onNavigate, onToast }) {
             </div>
             <AnexosPanel solicitacaoId={ticketDetalhe.id} onToast={onToast} />
           </div>
+          <ConversaChamado
+            solicitacaoId={ticketDetalhe.id}
+            visibilidade="morador"
+            autorTipo="morador"
+            titulo="Conversa com o síndico"
+            placeholder="Escreva uma mensagem para o síndico..."
+          />
         </div>
       </div>
     )
