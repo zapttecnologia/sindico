@@ -110,6 +110,7 @@ function Evolucao({ dados, C }) {
 
 export default function SABI({ empresas, C }) {
   const [chamados, setChamados] = useState([])
+  const [condToEmpresa, setCondToEmpresa] = useState({})   // condominio_id -> empresa_id
   const [moradoresCount, setMoradoresCount] = useState(null)
   const [loading, setLoading] = useState(true)
   const [empresaFiltro, setEmpresaFiltro] = useState('todas')
@@ -117,9 +118,14 @@ export default function SABI({ empresas, C }) {
   useEffect(() => {
     const carregar = async () => {
       setLoading(true)
+      // Mapa condomínio → empresa (para o filtro por cliente ser confiável)
+      const { data: conds } = await supabase.from('condominios').select('id,empresa_id')
+      const mapa = {}
+      ;(conds || []).forEach(c => { mapa[c.id] = c.empresa_id })
+      setCondToEmpresa(mapa)
       // Chamados de toda a plataforma (campos leves, para os gráficos)
       const { data: ch } = await supabase.from('solicitacoes')
-        .select('id,status,categoria,criado_em,fechado_em,condominio_id,condominios(nome,empresa_id)')
+        .select('id,status,categoria,criado_em,fechado_em,condominio_id,condominios(nome)')
         .order('criado_em', { ascending:false }).limit(5000)
       setChamados(ch || [])
       // Total de moradores da plataforma
@@ -131,15 +137,18 @@ export default function SABI({ empresas, C }) {
     carregar()
   }, [])
 
-  // Filtra por empresa, se selecionada
+  // Filtra por empresa usando o mapa condomínio→empresa
   const base = empresaFiltro === 'todas'
     ? chamados
-    : chamados.filter(c => c.condominios?.empresa_id === empresaFiltro)
+    : chamados.filter(c => condToEmpresa[c.condominio_id] === empresaFiltro)
 
   const estaFechado = c => FECHADOS.includes(c.status)
 
-  // KPIs macro
-  const totalCond = empresas.reduce((s,e)=>s+Number(e.total_condominios||0),0)
+  // KPIs macro — respeitam o filtro de cliente
+  const empresaSel = empresaFiltro === 'todas' ? null : empresas.find(e => e.id === empresaFiltro)
+  const totalCond = empresaSel
+    ? Number(empresaSel.total_condominios || 0)
+    : empresas.reduce((s,e)=>s+Number(e.total_condominios||0),0)
   const totalChamados = base.length
   const abertos = base.filter(c => !estaFechado(c)).length
   const resolvidos = base.filter(c => c.status==='resolvido').length
@@ -205,9 +214,9 @@ export default function SABI({ empresas, C }) {
 
       {/* KPIs macro */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12, margin:'20px 0' }}>
-        <Kpi C={C} n={empresas.length} label="Clientes" cor={C.text} />
+        <Kpi C={C} n={empresaSel ? 1 : empresas.length} label={empresaSel ? 'Cliente' : 'Clientes'} cor={C.text} />
         <Kpi C={C} n={totalCond} label="Condomínios" cor="#3b82f6" />
-        <Kpi C={C} n={moradoresCount ?? '—'} label="Moradores" cor="#a855f7" />
+        <Kpi C={C} n={empresaSel ? '—' : (moradoresCount ?? '—')} label="Moradores" cor="#a855f7" sub={empresaSel?'(total da plataforma)':''} />
         <Kpi C={C} n={totalChamados} label="Chamados" cor={C.text} />
         <Kpi C={C} n={abertos} label="Em aberto" cor="#f59e0b" />
         <Kpi C={C} n={`${taxa}%`} label="Taxa de resolução" cor={taxa>=70?'#22c55e':taxa>=40?'#f59e0b':'#ef4444'} />
