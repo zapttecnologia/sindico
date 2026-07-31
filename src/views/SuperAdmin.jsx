@@ -1512,6 +1512,21 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
     return json
   }
 
+  const resetarSenha = async () => {
+    if (!modalUsuario?.novaSenha || modalUsuario.novaSenha.length < 4) { onToast('Senha mínimo 4 caracteres.'); return }
+    try { await api({ action:'reset_password', user_id:modalUsuario.id, new_password:modalUsuario.novaSenha }); onToast('Senha alterada!') }
+    catch(e) { onToast('Erro: '+e.message) }
+  }
+
+  const resetarPadrao = async () => {
+    if (!window.confirm(`Resetar a senha de ${modalUsuario?.nome} para "mudar123"?`)) return
+    try {
+      await api({ action:'reset_password', user_id:modalUsuario.id, new_password:'mudar123' })
+      await supabase.from('perfis').update({ primeiro_acesso:true }).eq('id', modalUsuario.id)
+      onToast('Senha resetada para mudar123.')
+    } catch(e) { onToast('Erro: '+e.message) }
+  }
+
   const criarConta = async () => {
     if (!novaConta.nome||!novaConta.email||!novaConta.codigo) { onToast('Preencha nome, e-mail e código.'); return }
     setSalvando(true)
@@ -1640,6 +1655,14 @@ function CondominioCard({ condo, usuarios, chamados, condominios, empresa, onToa
             <Fld label="Papel"><DS value={modalUsuario.papel} onChange={v=>setModalUsuario(m=>({...m,papel:v}))}>{PAPEIS.map(p=><option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}</DS></Fld>
           </G2>
           <Btn onClick={salvarUsuario} style={{ width:'100%' }}>Salvar</Btn>
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14, marginTop:14 }}>
+            <div style={{ fontSize:11, color:C.muted, marginBottom:8, textTransform:'uppercase', letterSpacing:'.04em', fontWeight:700 }}>Senha</div>
+            <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+              <DI value={modalUsuario.novaSenha||''} onChange={v=>setModalUsuario(m=>({...m,novaSenha:v}))} placeholder="Nova senha"/>
+              <Btn sm onClick={resetarSenha}>Resetar</Btn>
+            </div>
+            <Btn sm variant='ghost' onClick={resetarPadrao} style={{ width:'100%' }}>🔑 Resetar para mudar123</Btn>
+          </div>
         </Modal>
       )}
       {modalNovaConta&&(
