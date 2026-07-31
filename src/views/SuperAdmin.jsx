@@ -999,6 +999,23 @@ function PainelAdmins({ empresas, onToast }) {
     return true
   })
 
+  const salvarEmail = async () => {
+    if (!editando) return
+    const novo = (editando.email || '').trim()
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(novo)) { onToast('E-mail inválido.'); return }
+    try {
+      const sess = (await supabase.auth.getSession()).data.session
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-actions`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${sess?.access_token}` },
+        body: JSON.stringify({ action:'update_email', user_id:editando.id, new_email:novo }),
+      })
+      const json = await r.json()
+      if (!r.ok) throw new Error(json.error || 'Erro')
+      onToast('E-mail atualizado!')
+    } catch(e) { onToast('Erro: '+e.message) }
+  }
+
   const resetarSenhaAdmin = async (padrao) => {
     if (!editando) return
     const nova = padrao ? 'mudar123' : (editando.novaSenha || '')
@@ -1119,6 +1136,12 @@ function PainelAdmins({ empresas, onToast }) {
       {editando&&(
         <Modal title="Editar usuário" onClose={()=>setEditando(null)} maxWidth={420}>
           <Fld label="Nome"><DI value={editando.nome||''} onChange={v=>setEditando(m=>({...m,nome:v}))}/></Fld>
+          <Fld label="E-mail (notificações)">
+            <div style={{ display:'flex', gap:8 }}>
+              <DI value={editando.email||''} onChange={v=>setEditando(m=>({...m,email:v}))} type="email" placeholder="email@exemplo.com"/>
+              <Btn sm onClick={salvarEmail}>Salvar e-mail</Btn>
+            </div>
+          </Fld>
           <Fld label="Papel">
             <DS value={editando.papel||'morador'} onChange={v=>setEditando(m=>({...m,papel:v}))}>
               {[['morador','Morador'],['conselheiro','Conselheiro'],['equipe','Síndico'],['admin','Admin']].map(([v,l])=>(

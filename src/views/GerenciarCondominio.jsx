@@ -338,6 +338,16 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
   }
 
   // Reseta para a senha padrão do sistema e força troca no próximo acesso
+  const salvarEmail = async () => {
+    const novo = (modalEditar?.email || '').trim()
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(novo)) { onToast('E-mail inválido.'); return }
+    try {
+      await api({ action:'update_email', user_id:modalEditar.id, new_email:novo })
+      onToast('E-mail atualizado!')
+      await carregar()
+    } catch(e) { onToast('Erro: '+e.message) }
+  }
+
   const resetarPadrao = async () => {
     if (!window.confirm(`Resetar a senha de ${modalEditar?.nome} para "mudar123"?`)) return
     try {
@@ -738,6 +748,13 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
               <div className="field"><label>Apartamento</label><input className="input" value={modalEditar.apartamento||''} onChange={e=>setModalEditar(m=>({...m,apartamento:e.target.value}))}/></div>
             </div>
             <div className="field"><label>Código de acesso</label><input className="input" value={modalEditar.codigo_acesso||''} onChange={e=>setModalEditar(m=>({...m,codigo_acesso:e.target.value.toUpperCase()}))}/></div>
+            <div className="field">
+              <label>E-mail (notificações)</label>
+              <div style={{ display:'flex', gap:8 }}>
+                <input className="input" type="email" value={modalEditar.email||''} onChange={e=>setModalEditar(m=>({...m,email:e.target.value}))} placeholder="email@exemplo.com"/>
+                <button className="btn btn-ghost btn-sm" style={{ whiteSpace:'nowrap' }} onClick={salvarEmail}>Salvar e-mail</button>
+              </div>
+            </div>
             {modalEditar.papel==='morador' && (
               <div className="field"><label>Tipo de ocupação</label>
                 <div className="chip-row">
