@@ -27,7 +27,7 @@ export default function AlterarSenha() {
       <div style={{ width: '100%', maxWidth: 440, background: 'var(--white)', borderRadius: 'var(--r-xl) var(--r-xl) 0 0', padding: '36px 28px 48px', boxShadow: 'var(--shadow-lg)' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>🔒</div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: 'var(--navy)', margin: '0 0 8px' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, letterSpacing: '-.02em', color: 'var(--navy)', margin: '0 0 8px' }}>
             Crie sua senha
           </h1>
           <p style={{ fontSize: 14, color: 'var(--gray-400)', margin: 0, lineHeight: 1.5 }}>

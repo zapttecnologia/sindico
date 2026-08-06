@@ -14,6 +14,7 @@ import Relatorio from './views/Relatorio'
 import Comunicados from './views/Comunicados'
 import Agenda from './views/Agenda'
 import Fornecedores from './views/Fornecedores'
+import Vencimentos from './views/Vencimentos'
 import DashboardAnalitico from './views/DashboardAnalitico'
 import Departamento from './views/Departamento'
 import { Toast, useToast } from './components/Toast'
@@ -45,6 +46,7 @@ function AppNormal() {
       if (activeView === 'comunicados') return <Comunicados onToast={toast} />
       if (activeView === 'agenda') return <Agenda onToast={toast} />
       if (activeView === 'fornecedores') return <Fornecedores onToast={toast} />
+      if (activeView === 'vencimentos') return <Vencimentos onToast={toast} />
       if (activeView === 'analitico') return <DashboardAnalitico onToast={toast} />
       return <Equipe view={activeView} onToast={toast} />
     }

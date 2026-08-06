@@ -269,7 +269,7 @@ export default function Equipe({ view, onToast }) {
       {subTela === 'lista' && (
         <div>
           {/* Filtros */}
-          <div style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', padding:'14px 18px', marginBottom:14 }}>
+          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'14px 18px', marginBottom:14 }}>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))', gap:10 }}>
               <div>
                 <label style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', display:'block', marginBottom:4 }}>Condominio</label>
@@ -309,7 +309,7 @@ export default function Equipe({ view, onToast }) {
 
           {/* Alternar Lista / Kanban + seletor de colunas */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
-            <div style={{ display:'flex', gap:6, background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-md)', padding:4 }}>
+            <div style={{ display:'flex', gap:6, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:4 }}>
               <button onClick={() => setModoExibicao('lista')}
                 className={`btn btn-sm ${modoExibicao==='lista'?'btn-primary':'btn-ghost'}`}>☰ Lista</button>
               <button onClick={() => setModoExibicao('kanban')}
@@ -323,7 +323,7 @@ export default function Equipe({ view, onToast }) {
                 </button>
                 {menuColunas && (
                   <div style={{ position:'absolute', right:0, top:'100%', marginTop:6, zIndex:20,
-                    background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
+                    background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)',
                     boxShadow:'0 8px 24px rgba(0,0,0,.12)', padding:10, minWidth:210 }}>
                     <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', marginBottom:8 }}>
                       Colunas visíveis
@@ -344,15 +344,18 @@ export default function Equipe({ view, onToast }) {
           </div>
 
           {/* Mini stats */}
-          <div className="filtros-row" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
+          <div className="filtros-row" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'var(--space-3)', marginBottom:'var(--space-4)' }}>
             {[
-              { l:'Total filtrado', v:filtStats.total, c:'var(--navy)' },
-              { l:'Pendentes', v:filtStats.pendentes, c:'var(--amber)' },
-              { l:'Ag. aprovacao', v:filtStats.aprovacao, c:'#8a5a00' },
+              { l:'Total filtrado', v:filtStats.total, tone:'var(--gray-400)' },
+              { l:'Pendentes', v:filtStats.pendentes, tone:'var(--warning)' },
+              { l:'Ag. aprovacao', v:filtStats.aprovacao, tone:'var(--purple)' },
             ].map(k => (
-              <div key={k.l} style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', padding:'12px 14px', textAlign:'center' }}>
-                <div style={{ fontFamily:'var(--font-display)', fontSize:24, fontWeight:800, color:k.c }}>{k.v}</div>
-                <div style={{ fontSize:11, fontWeight:600, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em' }}>{k.l}</div>
+              <div key={k.l} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'var(--space-4)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'var(--space-2)', marginBottom:'var(--space-2)' }}>
+                  <span style={{ width:8, height:8, borderRadius:'var(--r-full)', background:k.tone, flexShrink:0 }}/>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'.05em' }}>{k.l}</span>
+                </div>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, letterSpacing:'-.02em', color:'var(--navy)', lineHeight:1 }}>{k.v}</div>
               </div>
             ))}
           </div>
@@ -373,11 +376,11 @@ export default function Equipe({ view, onToast }) {
                 const accentColor = ehConselho ? '#4338ca' : (prio?.cor || (t.status==='resolvido' ? 'var(--emerald)' : t.aprovacao_status==='aguardando' ? 'var(--amber)' : 'var(--blue)'))
                 return (
                   <div key={t.id} onClick={() => setTicketSel(t)}
-                    style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
+                    style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)',
                       borderLeft:`3px solid ${accentColor}`,
-                      padding:'14px 18px', cursor:'pointer', transition:'all .15s', boxShadow:'var(--shadow-sm)' }}
-                    onMouseEnter={e => { e.currentTarget.style.boxShadow='var(--shadow-md)'; e.currentTarget.style.transform='translateY(-1px)' }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow='var(--shadow-sm)'; e.currentTarget.style.transform='translateY(0)' }}>
+                      padding:'14px 18px', cursor:'pointer', transition:'all .15s', boxShadow:'none' }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow='var(--shadow-sm)'; e.currentTarget.style.borderColor='var(--gray-300)' }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='var(--border)' }}>
 
                     {/* Linha 1: categoria + badges + status + data */}
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, flexWrap:'wrap' }}>
@@ -467,11 +470,11 @@ export default function Equipe({ view, onToast }) {
             : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {tickets.filter(t => t.aprovacao_status === 'aguardando').map(t => (
                 <div key={t.id} onClick={() => setTicketSel(t)}
-                  style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)',
+                  style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)',
                     borderLeft:'3px solid var(--amber)', padding:'14px 18px', cursor:'pointer',
-                    transition:'all .15s', boxShadow:'var(--shadow-sm)' }}
-                  onMouseEnter={e => { e.currentTarget.style.boxShadow='var(--shadow-md)'; e.currentTarget.style.transform='translateY(-1px)' }}
-                  onMouseLeave={e => { e.currentTarget.style.boxShadow='var(--shadow-sm)'; e.currentTarget.style.transform='translateY(0)' }}>
+                    transition:'all .15s', boxShadow:'none' }}
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow='var(--shadow-sm)'; e.currentTarget.style.borderColor='var(--gray-300)' }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='var(--border)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <span style={{ fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, color:'var(--gray-400)' }}>
                       #{ticketNumber(t.id)}

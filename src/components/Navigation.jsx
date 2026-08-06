@@ -17,6 +17,7 @@ const ICONS = {
   search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
   chart:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
   truck:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="1" y="6" width="13" height="10" rx="1"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>,
+  shield: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4l2 1"/></svg>,
   dots:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
 }
 
@@ -33,7 +34,10 @@ function initials(name) {
 
 export default function Navigation({ activeView, onNavigate }) {
   const { perfil, logout } = useAuth()
-  const [novos, setNovos] = useState(0)
+  const [chamados, setChamados] = useState(0)
+  const [venc, setVenc] = useState(0)
+  const [contratos, setContratos] = useState(0)
+  const novos = chamados + venc + contratos
   const [somLigado, setSomLigado] = useState(() => {
     // Preferência do usuário (padrão: ligado)
     try { return localStorage.getItem('alertaSom') !== 'off' } catch { return true }
@@ -84,6 +88,20 @@ export default function Navigation({ activeView, onNavigate }) {
 
     const contar = async () => {
       try {
+        const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+        const emDias = (d) => Math.round((new Date(String(d).slice(0,10) + 'T00:00:00') - hoje) / 86400000)
+
+        // Contratos de fornecedores vencendo (por empresa — independe de condomínio)
+        let nContratos = 0
+        try {
+          const { data: fs } = await supabase.from('fornecedores')
+            .select('contrato_fim').eq('empresa_id', perfil.empresa_id)
+            .eq('tem_contrato', true).eq('ativo', true).not('contrato_fim', 'is', null)
+          nContratos = (fs || []).filter(f => emDias(f.contrato_fim) <= 30).length
+        } catch { /* coluna/tabela pode faltar: o sino não pode quebrar */ }
+        setContratos(nContratos)
+
+        // Condomínios do gestor
         let ids = []
         if (perfil.papel === 'admin') {
           const { data } = await supabase.from('condominios').select('id').eq('empresa_id', perfil.empresa_id)
@@ -93,16 +111,29 @@ export default function Navigation({ activeView, onNavigate }) {
             .select('condominio_id').eq('perfil_id', perfil.id)
           ids = (data || []).map(v => v.condominio_id)
         }
-        if (!ids.length) { setNovos(0); return }
-        const { count } = await supabase.from('solicitacoes')
-          .select('id', { count:'exact', head:true })
-          .in('condominio_id', ids)
-          .not('status', 'in', '("resolvido","cancelado")')
-        const total = count || 0
+
+        let nChamados = 0, nVenc = 0
+        if (ids.length) {
+          const { count } = await supabase.from('solicitacoes')
+            .select('id', { count:'exact', head:true })
+            .in('condominio_id', ids)
+            .not('status', 'in', '("resolvido","cancelado")')
+          nChamados = count || 0
+
+          // Vencimentos vencendo/vencidos: janela por-linha (data - hoje <= dias_aviso).
+          try {
+            const { data: vs } = await supabase.from('vencimentos')
+              .select('data_vencimento, dias_aviso')
+              .in('condominio_id', ids).eq('status', 'ativo')
+            nVenc = (vs || []).filter(v => emDias(v.data_vencimento) <= (v.dias_aviso ?? 30)).length
+          } catch { /* tabela pode não existir ainda */ }
+        }
+        setChamados(nChamados); setVenc(nVenc)
+
+        const total = nChamados + nVenc + nContratos
         // Toca só quando AUMENTA (e não na primeira verificação)
         if (anteriorRef.current !== null && total > anteriorRef.current) tocarAlerta()
         anteriorRef.current = total
-        setNovos(total)
       } catch { /* silencioso: o sino é acessório */ }
     }
 
@@ -137,6 +168,7 @@ export default function Navigation({ activeView, onNavigate }) {
       { id:'chamados',   label:'Chamados',       icon:ICONS.list },
       { id:'admin',      label:'Condomínios',    icon:ICONS.condo,  section:'Gestão' },
       { id:'fornecedores', label:'Fornecedores', icon:ICONS.truck },
+      { id:'vencimentos', label:'Controle de Vencimentos',  icon:ICONS.shield },
       { id:'comunicados',label:'Comunicados',    icon:ICONS.bell },
       { id:'agenda',     label:'Agenda',         icon:ICONS.agenda },
       { id:'relatorio',  label:'Relatórios',     icon:ICONS.report },
@@ -152,7 +184,7 @@ export default function Navigation({ activeView, onNavigate }) {
 
   const PAGE_LABEL = {
     dashboard:'Painel', chamados:'Chamados', admin:'Condomínios',
-    fornecedores:'Fornecedores', analitico:'Dashboard',
+    fornecedores:'Fornecedores', vencimentos:'Controle de Vencimentos', analitico:'Dashboard',
     relatorio:'Relatórios', perfil:'Minha empresa', painel:'Painel',
     comunicados:'Comunicados', agenda:'Agenda',
     'novo-chamado':'Novo chamado', 'meus-chamados':'Meus chamados',
@@ -218,8 +250,10 @@ export default function Navigation({ activeView, onNavigate }) {
         </div>
         <div className="topbar-actions">
           <div className="topbar-icon-btn"
-            onClick={() => novos > 0 && onNavigate('chamados')}
-            title={novos > 0 ? `${novos} chamado(s) em aberto` : 'Nenhum chamado em aberto'}
+            onClick={() => { if (chamados > 0) onNavigate('chamados'); else if (venc > 0) onNavigate('vencimentos'); else if (contratos > 0) onNavigate('fornecedores') }}
+            title={novos > 0
+              ? [chamados > 0 && `${chamados} chamado(s) em aberto`, venc > 0 && `${venc} vencimento(s) a vencer`, contratos > 0 && `${contratos} contrato(s) a vencer`].filter(Boolean).join(' · ')
+              : 'Nada pendente'}
             style={{ cursor: novos > 0 ? 'pointer' : 'default', position:'relative' }}>
             {ICONS.bell}
             {novos > 0 && (

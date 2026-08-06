@@ -29,7 +29,7 @@ function KPI({ label, value, sub, cor, icon, prefix='', suffix='', C }) {
         <span style={{ fontSize:12, fontWeight:600, color:C.muted }}>{label}</span>
         <span style={{ fontSize:18 }}>{icon}</span>
       </div>
-      <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:cor||C.text, lineHeight:1 }}>
+      <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, letterSpacing:'-.02em', color:cor||C.text, lineHeight:1 }}>
         {prefix}{typeof value==='number'?value.toLocaleString('pt-BR',{minimumFractionDigits:value%1?2:0, maximumFractionDigits:2}):value}{suffix}
       </div>
       {sub && <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>{sub}</div>}
@@ -415,7 +415,7 @@ function SAFinanceiroInterno({ empresas, planos, C: Cprop, tema }) {
     <div>
       <div style={{ marginBottom:24, display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12 }}>
         <div>
-          <h2 style={{ margin:0, fontSize:20, fontWeight:800, color:C.text }}>Financeiro</h2>
+          <h2 style={{ margin:0, fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:C.text }}>Financeiro</h2>
           <p style={{ margin:'4px 0 0', fontSize:13, color:C.muted }}>Gestão de receitas, cobranças e previsão financeira</p>
         </div>
         <button onClick={gerarRelatorio} disabled={gerandoPDF}
@@ -740,7 +740,7 @@ function SAFinanceiroInterno({ empresas, planos, C: Cprop, tema }) {
                   <div style={{ fontSize:12, color:C.muted, marginBottom:4, textTransform:'uppercase', letterSpacing:'.05em' }}>
                     {p.mes} {p.real&&<span style={{ color:'#a855f7', fontWeight:700 }}>· Atual</span>}
                   </div>
-                  <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:'#22c55e' }}>
+                  <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, letterSpacing:'-.02em', color:'#22c55e' }}>
                     {fmt(p.valor)}
                   </div>
                   <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>MRR projetado</div>

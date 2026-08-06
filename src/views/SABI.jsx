@@ -17,7 +17,7 @@ const STATUS_LABEL = {
 function Kpi({ n, label, cor, sub, C }) {
   return (
     <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 18px' }}>
-      <div style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:800, lineHeight:1, color:cor||C.text }}>{n}</div>
+      <div style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:700, letterSpacing:'-.02em', lineHeight:1, color:cor||C.text }}>{n}</div>
       <div style={{ color:C.muted, fontSize:11, marginTop:6, fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>{label}</div>
       {sub && <div style={{ color:C.muted, fontSize:11, marginTop:3, opacity:.8 }}>{sub}</div>}
     </div>
@@ -67,7 +67,7 @@ function Donut({ dados, C }) {
         background:`conic-gradient(${partes.join(',')})`, position:'relative' }}>
         <div style={{ position:'absolute', inset:'24%', borderRadius:'50%', background:C.surface,
           display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ fontSize:20, fontWeight:800, color:C.text, lineHeight:1 }}>{total}</div>
+          <div style={{ fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:C.text, lineHeight:1 }}>{total}</div>
           <div style={{ fontSize:9, color:C.muted, textTransform:'uppercase' }}>total</div>
         </div>
       </div>
@@ -202,7 +202,7 @@ export default function SABI({ empresas, C }) {
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12, marginBottom:8 }}>
         <div>
-          <h2 style={{ margin:'0 0 4px', fontSize:22, fontWeight:800, color:C.text }}>BI · Análise da plataforma</h2>
+          <h2 style={{ margin:'0 0 4px', fontSize:22, fontWeight:700, letterSpacing:'-.02em', color:C.text }}>BI · Análise da plataforma</h2>
           <p style={{ margin:0, fontSize:13, color:C.muted }}>Visão macro de operação — chamados, condomínios e clientes</p>
         </div>
         <select value={empresaFiltro} onChange={e=>setEmpresaFiltro(e.target.value)}

@@ -459,7 +459,7 @@ export default function Relatorio({ onToast }) {
           { l:'Concluídos',   v:stats.concluido, c:'#22c55e' },
         ].map(k=>(
           <div key={k.l} style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', padding:'14px', textAlign:'center', boxShadow:'var(--shadow-sm)' }}>
-            <div style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:800, color:k.c }}>
+            <div style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:700, letterSpacing:'-.02em', color:k.c }}>
               {loading ? '—' : k.v}
             </div>
             <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginTop:4 }}>{k.l}</div>

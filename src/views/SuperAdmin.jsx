@@ -503,7 +503,7 @@ export default function SuperAdmin({ onToast }) {
           {/* ── DASHBOARD ── */}
           {activeMenu==='dashboard' && (
             <div>
-              <h2 style={{ margin:'0 0 4px', fontSize:22, fontWeight:800, color:C.text }}>Bem-vindo ao painel</h2>
+              <h2 style={{ margin:'0 0 4px', fontSize:22, fontWeight:700, letterSpacing:'-.02em', color:C.text }}>Bem-vindo ao painel</h2>
               <p style={{ margin:'0 0 24px', fontSize:13, color:C.muted }}>Visão geral da plataforma</p>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:12, marginBottom:28 }}>
                 {[
@@ -522,7 +522,7 @@ export default function SuperAdmin({ onToast }) {
                     <div style={{ display:'flex', justifyContent:'space-between', marginBottom:10 }}>
                       <span style={{ fontSize:18 }}>{k.ic}</span>
                     </div>
-                    <div style={{ fontFamily:'var(--font-display)', fontSize:32, fontWeight:800, color:k.c, lineHeight:1 }}>{k.v}</div>
+                    <div style={{ fontFamily:'var(--font-display)', fontSize:32, fontWeight:700, letterSpacing:'-.02em', color:k.c, lineHeight:1 }}>{k.v}</div>
                     <div style={{ fontSize:11, color:C.muted, marginTop:6, fontWeight:600, textTransform:'uppercase', letterSpacing:'.05em' }}>{k.l}</div>
                   </div>
                 ))}
@@ -538,7 +538,7 @@ export default function SuperAdmin({ onToast }) {
                 ].map(k=>(
                   <div key={k.l} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'18px 20px' }}>
                     <div style={{ fontSize:18, marginBottom:10 }}>{k.ic}</div>
-                    <div style={{ fontFamily:'var(--font-display)', fontSize:32, fontWeight:800, color:k.c, lineHeight:1 }}>{k.v}</div>
+                    <div style={{ fontFamily:'var(--font-display)', fontSize:32, fontWeight:700, letterSpacing:'-.02em', color:k.c, lineHeight:1 }}>{k.v}</div>
                     <div style={{ fontSize:11, color:C.muted, marginTop:6, fontWeight:600, textTransform:'uppercase', letterSpacing:'.05em' }}>{k.l}</div>
                   </div>
                 ))}
@@ -583,7 +583,7 @@ export default function SuperAdmin({ onToast }) {
           {/* ── MINHA EMPRESA ── */}
           {activeMenu==='minha-empresa' && (
             <div style={{ maxWidth:600 }}>
-              <h2 style={{ margin:'0 0 4px', fontSize:20, fontWeight:800, color:C.text }}>Minha empresa</h2>
+              <h2 style={{ margin:'0 0 4px', fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:C.text }}>Minha empresa</h2>
               <p style={{ margin:'0 0 24px', fontSize:13, color:C.muted }}>Dados da plataforma e identidade visual</p>
 
               <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'24px', marginBottom:16 }}>
@@ -641,7 +641,7 @@ export default function SuperAdmin({ onToast }) {
             <div>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
                 <div>
-                  <h2 style={{ margin:0, fontSize:20, fontWeight:800, color:C.text }}>
+                  <h2 style={{ margin:0, fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:C.text }}>
                     {subMenu==='ativos'?'Clientes ativos':subMenu==='inadimplentes'?'Inadimplentes':
                      subMenu==='suspensos'?'Suspensos':subMenu==='cancelados'?'Cancelados':'Todos os clientes'}
                   </h2>
@@ -743,7 +743,7 @@ export default function SuperAdmin({ onToast }) {
           {/* ── PLANOS ── */}
           {activeMenu==='planos' && (
             <div>
-              <h2 style={{ margin:'0 0 4px', fontSize:20, fontWeight:800, color:C.text }}>Planos</h2>
+              <h2 style={{ margin:'0 0 4px', fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:C.text }}>Planos</h2>
               <p style={{ margin:'0 0 24px', fontSize:13, color:C.muted }}>Gerencie os planos e veja quem está em cada um</p>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:16 }}>
                 {planos.map(p => {
@@ -755,7 +755,7 @@ export default function SuperAdmin({ onToast }) {
                           <Badge label={p.nome} map={PLANO_COR}/>
                           <PlanoCardEdicao plano={p} onToast={onToast} onSaved={carregar} />
                         </div>
-                        <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:C.text, margin:'10px 0 4px' }}>
+                        <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, letterSpacing:'-.02em', color:C.text, margin:'10px 0 4px' }}>
                           {Number(p.valor_mensal)===0?'Gratuito':`R$ ${Number(p.valor_mensal).toLocaleString('pt-BR')}/mês`}
                         </div>
                         <div style={{ fontSize:13, color:C.muted }}>{p.nome_exibicao}</div>
@@ -1057,7 +1057,7 @@ function PainelAdmins({ empresas, onToast }) {
 
   return (
     <div>
-      <h2 style={{ margin:'0 0 4px', fontSize:20, fontWeight:800, color:C.text }}>Usuários admin e síndicos</h2>
+      <h2 style={{ margin:'0 0 4px', fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:C.text }}>Usuários admin e síndicos</h2>
       <p style={{ margin:'0 0 20px', fontSize:13, color:C.muted }}>{admins.length} usuários</p>
       <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap' }}>
         <input placeholder="Buscar..." value={busca} onChange={e=>setBusca(e.target.value)}

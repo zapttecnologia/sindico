@@ -180,7 +180,7 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
           { l:'Concluidos', v:kpis.concluidos, c:'var(--emerald)' },
         ].map(k => (
           <div key={k.l} style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', padding:'14px 16px', textAlign:'center' }}>
-            <div style={{ fontFamily:'var(--font-display)', fontSize:30, fontWeight:800, color:k.c }}>{k.v}</div>
+            <div style={{ fontFamily:'var(--font-display)', fontSize:30, fontWeight:700, letterSpacing:'-.02em', color:k.c }}>{k.v}</div>
             <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.05em', marginTop:4 }}>{k.l}</div>
           </div>
         ))}

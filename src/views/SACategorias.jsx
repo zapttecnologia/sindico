@@ -185,7 +185,7 @@ export default function SACategorias({ C, tema, onToast }) {
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
         <div>
-          <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:800, color:C.text, margin:0 }}>Categorias do sistema</h2>
+          <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:C.text, margin:0 }}>Categorias do sistema</h2>
           <p style={{ fontSize:13, color:C.muted, margin:'4px 0 0' }}>Gerencie categorias e subcategorias disponíveis para os condomínios</p>
         </div>
         <button onClick={()=>setFormCat(formCat ? null : { ...CAT_VAZIO })}

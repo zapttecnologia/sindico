@@ -436,7 +436,7 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
           ← Voltar
         </button>
         <div style={{ flex:1 }}>
-          <h1 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:800, color:'var(--navy)', margin:0 }}>
+          <h1 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:'var(--navy)', margin:0 }}>
             {condominio.nome}
           </h1>
           <p style={{ fontSize:13, color:'var(--gray-400)', margin:'2px 0 0' }}>
@@ -454,7 +454,7 @@ export default function GerenciarCondominio({ condominio, onVoltar, onToast }) {
           { l:'Operacional', v:kpis.dept, c:'var(--emerald)' },
         ].map(k => (
           <div key={k.l} style={{ background:'#fff', border:'1px solid var(--gray-200)', borderRadius:'var(--r-lg)', padding:'12px 16px', textAlign:'center' }}>
-            <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:k.c }}>{k.v}</div>
+            <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, letterSpacing:'-.02em', color:k.c }}>{k.v}</div>
             <div style={{ fontSize:11, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', marginTop:4 }}>{k.l}</div>
           </div>
         ))}

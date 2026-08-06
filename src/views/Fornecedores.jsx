@@ -10,6 +10,7 @@ const VAZIO = {
   categoria:'', observacoes:'',
   banco:'', agencia:'', conta:'', pix:'',
   tem_contrato:false, contrato_inicio:'', contrato_fim:'', contrato_valor:'',
+  contrato_indice:'',
   contrato_arquivo:null, contrato_arquivo_nome:'',
   ativo:true,
 }
@@ -116,6 +117,7 @@ export default function Fornecedores({ onToast }) {
       contrato_fim: modal.tem_contrato && modal.contrato_fim ? modal.contrato_fim : null,
       contrato_valor: modal.tem_contrato && modal.contrato_valor !== '' && modal.contrato_valor != null
         ? Number(String(modal.contrato_valor).replace(',', '.')) : null,
+      contrato_indice: modal.tem_contrato && modal.contrato_indice?.trim() ? modal.contrato_indice.trim() : null,
       ativo: modal.ativo !== false,
       atualizado_em: new Date().toISOString(),
     }
@@ -243,6 +245,7 @@ export default function Fornecedores({ onToast }) {
                       </span>
                     )
                   })()}
+                  {f.tem_contrato && f.contrato_indice && <span>📈 Reajuste: {f.contrato_indice}</span>}
                 </div>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => toggleAtivo(f)} title={f.ativo?'Desativar':'Ativar'}>
@@ -379,12 +382,25 @@ export default function Fornecedores({ onToast }) {
                       onChange={e => set('contrato_fim', e.target.value)} />
                   </div>
                 </div>
-                <div className="field">
-                  <label>Valor do contrato (R$)</label>
-                  <input className="input" type="number" step="0.01" min="0"
-                    value={modal.contrato_valor ?? ''}
-                    onChange={e => set('contrato_valor', e.target.value)}
-                    placeholder="Ex.: 1500.00" />
+                <div className="row2" style={{ display:'flex', gap:12 }}>
+                  <div className="field" style={{ flex:1 }}>
+                    <label>Valor do contrato (R$)</label>
+                    <input className="input" type="number" step="0.01" min="0"
+                      value={modal.contrato_valor ?? ''}
+                      onChange={e => set('contrato_valor', e.target.value)}
+                      placeholder="Ex.: 1500.00" />
+                  </div>
+                  <div className="field" style={{ flex:1 }}>
+                    <label>Índice de reajuste</label>
+                    <input className="input" list="indices-reajuste" value={modal.contrato_indice || ''}
+                      onChange={e => set('contrato_indice', e.target.value)}
+                      placeholder="Ex.: IGP-M, IPCA, INPC..." />
+                    <datalist id="indices-reajuste">
+                      <option value="IGP-M" /><option value="IPCA" /><option value="INPC" />
+                      <option value="INCC" /><option value="IGP-DI" /><option value="CDI" />
+                      <option value="Sem reajuste" />
+                    </datalist>
+                  </div>
                 </div>
                 <div className="field" style={{ marginBottom:0 }}>
                   <label>Arquivo do contrato</label>

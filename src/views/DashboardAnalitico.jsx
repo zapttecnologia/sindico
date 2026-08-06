@@ -27,7 +27,7 @@ const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov'
 function Kpi({ n, label, cor, sub }) {
   return (
     <div style={{ background:C.panel, border:`1px solid ${C.line}`, borderRadius:14, padding:14 }}>
-      <div style={{ fontSize:26, fontWeight:800, lineHeight:1, color:cor||C.txt }}>{n}</div>
+      <div style={{ fontSize:26, fontWeight:700, letterSpacing:'-.02em', lineHeight:1, color:cor||C.txt }}>{n}</div>
       <div style={{ color:C.muted, fontSize:11, marginTop:6, textTransform:'uppercase', letterSpacing:'.03em' }}>{label}</div>
       {sub && <div style={{ color:C.muted, fontSize:11, marginTop:3, opacity:.75 }}>{sub}</div>}
     </div>
@@ -85,7 +85,7 @@ function Donut({ dados }) {
         background:`conic-gradient(${partes.join(',')})`, position:'relative' }}>
         <div style={{ position:'absolute', inset:'22%', borderRadius:'50%', background:C.panel,
           display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ fontSize:22, fontWeight:800, color:C.txt, lineHeight:1 }}>{total}</div>
+          <div style={{ fontSize:22, fontWeight:700, letterSpacing:'-.02em', color:C.txt, lineHeight:1 }}>{total}</div>
           <div style={{ fontSize:10, color:C.muted, textTransform:'uppercase' }}>chamados</div>
         </div>
       </div>
@@ -317,7 +317,7 @@ export default function DashboardAnalitico({ onToast }) {
       {/* Cabeçalho */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:14, flexWrap:'wrap', marginBottom:20 }}>
         <div>
-          <h1 style={{ fontSize:22, fontWeight:800, margin:0, color:C.txt }}>Dashboard de chamados</h1>
+          <h1 style={{ fontSize:22, fontWeight:700, letterSpacing:'-.02em', margin:0, color:C.txt }}>Dashboard de chamados</h1>
           <p style={{ color:C.muted, fontSize:13, margin:'4px 0 0' }}>
             Visão analítica {condoFiltro === 'todos' ? 'de todos os condomínios' : `— ${nomeCondo(condoFiltro)}`}
             {' · '}últimos {periodo} dias

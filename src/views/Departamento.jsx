@@ -144,7 +144,7 @@ export default function Departamento({ onToast }) {
               <div style={{ fontFamily:'var(--font-mono)', fontSize:11, color:'var(--gray-400)', marginBottom:4 }}>
                 #{ticketNumber(ticketSel.id)}
               </div>
-              <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:800, color:'var(--navy)', margin:'0 0 6px' }}>
+              <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:'var(--navy)', margin:'0 0 6px' }}>
                 {ticketSel.categoria_personalizada||ticketSel.categoria}
               </h2>
               <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
@@ -274,7 +274,7 @@ export default function Departamento({ onToast }) {
             padding:'12px 10px', textAlign:'center', cursor:'pointer',
             boxShadow: filtroStatus===(k.l==='Total'?'todos':k.l.toLowerCase().replace(/ /g,'_').replace('ção','cao').replace('ú','u')) ? '0 0 0 2px var(--emerald)' : 'var(--shadow-sm)' }}
             onClick={()=>setFiltroStatus(k.l==='Total'?'todos':k.l.toLowerCase().replace(/ /g,'_').replace('ção','cao').replace('ú','u'))}>
-            <div style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:800, color:k.c }}>{k.v}</div>
+            <div style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:700, letterSpacing:'-.02em', color:k.c }}>{k.v}</div>
             <div style={{ fontSize:10, fontWeight:700, color:'var(--gray-400)', textTransform:'uppercase', letterSpacing:'.04em', marginTop:3 }}>{k.l}</div>
           </div>
         ))}
