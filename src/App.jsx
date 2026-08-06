@@ -47,8 +47,8 @@ function AppNormal() {
       if (activeView === 'agenda') return <Agenda onToast={toast} />
       if (activeView === 'fornecedores') return <Fornecedores onToast={toast} />
       if (activeView === 'vencimentos') return <Vencimentos onToast={toast} />
-      if (activeView === 'analitico') return <DashboardAnalitico onToast={toast} />
-      return <Equipe view={activeView} onToast={toast} />
+      if (activeView === 'analitico') return <DashboardAnalitico onNavigate={setActiveView} onToast={toast} />
+      return <Equipe view={activeView} onNavigate={setActiveView} onToast={toast} />
     }
     return <div style={{ padding:40 }}>Papel nao reconhecido: {perfil?.papel}</div>
   }

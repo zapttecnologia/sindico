@@ -45,6 +45,19 @@ const IcoPie = () => <svg {...ico}><path d="M21 15.5A9 9 0 1 1 8.5 3"/><path d="
 const IcoTag = () => <svg {...ico}><path d="M20.6 13.4 12 22l-9-9V4h9l8.6 8.6a1.4 1.4 0 0 1 0 2z"/><circle cx="7.5" cy="7.5" r="1.1"/></svg>
 const IcoFlame = () => <svg {...ico}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.3 1-3a2.5 2.5 0 0 0 2 2.5z"/></svg>
 const IcoRank = () => <svg {...ico}><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-1.5 2-2.5S5 14 4 14.5"/></svg>
+const IcoCalendar = () => <svg {...ico}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+
+// aaaa-mm-dd -> dd/mm/aaaa
+const fmtDataBR = (d) => { if (!d) return ''; const [a,m,dia] = String(d).slice(0,10).split('-'); return `${dia}/${m}/${a}` }
+// Dias até a data (negativo = já venceu), com base em hoje 00:00
+const diasAteData = (d) => {
+  const h = new Date(); h.setHours(0,0,0,0)
+  return Math.round((new Date(String(d).slice(0,10) + 'T00:00:00') - h) / 86400000)
+}
+// Selo de situação por cor (mesma paleta do Controle de Vencimentos)
+const seloSituacao = (dias) => dias < 0
+  ? { cor:'var(--rust)', bg:'var(--rust-bg)', texto:`Vencido há ${Math.abs(dias)} dia${Math.abs(dias)===1?'':'s'}` }
+  : { cor:'#b45309', bg:'var(--amber-bg)', texto: dias===0 ? 'Vence hoje' : `Vence em ${dias} dia${dias===1?'':'s'}` }
 
 function SectionTitle({ icon, children }) {
   return (
@@ -73,27 +86,34 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-export default function Dashboard({ onToast }) {
+export default function Dashboard({ onNavigate, onToast }) {
   const { perfil } = useAuth()
   const [tickets, setTickets] = useState([])
   const [condominios, setCondominios] = useState([])
+  const [vencimentos, setVencimentos] = useState([])
+  const [fornecedores, setFornecedores] = useState([])
   const [condoFiltro, setCondoFiltro] = useState('todos')
   const [loading, setLoading] = useState(true)
   const ehAdmin = perfil?.papel === 'admin'
 
   const carregar = async () => {
     setLoading(true)
-    const [{ data: t }, { data: c }] = await Promise.all([
+    const [{ data: t }, { data: c }, { data: v }, { data: f }] = await Promise.all([
       supabase.from('solicitacoes').select('id,status,categoria,condominio_id,aprovacao_status,criado_em'),
       ehAdmin
         ? supabase.from('condominios').select('id,nome').order('nome')
         : supabase.from('sindico_condominios').select('condominio_id,condominios(id,nome)').eq('perfil_id', perfil?.id),
+      supabase.from('vencimentos').select('id,titulo,tipo,data_vencimento,condominio_id').neq('status','arquivado'),
+      supabase.from('fornecedores').select('id,razao_social,nome_fantasia,categoria,contrato_fim')
+        .eq('empresa_id', perfil?.empresa_id).eq('ativo', true).eq('tem_contrato', true),
     ])
     if (t) setTickets(t)
     if (c) {
       if (ehAdmin) setCondominios(c)
       else setCondominios(c.map(r => ({ id:r.condominio_id, nome:r.condominios?.nome||'' })))
     }
+    setVencimentos(v || [])
+    setFornecedores(f || [])
     setLoading(false)
   }
 
@@ -173,6 +193,24 @@ export default function Dashboard({ onToast }) {
   // Ranking: top categorias
   const rankingCat = [...porCategoria].slice(0, 5)
 
+  // Vencimentos próximos: unifica Controle de Vencimentos + contratos de fornecedores.
+  // Mostra só vencidos (dias<0) ou vencendo nos próximos 30 dias; ordena do mais urgente.
+  const condoNome = (id) => condominios.find(c => c.id === id)?.nome || ''
+  const condoIds = new Set(condominios.map(c => c.id))
+  const vencItens = vencimentos
+    .filter(v => v.data_vencimento && (condoIds.size === 0 || condoIds.has(v.condominio_id)))
+    .map(v => ({ id:`v${v.id}`, titulo:v.titulo, tipo:'vencimento', data:v.data_vencimento,
+      condominio:condoNome(v.condominio_id), dias:diasAteData(v.data_vencimento) }))
+  const fornItens = fornecedores
+    .filter(f => f.contrato_fim)
+    .map(f => ({ id:`f${f.id}`, titulo:`Contrato · ${f.nome_fantasia || f.razao_social}`, tipo:'fornecedor',
+      data:f.contrato_fim, condominio:f.categoria || '', dias:diasAteData(f.contrato_fim) }))
+  const vencProximos = [...vencItens, ...fornItens]
+    .filter(i => i.dias <= 30)
+    .sort((a, b) => a.dias - b.dias)
+  const nVencidos  = vencProximos.filter(i => i.dias < 0).length
+  const nVencendo  = vencProximos.filter(i => i.dias >= 0).length
+
   // Contexto da saudação (escopo do síndico, independente do filtro de condomínio)
   const sAberto = tickets.filter(t => !FECHADOS.includes(t.status)).length
   const sAprov  = tickets.filter(t => t.aprovacao_status === 'aguardando').length
@@ -211,6 +249,47 @@ export default function Dashboard({ onToast }) {
         <KPI label="Em andamento" value={kpis.andamento} tone="var(--accent)" />
         <KPI label="Ag. aprovacao" value={kpis.aprovacao} tone="var(--purple)" />
         <KPI label="Concluidos" value={kpis.concluido} tone="var(--success)" />
+      </div>
+
+      {/* Vencimentos próximos */}
+      <SectionTitle icon={<IcoCalendar/>}>Vencimentos próximos</SectionTitle>
+      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'16px 20px' }}>
+        {vencProximos.length === 0 ? (
+          <p style={{ fontSize:13.5, color:'var(--text-subtle)', margin:0 }}>✅ Nenhum vencimento próximo. Tudo em dia!</p>
+        ) : (
+          <>
+            <div style={{ fontSize:12.5, fontWeight:600, color:'var(--text-subtle)', marginBottom:10 }}>
+              {nVencidos} vencido{nVencidos!==1?'s':''} · {nVencendo} vencendo em 30 dias
+            </div>
+            {vencProximos.map((item, i) => {
+              const st = seloSituacao(item.dias)
+              const destino = item.tipo === 'fornecedor' ? 'fornecedores' : 'vencimentos'
+              return (
+                <div key={item.id} onClick={() => onNavigate?.(destino)}
+                  style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', cursor:'pointer',
+                    borderBottom: i<vencProximos.length-1 ? '1px solid var(--gray-100)' : '' }}
+                  onMouseEnter={e => e.currentTarget.style.background='var(--gray-50)'}
+                  onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:600, color:'var(--gray-800)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                      {item.titulo}
+                    </div>
+                    <div style={{ fontSize:11.5, color:'var(--gray-400)', marginTop:3, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                      <span style={{ padding:'1px 8px', borderRadius:20, background:'var(--gray-100)', color:'var(--gray-500)', fontWeight:600, fontSize:10.5 }}>
+                        {item.tipo === 'fornecedor' ? 'Contrato de fornecedor' : 'Vencimento'}
+                      </span>
+                      <span>{fmtDataBR(item.data)}</span>
+                      {item.condominio && <span>· {item.condominio}</span>}
+                    </div>
+                  </div>
+                  <span style={{ fontSize:11.5, fontWeight:700, color:st.cor, background:st.bg, padding:'4px 10px', borderRadius:20, whiteSpace:'nowrap', flexShrink:0 }}>
+                    {st.texto}
+                  </span>
+                </div>
+              )
+            })}
+          </>
+        )}
       </div>
 
       {/* Evolucao mensal */}

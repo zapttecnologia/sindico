@@ -7,7 +7,7 @@ import Modal from '../components/Modal'
 import Dashboard from './Dashboard'
 import KanbanChamados from './KanbanChamados'
 
-export default function Equipe({ view, onToast }) {
+export default function Equipe({ view, onNavigate, onToast }) {
   const { perfil } = useAuth()
   // subTela é só para navegação DENTRO de chamados (aprovações, etc)
   const [subTela, setSubTela] = useState('lista')
@@ -241,7 +241,7 @@ export default function Equipe({ view, onToast }) {
   }
 
   // ── VIEW: PAINEL → Dashboard BI
-  if (view === 'dashboard') return <Dashboard onToast={onToast} />
+  if (view === 'dashboard') return <Dashboard onNavigate={onNavigate} onToast={onToast} />
 
   // ── VIEW: CHAMADOS
   // O detalhe do chamado abre em um modal por cima da lista (ver final do render)

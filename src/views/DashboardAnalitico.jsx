@@ -23,6 +23,15 @@ const PRIORIDADE_LABEL = { baixa:'Baixa', media:'Média', alta:'Alta', urgente:'
 
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 
+// aaaa-mm-dd -> dd/mm/aaaa
+const fmtDataBR = (d) => { if (!d) return ''; const [a,m,dia] = String(d).slice(0,10).split('-'); return `${dia}/${m}/${a}` }
+// Dias até a data (negativo = já venceu), base hoje 00:00
+const diasAteData = (d) => { const h = new Date(); h.setHours(0,0,0,0); return Math.round((new Date(String(d).slice(0,10) + 'T00:00:00') - h) / 86400000) }
+// Selo de vencimento (tema escuro)
+const seloVenc = (dias) => dias < 0
+  ? { cor:'#fca5a5', texto:`Vencido há ${Math.abs(dias)} dia${Math.abs(dias)===1?'':'s'}` }
+  : { cor:'#fbbf24', texto: dias===0 ? 'Vence hoje' : `Vence em ${dias} dia${dias===1?'':'s'}` }
+
 // ── Blocos visuais ────────────────────────────────────────────
 function Kpi({ n, label, cor, sub }) {
   return (
@@ -132,10 +141,12 @@ function Evolucao({ dados }) {
 }
 
 // ── Tela ──────────────────────────────────────────────────────
-export default function DashboardAnalitico({ onToast }) {
+export default function DashboardAnalitico({ onNavigate, onToast }) {
   const { perfil } = useAuth()
   const [tickets, setTickets] = useState([])
   const [condominios, setCondominios] = useState([])
+  const [vencimentos, setVencimentos] = useState([])
+  const [fornecedores, setFornecedores] = useState([])
   const [loading, setLoading] = useState(true)
   const [condoFiltro, setCondoFiltro] = useState('todos')
   const [periodo, setPeriodo] = useState(90)   // dias
@@ -186,9 +197,19 @@ export default function DashboardAnalitico({ onToast }) {
         .in('condominio_id', ids)
         .order('criado_em', { ascending:false })
       setTickets(data || [])
+      const { data: v } = await supabase.from('vencimentos')
+        .select('id,titulo,tipo,data_vencimento,condominio_id')
+        .in('condominio_id', ids).neq('status', 'arquivado')
+      setVencimentos(v || [])
     } else {
       setTickets([])
+      setVencimentos([])
     }
+    // Contratos de fornecedores (por empresa — independem de condomínio)
+    const { data: f } = await supabase.from('fornecedores')
+      .select('id,razao_social,nome_fantasia,categoria,contrato_fim')
+      .eq('empresa_id', perfil?.empresa_id).eq('ativo', true).eq('tem_contrato', true)
+    setFornecedores(f || [])
     setAtualizadoEm(new Date())
     setLoading(false)
   }
@@ -302,6 +323,22 @@ export default function DashboardAnalitico({ onToast }) {
 
   const nomeCondo = id => condominios.find(c => c.id === id)?.nome || '—'
 
+  // Vencimentos próximos: Controle de Vencimentos + contratos de fornecedores.
+  // Só vencidos ou vencendo em 30 dias; independe dos filtros de período/condomínio.
+  const vencItens = vencimentos
+    .filter(v => v.data_vencimento)
+    .map(v => ({ id:`v${v.id}`, titulo:v.titulo, tipo:'vencimento', data:v.data_vencimento,
+      contexto: condominios.find(c => c.id === v.condominio_id)?.nome || '', dias:diasAteData(v.data_vencimento) }))
+  const fornItens = fornecedores
+    .filter(f => f.contrato_fim)
+    .map(f => ({ id:`f${f.id}`, titulo:`Contrato · ${f.nome_fantasia || f.razao_social}`, tipo:'fornecedor',
+      data:f.contrato_fim, contexto:f.categoria || '', dias:diasAteData(f.contrato_fim) }))
+  const vencProximos = [...vencItens, ...fornItens]
+    .filter(i => i.dias <= 30)
+    .sort((a, b) => a.dias - b.dias)
+  const nVencidos = vencProximos.filter(i => i.dias < 0).length
+  const nVencendo = vencProximos.filter(i => i.dias >= 0).length
+
   if (loading) return (
     <div style={{ background:C.bg, minHeight:'100vh', margin:-24, padding:40, color:C.muted }}>
       Carregando painel...
@@ -355,6 +392,44 @@ export default function DashboardAnalitico({ onToast }) {
         <Kpi n={kpis.aprovacao}  label="Ag. aprovação"   cor="#c4b5fd" />
         <Kpi n={kpis.resolvidos} label="Resolvidos"      cor="#86efac" />
         <Kpi n={kpis.urgentes}   label="Urgentes abertos" cor="#fca5a5" />
+      </div>
+
+      {/* Vencimentos próximos */}
+      <div style={{ marginBottom:20 }}>
+        <Painel titulo="Vencimentos próximos"
+          contagem={vencProximos.length ? `${nVencidos} vencido${nVencidos!==1?'s':''} · ${nVencendo} vencendo` : null}>
+          {vencProximos.length === 0 ? (
+            <div style={{ color:'#86efac', fontSize:13 }}>✅ Nenhum vencimento próximo. Tudo em dia!</div>
+          ) : (
+            vencProximos.map((item, i) => {
+              const st = seloVenc(item.dias)
+              const destino = item.tipo === 'fornecedor' ? 'fornecedores' : 'vencimentos'
+              return (
+                <div key={item.id} onClick={() => onNavigate?.(destino)}
+                  style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 6px', cursor:'pointer', borderRadius:8,
+                    borderTop: i>0 ? `1px solid ${C.line}` : '' }}
+                  onMouseEnter={e => e.currentTarget.style.background=C.panel2}
+                  onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13.5, fontWeight:600, color:C.txt, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                      {item.titulo}
+                    </div>
+                    <div style={{ fontSize:11.5, color:C.muted, marginTop:3, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                      <span style={{ padding:'1px 8px', borderRadius:20, background:C.panel2, color:C.muted, fontWeight:600, fontSize:10.5 }}>
+                        {item.tipo === 'fornecedor' ? 'Contrato de fornecedor' : 'Vencimento'}
+                      </span>
+                      <span>{fmtDataBR(item.data)}</span>
+                      {item.contexto && <span>· {item.contexto}</span>}
+                    </div>
+                  </div>
+                  <span style={{ fontSize:11.5, fontWeight:700, color:st.cor, background:`${st.cor}22`, padding:'4px 10px', borderRadius:20, whiteSpace:'nowrap', flexShrink:0 }}>
+                    {st.texto}
+                  </span>
+                </div>
+              )
+            })
+          )}
+        </Painel>
       </div>
 
       {/* Indicadores de desempenho */}
