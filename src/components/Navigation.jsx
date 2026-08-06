@@ -199,11 +199,11 @@ export default function Navigation({ activeView, onNavigate }) {
         {/* Logo */}
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon">
-            <svg viewBox="0 0 24 24"><path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/></svg>
+            <img src="/icone.png" alt="Logo" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'inherit' }} />
           </div>
           <div>
             <div className="sidebar-logo-text">Portal Síndico</div>
-            <div className="sidebar-logo-sub">Gestão condominial</div>
+            <div className="sidebar-logo-sub">Zapt Condo</div>
           </div>
         </div>
 

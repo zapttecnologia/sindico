@@ -81,18 +81,13 @@ export default function Login() {
         {/* ── Topo: marca + descrição ── */}
         <div style={{ textAlign: 'center', marginBottom: 36, padding: '0 8px' }}>
           {/* Logo */}
-          <div style={{
+          <img src="/icone.png" alt="Logo" style={{
             width: 64, height: 64,
-            background: 'rgba(255,255,255,.15)',
             borderRadius: 18,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            objectFit: 'cover',
+            display: 'block',
             margin: '0 auto 20px',
-            backdropFilter: 'blur(4px)',
-          }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8">
-              <path d="M4 21V8L12 3l8 5v13"/><path d="M9 21v-6h6v6"/>
-            </svg>
-          </div>
+          }} />
 
           {/* Nome */}
           <h1 style={{
@@ -195,6 +190,23 @@ export default function Login() {
             Não recebeu seu código de acesso?<br />
             Entre em contato com a administração.
           </p>
+        </div>
+
+        {/* ── Identificação / marca ── */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          marginTop: 24,
+          color: 'rgba(255,255,255,.6)',
+          fontSize: 12.5,
+          letterSpacing: '.2px',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+          </svg>
+          <span>Uma solução <strong style={{ color:'rgba(255,255,255,.85)', fontWeight:700 }}>Zapt Soluções</strong></span>
         </div>
 
       </div>
