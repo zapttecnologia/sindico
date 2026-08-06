@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import Saudacao from '../components/Saudacao'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell, LineChart, Line,
@@ -172,6 +173,13 @@ export default function Dashboard({ onToast }) {
   // Ranking: top categorias
   const rankingCat = [...porCategoria].slice(0, 5)
 
+  // Contexto da saudação (escopo do síndico, independente do filtro de condomínio)
+  const sAberto = tickets.filter(t => !FECHADOS.includes(t.status)).length
+  const sAprov  = tickets.filter(t => t.aprovacao_status === 'aguardando').length
+  const saudacaoCtx = sAberto === 0
+    ? 'Nenhum chamado em aberto no momento. Tudo em dia!'
+    : `Você tem ${sAberto} chamado${sAberto !== 1 ? 's' : ''} em aberto${sAprov > 0 ? ` e ${sAprov} aguardando aprovação` : ''}.`
+
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:60, color:'var(--gray-400)' }}>
       Carregando dados...
@@ -180,6 +188,8 @@ export default function Dashboard({ onToast }) {
 
   return (
     <div>
+      <Saudacao contexto={saudacaoCtx} />
+
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24, flexWrap:'wrap', gap:12 }}>
         <div>

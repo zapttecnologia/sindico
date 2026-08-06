@@ -8,6 +8,7 @@ import ComunicadosLista from '../components/ComunicadosLista'
 import ComunicadosRecentes from '../components/ComunicadosRecentes'
 import AgendaLista from '../components/AgendaLista'
 import ConversaChamado from './ConversaChamado'
+import Saudacao from '../components/Saudacao'
 
 const MAX_BYTES = 10 * 1024 * 1024  // 10MB por arquivo
 
@@ -172,6 +173,11 @@ export default function Conselheiro({ view, onNavigate, onToast }) {
   if (view === 'painel') return (
     <div>
       {header}
+      <Saudacao contexto={
+        pendentes === 0
+          ? 'Nenhum chamado aguardando sua análise no momento.'
+          : `Você tem ${pendentes} chamado${pendentes !== 1 ? 's' : ''} aguardando sua análise.`
+      } />
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:10, marginBottom:24 }}>
         {[
           { l:'Total', v:kpis.total, c:'var(--navy)' },
