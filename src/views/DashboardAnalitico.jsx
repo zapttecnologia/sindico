@@ -152,6 +152,9 @@ export default function DashboardAnalitico({ onNavigate, onToast }) {
   const [periodo, setPeriodo] = useState(90)   // dias
   const [telaCheia, setTelaCheia] = useState(false)
   const [atualizadoEm, setAtualizadoEm] = useState(null)
+  const [totCondominios, setTotCondominios] = useState(0)
+  const [totMoradores, setTotMoradores] = useState(0)
+  const [totConselheiros, setTotConselheiros] = useState(0)
   const containerRef = useRef(null)
 
   // Entra/sai da tela cheia
@@ -210,6 +213,21 @@ export default function DashboardAnalitico({ onNavigate, onToast }) {
       .select('id,razao_social,nome_fantasia,categoria,contrato_fim')
       .eq('empresa_id', perfil?.empresa_id).eq('ativo', true).eq('tem_contrato', true)
     setFornecedores(f || [])
+
+    // Totais macro da empresa — condomínios, moradores e conselheiros cadastrados.
+    // Sempre restrito à empresa do usuário (empresa_id); a RLS garante que
+    // nunca conte itens de outra empresa/estrutura de síndico.
+    if (perfil?.empresa_id) {
+      const [{ count: nCondos }, { count: nMoradores }, { count: nConselheiros }] = await Promise.all([
+        supabase.from('condominios').select('id', { count:'exact', head:true }).eq('empresa_id', perfil.empresa_id),
+        supabase.from('perfis').select('id', { count:'exact', head:true }).eq('empresa_id', perfil.empresa_id).eq('papel', 'morador'),
+        supabase.from('perfis').select('id', { count:'exact', head:true }).eq('empresa_id', perfil.empresa_id).eq('papel', 'conselheiro'),
+      ])
+      setTotCondominios(nCondos || 0)
+      setTotMoradores(nMoradores || 0)
+      setTotConselheiros(nConselheiros || 0)
+    }
+
     setAtualizadoEm(new Date())
     setLoading(false)
   }
@@ -383,6 +401,25 @@ export default function DashboardAnalitico({ onNavigate, onToast }) {
           </button>
         </div>
       </div>
+
+      {/* Totais macro da empresa — só na visão de "Todos os condomínios" */}
+      {condoFiltro === 'todos' && (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:12, marginBottom:20 }}>
+          {[
+            { icone:'🏢', cor:C.brand, n:totCondominios,  label:'Condomínios cadastrados' },
+            { icone:'👥', cor:C.cyan,  n:totMoradores,    label:'Moradores cadastrados' },
+            { icone:'⭐', cor:C.slate, n:totConselheiros, label:'Conselheiros cadastrados' },
+          ].map((m, i) => (
+            <div key={i} style={{ background:C.panel, border:`1px solid ${C.line}`, borderRadius:14, padding:'16px 18px', display:'flex', alignItems:'center', gap:14 }}>
+              <div style={{ width:44, height:44, borderRadius:12, background:`${m.cor}22`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>{m.icone}</div>
+              <div>
+                <div style={{ fontSize:28, fontWeight:700, letterSpacing:'-.02em', lineHeight:1, color:C.txt }}>{m.n}</div>
+                <div style={{ color:C.muted, fontSize:11.5, marginTop:5, textTransform:'uppercase', letterSpacing:'.03em' }}>{m.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:12, marginBottom:20 }}>
