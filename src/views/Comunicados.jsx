@@ -37,27 +37,39 @@ export default function Comunicados({ onToast }) {
   // Modal de exclusão
   const [excluindo, setExcluindo] = useState(null)
 
+  // Condomínios aos quais este usuário tem acesso (admin → da própria empresa;
+  // síndico → apenas os vinculados). É a base do isolamento por empresa.
+  const [meusCondoIds, setMeusCondoIds] = useState(null)
+
   const carregarCondos = async () => {
     if (ehAdmin) {
       const { data } = await supabase.from('condominios').select('id, nome').order('nome')
-      if (data) setCondominios(data)
+      const lista = data || []
+      setCondominios(lista)
+      return lista.map(c => c.id)
     } else {
       const { data } = await supabase.from('sindico_condominios')
         .select('condominio_id, condominios(nome)').eq('perfil_id', perfil?.id)
-      if (data) setCondominios(data.map(r => ({ id:r.condominio_id, nome:r.condominios?.nome||'' })))
+      const lista = (data || []).map(r => ({ id:r.condominio_id, nome:r.condominios?.nome||'' }))
+      setCondominios(lista)
+      return lista.map(c => c.id)
     }
   }
 
-  const carregar = async () => {
+  // Isolamento por empresa: só carrega comunicados dos condomínios do usuário.
+  // Nunca traz comunicado de outra empresa/estrutura de síndico.
+  const carregar = async (condoIds) => {
     setLoading(true)
+    if (!condoIds || condoIds.length === 0) { setComunicados([]); setLoading(false); return }
     const { data } = await supabase.from('comunicados')
       .select('*, condominios(nome), comunicado_anexos(id, nome, caminho)')
+      .in('condominio_id', condoIds)
       .order('criado_em', { ascending:false })
     if (data) setComunicados(data)
     setLoading(false)
   }
 
-  useEffect(() => { carregarCondos(); carregar() }, [])
+  useEffect(() => { (async () => { const ids = await carregarCondos(); setMeusCondoIds(ids); await carregar(ids) })() }, [])
 
   const abrirNovo = () => {
     setEditando(null); setPasso(1)
@@ -112,7 +124,7 @@ export default function Comunicados({ onToast }) {
     setSalvando(false)
     onToast(editando ? 'Comunicado atualizado.' : 'Comunicado publicado.')
     fechar()
-    await carregar()
+    await carregar(meusCondoIds)
   }
 
   const excluir = async () => {
@@ -121,7 +133,7 @@ export default function Comunicados({ onToast }) {
     if (error) { onToast('Erro: '+error.message); return }
     onToast('Comunicado excluído.')
     setExcluindo(null)
-    await carregar()
+    await carregar(meusCondoIds)
   }
 
   const baixarAnexo = async (caminho, nome) => {

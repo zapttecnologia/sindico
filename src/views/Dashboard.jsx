@@ -103,7 +103,7 @@ export default function Dashboard({ onNavigate, onToast }) {
       ehAdmin
         ? supabase.from('condominios').select('id,nome').order('nome')
         : supabase.from('sindico_condominios').select('condominio_id,condominios(id,nome)').eq('perfil_id', perfil?.id),
-      supabase.from('vencimentos').select('id,titulo,tipo,data_vencimento,condominio_id').neq('status','arquivado'),
+      supabase.from('vencimentos').select('id,titulo,tipo,data_vencimento,condominio_id').eq('empresa_id', perfil?.empresa_id).neq('status','arquivado'),
       supabase.from('fornecedores').select('id,razao_social,nome_fantasia,categoria,contrato_fim')
         .eq('empresa_id', perfil?.empresa_id).eq('ativo', true).eq('tem_contrato', true),
     ])

@@ -57,8 +57,9 @@ export default function Agenda({ onToast }) {
   const carregarCondos = async () => {
     if (ehAdmin) {
       const { data } = await supabase.from('condominios').select('id, nome').order('nome')
-      if (data) setCondominios(data)
-      return null
+      const lista = data || []
+      setCondominios(lista)
+      return lista.map(c => c.id)
     } else {
       const { data } = await supabase.from('sindico_condominios')
         .select('condominio_id, condominios(nome)').eq('perfil_id', perfil?.id)
@@ -68,13 +69,15 @@ export default function Agenda({ onToast }) {
     }
   }
 
+  // Isolamento por empresa: só carrega eventos dos condomínios do usuário.
+  // Sem condomínios acessíveis → nada (nunca traz agenda de outra empresa).
   const carregar = async (condoIds) => {
     setLoading(true)
-    let q = supabase.from('eventos')
+    if (!Array.isArray(condoIds) || condoIds.length === 0) { setEventos([]); setLoading(false); return }
+    const { data } = await supabase.from('eventos')
       .select('*, condominios(nome)')
+      .in('condominio_id', condoIds)
       .order('inicio', { ascending:true })
-    if (Array.isArray(condoIds) && condoIds.length > 0) q = q.in('condominio_id', condoIds)
-    const { data } = await q
     if (data) setEventos(data)
     setLoading(false)
   }

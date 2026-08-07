@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 // Data e hora fixas: "16/07 14:30"
 const fmtDataHora = (d) => {
@@ -16,16 +17,20 @@ const fmtDataHora = (d) => {
  * para a tela de comunicados.
  */
 export default function ComunicadosRecentes({ onVerTodos, limite = 3 }) {
+  const { perfil } = useAuth()
   const [comunicados, setComunicados] = useState([])
   const [carregado, setCarregado] = useState(false)
 
   useEffect(() => {
-    supabase.from('comunicados')
+    // Defesa em profundidade: além da RLS, filtra pelo condomínio do usuário,
+    // para nunca mostrar comunicado de outro condomínio/empresa.
+    let q = supabase.from('comunicados')
       .select('id, titulo, mensagem, publico, criado_em, condominios(nome)')
       .order('criado_em', { ascending:false })
       .limit(limite)
-      .then(({ data }) => { setComunicados(data || []); setCarregado(true) })
-  }, [limite])
+    if (perfil?.condominio_id) q = q.eq('condominio_id', perfil.condominio_id)
+    q.then(({ data }) => { setComunicados(data || []); setCarregado(true) })
+  }, [limite, perfil?.condominio_id])
 
   // Não ocupa espaço se não houver comunicados
   if (carregado && comunicados.length === 0) return null

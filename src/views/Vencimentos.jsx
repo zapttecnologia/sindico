@@ -106,7 +106,7 @@ export default function Vencimentos({ onToast }) {
   const carregar = async () => {
     setLoading(true)
     const [{ data:v }, { data:c }, { data:f }] = await Promise.all([
-      supabase.from('vencimentos').select('*').neq('status','arquivado').order('data_vencimento'),
+      supabase.from('vencimentos').select('*').eq('empresa_id', perfil.empresa_id).neq('status','arquivado').order('data_vencimento'),
       supabase.from('condominios').select('id, nome').order('nome'),
       supabase.from('fornecedores').select('id, razao_social, nome_fantasia').eq('empresa_id', perfil.empresa_id).eq('ativo', true).order('razao_social'),
     ])
