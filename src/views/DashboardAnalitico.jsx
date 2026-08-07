@@ -214,18 +214,22 @@ export default function DashboardAnalitico({ onNavigate, onToast }) {
       .eq('empresa_id', perfil?.empresa_id).eq('ativo', true).eq('tem_contrato', true)
     setFornecedores(f || [])
 
-    // Totais macro da empresa — condomínios, moradores e conselheiros cadastrados.
-    // Sempre restrito à empresa do usuário (empresa_id); a RLS garante que
-    // nunca conte itens de outra empresa/estrutura de síndico.
-    if (perfil?.empresa_id) {
-      const [{ count: nCondos }, { count: nMoradores }, { count: nConselheiros }] = await Promise.all([
-        supabase.from('condominios').select('id', { count:'exact', head:true }).eq('empresa_id', perfil.empresa_id),
-        supabase.from('perfis').select('id', { count:'exact', head:true }).eq('empresa_id', perfil.empresa_id).eq('papel', 'morador'),
-        supabase.from('perfis').select('id', { count:'exact', head:true }).eq('empresa_id', perfil.empresa_id).eq('papel', 'conselheiro'),
+    // Totais macro — condomínios, moradores e conselheiros dos condomínios
+    // acessíveis ao usuário (admin → empresa inteira via RLS; síndico → os
+    // vinculados). Conta por condominio_id (e não por empresa_id do perfil,
+    // que pode estar nulo em moradores/conselheiros antigos) — mesmo isolamento
+    // por empresa dos demais dados do painel, sem depender do backfill.
+    setTotCondominios(ids.length)
+    if (ids.length) {
+      const [{ count: nMoradores }, { count: nConselheiros }] = await Promise.all([
+        supabase.from('perfis').select('id', { count:'exact', head:true }).in('condominio_id', ids).eq('papel', 'morador'),
+        supabase.from('perfis').select('id', { count:'exact', head:true }).in('condominio_id', ids).eq('papel', 'conselheiro'),
       ])
-      setTotCondominios(nCondos || 0)
       setTotMoradores(nMoradores || 0)
       setTotConselheiros(nConselheiros || 0)
+    } else {
+      setTotMoradores(0)
+      setTotConselheiros(0)
     }
 
     setAtualizadoEm(new Date())
