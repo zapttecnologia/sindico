@@ -1,5 +1,33 @@
 import { supabase } from './supabase'
 
+// ── Cobrança por modelo ──────────────────────────────────────────────────────
+// Modelos: 'fixo' (usa valor_mensal), 'por_condominio' e 'por_unidade'
+// (usam preco_unitario × quantidade real do cliente).
+
+const fmtBRL = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: Number(v) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
+
+// Descrição curta do preço do plano (para cards/labels). Ex.: "R$ 2/unidade".
+export function descricaoCobranca(plano) {
+  if (!plano) return ''
+  const modelo = plano.modelo_cobranca || 'fixo'
+  const unit = Number(plano.preco_unitario) || 0
+  if (modelo === 'por_condominio') return `${fmtBRL(unit)}/condomínio`
+  if (modelo === 'por_unidade')    return `${fmtBRL(unit)}/unidade`
+  const vm = Number(plano.valor_mensal) || 0
+  return vm === 0 ? 'Gratuito' : `${fmtBRL(vm)}/mês`
+}
+
+// Valor mensal de um cliente conforme o modelo de cobrança do plano.
+// counts: { condominios, unidades } — quantidades reais do cliente.
+export function calcularValorCliente(plano, counts = {}) {
+  if (!plano) return 0
+  const modelo = plano.modelo_cobranca || 'fixo'
+  const unit = Number(plano.preco_unitario) || 0
+  if (modelo === 'por_condominio') return unit * (Number(counts.condominios) || 0)
+  if (modelo === 'por_unidade')    return unit * (Number(counts.unidades) || 0)
+  return Number(plano.valor_mensal) || 0
+}
+
 // Busca o uso atual da empresa e os limites do plano
 export async function verificarUsoPlano(empresaId) {
   const [{ data: empresa }, { data: condos }] = await Promise.all([

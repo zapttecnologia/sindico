@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { calcularValorCliente, descricaoCobranca } from '../lib/plano'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import React from 'react'
@@ -183,25 +184,45 @@ function SAFinanceiroInterno({ empresas, planos, C: Cprop, tema }) {
 
   useEffect(() => { carregar() }, [])
 
+  // Mapa empresa_id → total de unidades (para planos cobrados por unidade).
+  // A view não expõe total_unidades; somamos de condominios. Falha silenciosa
+  // (map vazio → por_unidade calcula 0) para nunca quebrar o financeiro.
+  const [unidadesPorEmpresa, setUnidadesPorEmpresa] = useState({})
+  useEffect(() => {
+    supabase.from('condominios').select('empresa_id, total_unidades')
+      .then(({ data }) => {
+        const m = {}
+        for (const c of (data || [])) m[c.empresa_id] = (m[c.empresa_id] || 0) + (Number(c.total_unidades) || 0)
+        setUnidadesPorEmpresa(m)
+      })
+      .catch(() => {})
+  }, [])
+
+  // Valor mensal de um cliente conforme o modelo de cobrança do plano dele.
+  const valorEmpresa = (e) => {
+    const plano = planos.find(p => p.nome === e.plano_nome)
+    return calcularValorCliente(plano, {
+      condominios: Number(e.total_condominios) || 0,
+      unidades: unidadesPorEmpresa[e.id] || 0,
+    })
+  }
+
   // ── Cálculos financeiros ──────────────────────────────────
   const empresasAtivas = empresas.filter(e => e.status === 'ativa')
-  const mrr = empresasAtivas.reduce((sum, e) => {
-    const plano = planos.find(p => p.nome === e.plano_nome)
-    return sum + (Number(plano?.valor_mensal) || 0)
-  }, 0)
+  const mrr = empresasAtivas.reduce((sum, e) => sum + valorEmpresa(e), 0)
   const arr = mrr * 12
   const churn = empresas.filter(e => e.status === 'cancelada').length
   const churnRate = empresas.length > 0 ? ((churn / empresas.length) * 100).toFixed(1) : 0
   const ticketMedio = empresasAtivas.length > 0 ? mrr / empresasAtivas.length : 0
   const totalInadimplentes = empresas.filter(e => e.status === 'inadimplente').length
 
-  // Receita por plano
+  // Receita por plano (conforme o modelo de cobrança de cada plano)
   const receitaPorPlano = planos.map(p => {
     const clientes = empresasAtivas.filter(e => e.plano_nome === p.nome)
     return {
       nome: p.nome_exibicao,
       clientes: clientes.length,
-      receita: clientes.length * Number(p.valor_mensal),
+      receita: clientes.reduce((s, e) => s + valorEmpresa(e), 0),
     }
   }).filter(p => p.clientes > 0).sort((a,b) => b.receita - a.receita)
 
@@ -304,9 +325,9 @@ function SAFinanceiroInterno({ empresas, planos, C: Cprop, tema }) {
         startY:y, margin:{left:14,right:14},
         head:[['Plano','Clientes','Valor/mês','Receita mensal','% do MRR']],
         body: planos.map(p=>{
-          const cli = empresasAtivas.filter(e=>e.plano_nome===p.nome).length
-          const rec = cli * Number(p.valor_mensal)
-          return [p.nome_exibicao, String(cli), `R$ ${Number(p.valor_mensal).toLocaleString('pt-BR',{minimumFractionDigits:2})}`, `R$ ${rec.toLocaleString('pt-BR',{minimumFractionDigits:2})}`, mrr>0?`${(rec/mrr*100).toFixed(1)}%`:'0%']
+          const cliArr = empresasAtivas.filter(e=>e.plano_nome===p.nome)
+          const rec = cliArr.reduce((s,e)=>s+valorEmpresa(e),0)
+          return [p.nome_exibicao, String(cliArr.length), descricaoCobranca(p), `R$ ${rec.toLocaleString('pt-BR',{minimumFractionDigits:2})}`, mrr>0?`${(rec/mrr*100).toFixed(1)}%`:'0%']
         }),
         headStyles:{fillColor:[40,67,173],textColor:255,fontStyle:'bold',fontSize:9},
         bodyStyles:{fontSize:9},
@@ -363,7 +384,7 @@ function SAFinanceiroInterno({ empresas, planos, C: Cprop, tema }) {
     const empAtivas = empresas.filter(e => e.status === 'ativa')
     const paraGerar = empAtivas.filter(e => {
       const pl = planos.find(p => p.nome === e.plano_nome)
-      return pl && Number(pl.valor_mensal) > 0
+      return pl && valorEmpresa(e) > 0
     })
     if (!paraGerar.length) { return }
     const ok = window.confirm(`Gerar ${paraGerar.length} cobrança${paraGerar.length!==1?'s':''} referente a ${mesRef}?\nVencimento: dia de cada empresa (padrão dia 10).`)
@@ -377,7 +398,7 @@ function SAFinanceiroInterno({ empresas, planos, C: Cprop, tema }) {
       await supabase.from('faturas').insert({
         empresa_id: emp.id,
         descricao: `Mensalidade ${pl.nome_exibicao}`,
-        valor: Number(pl.valor_mensal),
+        valor: valorEmpresa(emp),
         vencimento: vencDaEmpresa(emp), referencia: mesRef, status: 'pendente',
       })
       criadas++
@@ -585,17 +606,16 @@ function SAFinanceiroInterno({ empresas, planos, C: Cprop, tema }) {
               </thead>
               <tbody>
                 {planos.map((p,i) => {
-                  const clientes = empresasAtivas.filter(e=>e.plano_nome===p.nome).length
-                  const receita = clientes * Number(p.valor_mensal)
+                  const clientesArr = empresasAtivas.filter(e=>e.plano_nome===p.nome)
+                  const clientes = clientesArr.length
+                  const receita = clientesArr.reduce((s,e)=>s+valorEmpresa(e),0)
                   const pct = mrr > 0 ? (receita/mrr*100).toFixed(1) : 0
-                  if (!clientes && Number(p.valor_mensal)===0) return null
+                  if (!clientes && Number(p.valor_mensal)===0 && !Number(p.preco_unitario)) return null
                   return (
                     <tr key={p.id} style={{ borderBottom:`1px solid ${C.border}` }}>
                       <td style={{ padding:'11px 12px', fontWeight:700, color:C.text }}>{p.nome_exibicao}</td>
                       <td style={{ padding:'11px 12px', color:C.muted }}>{clientes}</td>
-                      <td style={{ padding:'11px 12px', color:C.muted }}>
-                        {Number(p.valor_mensal)===0 ? 'Gratuito' : fmt(p.valor_mensal)}
-                      </td>
+                      <td style={{ padding:'11px 12px', color:C.muted }}>{descricaoCobranca(p)}</td>
                       <td style={{ padding:'11px 12px', fontWeight:700, color:'#22c55e' }}>{fmt(receita)}</td>
                       <td style={{ padding:'11px 12px', color:C.muted }}>{pct}%</td>
                     </tr>

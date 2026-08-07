@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { mascaraCNPJ, cnpjCompleto, consultarCNPJ } from '../lib/cnpj'
+import { descricaoCobranca, calcularValorCliente } from '../lib/plano'
 import SAFinanceiro from './SAFinanceiro'
 import SABI from './SABI'
 import SACategorias from './SACategorias'
@@ -170,6 +171,8 @@ export default function SuperAdmin({ onToast }) {
   const [empresaSel, setEmpresaSel] = useState(null)
   const [modalNova, setModalNova] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
+  const [modalPlano, setModalPlano] = useState(null)   // null | {} (novo) | plano (editar)
+  const [unidadesCliente, setUnidadesCliente] = useState(null)  // soma de unidades da empresa em edição
   const [busca, setBusca] = useState('')
   const [filtroPlano, setFiltroPlano] = useState('todos')
   const [filtroStatusCli, setFiltroStatusCli] = useState('todos')
@@ -213,13 +216,43 @@ export default function SuperAdmin({ onToast }) {
   const carregar = async () => {
     const [{ data:emp }, { data:pl }] = await Promise.all([
       supabase.from('vw_empresas_painel').select('*'),
-      supabase.from('planos').select('*').eq('ativo',true).order('valor_mensal'),
+      // Todos os planos (inclui arquivados) — a tela de Planos precisa vê-los;
+      // os seletores de plano do cliente filtram os disponíveis à parte.
+      // Ordena por coluna existente (valor_mensal); padrão/personalizado é
+      // separado em JS, então não dependemos de tipo_plano para carregar.
+      supabase.from('planos').select('*').order('valor_mensal'),
     ])
     if (emp) setEmpresas(emp)
     if (pl) setPlanos(pl)
   }
 
   useEffect(() => { carregar() }, [])
+
+  // Soma de unidades da empresa em edição — para estimar o valor em planos
+  // por unidade (a view não expõe total_unidades; somamos de condominios).
+  useEffect(() => {
+    if (!modalEditar?.id) { setUnidadesCliente(null); return }
+    let vivo = true
+    supabase.from('condominios').select('total_unidades').eq('empresa_id', modalEditar.id)
+      .then(({ data }) => { if (vivo) setUnidadesCliente((data || []).reduce((s, c) => s + (Number(c.total_unidades) || 0), 0)) })
+    return () => { vivo = false }
+  }, [modalEditar?.id])
+
+  // Planos que podem ser ESCOLHIDOS para um cliente: ativos, não arquivados e
+  // — se personalizados — apenas do próprio cliente. Mantém o plano atual na
+  // lista mesmo se arquivado, para não trocá-lo silenciosamente ao editar.
+  const planosDisponiveis = (empresaId) => planos.filter(p =>
+    p.ativo !== false && !p.arquivado &&
+    ((p.tipo_plano || 'padrao') !== 'personalizado' || p.empresa_id === empresaId)
+  )
+  const opcoesPlano = (empresaId, atualNome) => {
+    const disp = planosDisponiveis(empresaId)
+    if (atualNome && !disp.some(p => p.nome === atualNome)) {
+      const atual = planos.find(p => p.nome === atualNome)
+      if (atual) return [atual, ...disp]
+    }
+    return disp
+  }
 
   const salvarBranding = (key, val) => {
     const b = { ...branding, [key]:val }
@@ -741,48 +774,72 @@ export default function SuperAdmin({ onToast }) {
           {activeMenu==='usuarios' && <PainelAdmins empresas={empresas} onToast={onToast} />}
 
           {/* ── PLANOS ── */}
-          {activeMenu==='planos' && (
-            <div>
-              <h2 style={{ margin:'0 0 4px', fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:C.text }}>Planos</h2>
-              <p style={{ margin:'0 0 24px', fontSize:13, color:C.muted }}>Gerencie os planos e veja quem está em cada um</p>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:16 }}>
-                {planos.map(p => {
-                  const clientes = empresas.filter(e=>e.plano_nome===p.nome)
-                  return (
-                    <div key={p.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>
-                      <div style={{ padding:'18px 20px', borderBottom:`1px solid ${C.border}` }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                          <Badge label={p.nome} map={PLANO_COR}/>
-                          <PlanoCardEdicao plano={p} onToast={onToast} onSaved={carregar} />
-                        </div>
-                        <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, letterSpacing:'-.02em', color:C.text, margin:'10px 0 4px' }}>
-                          {Number(p.valor_mensal)===0?'Gratuito':`R$ ${Number(p.valor_mensal).toLocaleString('pt-BR')}/mês`}
-                        </div>
-                        <div style={{ fontSize:13, color:C.muted }}>{p.nome_exibicao}</div>
-                        <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>
-                          {clientes.length} cliente{clientes.length!==1?'s':''}
-                          {' · '}Até {p.max_condominios>=999?'∞':p.max_condominios} condos
-                          {p.max_unidades && p.max_unidades < 999999 ? ` · ${p.max_unidades.toLocaleString('pt-BR')} unidades` : ''}
-                        </div>
+          {activeMenu==='planos' && (() => {
+            const limite = (v, inf) => (v == null || v >= inf) ? '∞' : Number(v).toLocaleString('pt-BR')
+            const CardPlano = (p) => {
+              const clientes = empresas.filter(e => e.plano_nome === p.nome)
+              const donoNome = p.empresa_id ? (empresas.find(e => e.id === p.empresa_id)?.nome || 'cliente') : null
+              return (
+                <div key={p.id} style={{ background:C.surface, border:`1px solid ${p.arquivado ? C.amber : C.border}`, borderRadius:12, overflow:'hidden', opacity:p.arquivado?.72:1 }}>
+                  <div style={{ padding:'18px 20px', borderBottom:`1px solid ${C.border}` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                        <Badge label={p.nome} map={PLANO_COR}/>
+                        {p.arquivado && <span style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.04em', padding:'3px 8px', borderRadius:6, background:'rgba(245,158,11,.15)', color:C.amber }}>Arquivado</span>}
                       </div>
-                      <div style={{ maxHeight:160, overflowY:'auto' }}>
-                        {clientes.length===0
-                          ? <div style={{ padding:'16px 20px', fontSize:13, color:C.muted }}>Nenhum cliente neste plano.</div>
-                          : clientes.map(c=>(
-                            <div key={c.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                              padding:'8px 20px', borderBottom:`1px solid ${C.border2}` }}>
-                              <span style={{ fontSize:13, color:C.text, fontWeight:500 }}>{c.nome}</span>
-                              <Badge label={c.status} map={STATUS_COR}/>
-                            </div>
-                          ))
-                        }
-                      </div>
+                      <Btn sm variant="secondary" onClick={()=>setModalPlano(p)}>Editar</Btn>
                     </div>
-                  )
-                })}
+                    <div style={{ fontFamily:'var(--font-display)', fontSize:24, fontWeight:700, letterSpacing:'-.02em', color:C.text, margin:'12px 0 2px' }}>
+                      {descricaoCobranca(p)}
+                    </div>
+                    <div style={{ fontSize:13, color:C.muted }}>{p.nome_exibicao}</div>
+                    {donoNome && <div style={{ fontSize:11.5, color:C.violet, fontWeight:600, marginTop:6 }}>★ Personalizado · {donoNome}</div>}
+                    <div style={{ fontSize:12, color:C.muted, marginTop:8, display:'flex', gap:10, flexWrap:'wrap' }}>
+                      <span>{clientes.length} cliente{clientes.length!==1?'s':''}</span>
+                      <span>· {limite(p.max_condominios,999)} condos</span>
+                      <span>· {limite(p.max_unidades,999999)} unid.</span>
+                      <span>· {limite(p.max_usuarios,999999)} usuários</span>
+                    </div>
+                  </div>
+                  <div style={{ maxHeight:150, overflowY:'auto' }}>
+                    {clientes.length===0
+                      ? <div style={{ padding:'14px 20px', fontSize:13, color:C.muted }}>Nenhum cliente neste plano.</div>
+                      : clientes.map(c=>(
+                        <div key={c.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                          padding:'8px 20px', borderBottom:`1px solid ${C.border2}` }}>
+                          <span style={{ fontSize:13, color:C.text, fontWeight:500 }}>{c.nome}</span>
+                          <Badge label={c.status} map={STATUS_COR}/>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )
+            }
+            const padrao = planos.filter(p => (p.tipo_plano||'padrao')!=='personalizado')
+            const personalizados = planos.filter(p => (p.tipo_plano||'padrao')==='personalizado')
+            const grid = (arr) => <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:16 }}>{arr.map(CardPlano)}</div>
+            return (
+              <div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', marginBottom:24 }}>
+                  <div>
+                    <h2 style={{ margin:'0 0 4px', fontSize:20, fontWeight:700, letterSpacing:'-.02em', color:C.text }}>Planos</h2>
+                    <p style={{ margin:0, fontSize:13, color:C.muted }}>Gerencie os planos, a base de cobrança e veja quem está em cada um</p>
+                  </div>
+                  <Btn onClick={()=>setModalPlano({})}>+ Novo plano</Btn>
+                </div>
+
+                <SecLbl C={C}>Planos padrão</SecLbl>
+                {padrao.length ? grid(padrao) : <div style={{ fontSize:13, color:C.muted, padding:'4px 0 8px' }}>Nenhum plano padrão. Clique em “+ Novo plano”.</div>}
+
+                {personalizados.length > 0 && <>
+                  <div style={{ height:24 }} />
+                  <SecLbl C={C}>Planos personalizados</SecLbl>
+                  {grid(personalizados)}
+                </>}
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* ── FINANCEIRO ── */}
           {activeMenu==='financeiro' && <SAFinanceiro empresas={empresas} planos={planos} C={C} tema={tema} />}
@@ -836,7 +893,7 @@ export default function SuperAdmin({ onToast }) {
           <SecLbl C={C}>Plano e cobrança</SecLbl>
           <Fld label="Plano">
             <DS value={nova.plano_nome} onChange={v=>setNova(x=>({...x,plano_nome:v}))}>
-              {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
+              {opcoesPlano(null, nova.plano_nome).map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
             </DS>
           </Fld>
           {nova.plano_nome==='trial' ? (
@@ -932,7 +989,7 @@ export default function SuperAdmin({ onToast }) {
           <G2>
             <Fld label="Plano">
               <DS value={modalEditar.plano_nome} onChange={v=>setModalEditar(m=>({...m,plano_nome:v}))}>
-                {planos.map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
+                {opcoesPlano(modalEditar.id, modalEditar.plano_nome).map(p=><option key={p.id} value={p.nome}>{p.nome_exibicao}</option>)}
               </DS>
             </Fld>
             {modalEditar.plano_nome==='trial'
@@ -944,6 +1001,23 @@ export default function SuperAdmin({ onToast }) {
                   </DS>
                 </Fld>}
           </G2>
+          {(() => {
+            const pl = planos.find(p => p.nome === modalEditar.plano_nome)
+            const modelo = pl?.modelo_cobranca || 'fixo'
+            if (!pl || modelo === 'fixo') return null
+            const nCondos = Number(modalEditar.total_condominios) || 0
+            const qtd = modelo === 'por_condominio' ? nCondos : unidadesCliente
+            const rotulo = modelo === 'por_condominio' ? 'condomínios' : 'unidades'
+            const val = calcularValorCliente(pl, { condominios: nCondos, unidades: unidadesCliente || 0 })
+            return (
+              <div style={{ fontSize:12.5, color:C.text, background:tema==='dark'?'rgba(124,58,237,.12)':'rgba(124,58,237,.06)', border:`1px solid ${C.border}`, borderRadius:8, padding:'10px 12px', marginBottom:14 }}>
+                💡 Cobrança <b>{descricaoCobranca(pl)}</b>
+                {qtd == null
+                  ? ' · calculando…'
+                  : <> · {qtd} {rotulo} → <b style={{ color:C.green }}>{`R$ ${val.toLocaleString('pt-BR',{minimumFractionDigits:val%1?2:0})}`}/mês</b> estimado</>}
+              </div>
+            )
+          })()}
           {modalEditar.plano_nome!=='trial' && (
             <Fld label="Forma de pagamento">
               <DS value={modalEditar.forma_pagamento||''} onChange={v=>setModalEditar(m=>({...m,forma_pagamento:v}))}>
@@ -963,41 +1037,212 @@ export default function SuperAdmin({ onToast }) {
           </div>
         </Modal>
       )}
+
+      {/* Modal criar/editar plano */}
+      {modalPlano && (
+        <PlanoModal plano={modalPlano} empresas={empresas}
+          onClose={()=>setModalPlano(null)} onToast={onToast} onSaved={carregar} />
+      )}
     </div>
     </TemaCtx.Provider>
   )
 }
-function PlanoCardEdicao({ plano, onToast, onSaved }) {
+
+// ── PlanoModal — criação/edição completa de plano (substitui o popover) ──────
+const SENT_CONDOS = 999          // sentinela de "ilimitado" em max_condominios
+const SENT_GRANDE = 999999       // sentinela de "ilimitado" em unidades/usuários
+
+function PlanoModal({ plano, empresas, onClose, onToast, onSaved }) {
   const { tema, C } = useTema()
-  const [editando, setEditando] = useState(false)
-  const [form, setForm] = useState({...plano})
+  const ehNovo = !plano?.id
+  const clientesNoPlano = ehNovo ? [] : empresas.filter(e => e.plano_nome === plano.nome)
+  const temClientes = clientesNoPlano.length > 0
+
+  const limiteParaInput = (v, sent) => (v == null || Number(v) >= sent) ? '' : String(v)
+  const [f, setF] = useState(() => ({
+    nome:            plano?.nome || '',
+    nome_exibicao:   plano?.nome_exibicao || '',
+    tipo_plano:      plano?.tipo_plano || 'padrao',
+    empresa_id:      plano?.empresa_id || '',
+    modelo_cobranca: plano?.modelo_cobranca || 'fixo',
+    valor_mensal:    plano?.valor_mensal != null ? String(plano.valor_mensal) : '',
+    preco_unitario:  plano?.preco_unitario != null ? String(plano.preco_unitario) : '',
+    max_condominios: limiteParaInput(plano?.max_condominios, SENT_CONDOS),
+    max_unidades:    limiteParaInput(plano?.max_unidades, SENT_GRANDE),
+    max_usuarios:    limiteParaInput(plano?.max_usuarios, SENT_GRANDE),
+    descricao:       plano?.descricao || '',
+    ativo:           plano?.ativo !== false,
+    arquivado:       !!plano?.arquivado,
+  }))
+  const [salvando, setSalvando] = useState(false)
+  const set = (k, v) => setF(x => ({ ...x, [k]: v }))
+
+  // Preview do preço em tempo real
+  const preview = descricaoCobranca({ modelo_cobranca:f.modelo_cobranca, preco_unitario:f.preco_unitario, valor_mensal:f.valor_mensal })
+
   const salvar = async () => {
-    await supabase.from('planos').update({
-      nome_exibicao:form.nome_exibicao,
-      max_condominios:Number(form.max_condominios),
-      max_unidades:Number(form.max_unidades)||999999,
-      max_usuarios:Number(form.max_usuarios),
-      valor_mensal:Number(form.valor_mensal),
-      descricao:form.descricao
-    }).eq('id',plano.id)
-    onToast('Plano atualizado.'); setEditando(false); onSaved()
+    if (!f.nome.trim())          { onToast('Informe o nome interno do plano.'); return }
+    if (!f.nome_exibicao.trim()) { onToast('Informe o nome de exibição.'); return }
+    if (f.tipo_plano === 'personalizado' && !f.empresa_id) { onToast('Escolha o cliente do plano personalizado.'); return }
+    if (f.modelo_cobranca === 'fixo' && f.valor_mensal === '') { onToast('Informe o valor mensal.'); return }
+    if (f.modelo_cobranca !== 'fixo' && (f.preco_unitario === '' || Number(f.preco_unitario) <= 0)) { onToast('Informe o preço unitário.'); return }
+
+    const paraLimite = (v, sent) => v === '' ? sent : Number(v)
+    const payload = {
+      nome: f.nome.trim(),
+      nome_exibicao: f.nome_exibicao.trim(),
+      tipo_plano: f.tipo_plano,
+      empresa_id: f.tipo_plano === 'personalizado' ? (f.empresa_id || null) : null,
+      modelo_cobranca: f.modelo_cobranca,
+      valor_mensal: f.modelo_cobranca === 'fixo' ? (Number(f.valor_mensal) || 0) : 0,
+      preco_unitario: f.modelo_cobranca === 'fixo' ? null : (Number(f.preco_unitario) || 0),
+      max_condominios: paraLimite(f.max_condominios, SENT_CONDOS),
+      max_unidades: paraLimite(f.max_unidades, SENT_GRANDE),
+      max_usuarios: paraLimite(f.max_usuarios, SENT_GRANDE),
+      descricao: f.descricao?.trim() || null,
+      ativo: f.ativo !== false,
+      arquivado: !!f.arquivado,
+    }
+    setSalvando(true)
+    let error
+    if (ehNovo) ({ error } = await supabase.from('planos').insert(payload))
+    else        ({ error } = await supabase.from('planos').update(payload).eq('id', plano.id))
+    setSalvando(false)
+    if (error) { onToast('Erro: ' + error.message); return }
+    onToast(ehNovo ? 'Plano criado.' : 'Plano atualizado.')
+    onClose(); onSaved()
   }
-  if (!editando) return <button onClick={()=>setEditando(true)} style={{ background:'none', border:`1px solid ${C.border}`, borderRadius:6, color:C.muted, padding:'3px 10px', fontSize:11, cursor:'pointer' }}>Editar</button>
+
+  const arquivar = async (valor) => {
+    setSalvando(true)
+    const { error } = await supabase.from('planos').update({ arquivado: valor }).eq('id', plano.id)
+    setSalvando(false)
+    if (error) { onToast('Erro: ' + error.message); return }
+    onToast(valor ? 'Plano arquivado.' : 'Plano reativado.')
+    onClose(); onSaved()
+  }
+
+  const excluir = async () => {
+    if (temClientes) { onToast('Este plano tem clientes — arquive em vez de excluir.'); return }
+    if (!window.confirm(`Excluir o plano "${f.nome_exibicao || f.nome}"? Esta ação não pode ser desfeita.`)) return
+    setSalvando(true)
+    const { error } = await supabase.from('planos').delete().eq('id', plano.id)
+    setSalvando(false)
+    if (error) { onToast('Erro: ' + error.message); return }
+    onToast('Plano excluído.')
+    onClose(); onSaved()
+  }
+
+  const modelos = [
+    { id:'por_condominio', titulo:'Por condomínio', desc:'Preço × nº de condomínios' },
+    { id:'por_unidade',    titulo:'Por unidade',    desc:'Preço × nº de unidades' },
+    { id:'fixo',           titulo:'Valor fixo',     desc:'Mensalidade fixa' },
+  ]
+
   return (
-    <div style={{ position:'absolute', right:20, top:16, background:C.surface, border:`1px solid #7c3aed`, borderRadius:10, padding:14, zIndex:10, minWidth:260 }}>
-      <div style={{ fontSize:11, color:'#a855f7', fontWeight:700, marginBottom:10 }}>Editando plano</div>
-      {[['nome_exibicao','Nome'],['valor_mensal','Valor/mês'],['max_condominios','Máx. condos'],['max_unidades','Máx. unidades'],['max_usuarios','Máx. usuários']].map(([k,l])=>(
-        <div key={k} style={{ marginBottom:8 }}>
-          <label style={{ fontSize:10, color:C.muted, display:'block', marginBottom:3 }}>{l}</label>
-          <input value={form[k]||''} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
-            style={{ width:'100%', background:C.sidebar, border:`1px solid ${C.border}`, borderRadius:6, padding:'6px 9px', color:C.text, fontSize:12, outline:'none', boxSizing:'border-box' }}/>
+    <Modal title={ehNovo ? 'Novo plano' : 'Editar plano'} onClose={onClose} maxWidth={620}>
+      <SecLbl C={C}>Identificação</SecLbl>
+      <G2>
+        <Fld label="Nome interno *">
+          <DI value={f.nome} onChange={v=>set('nome', v)} placeholder="ex.: profissional" style={ehNovo?{}:{ opacity:.6 }} />
+        </Fld>
+        <Fld label="Nome de exibição *">
+          <DI value={f.nome_exibicao} onChange={v=>set('nome_exibicao', v)} placeholder="ex.: Profissional" />
+        </Fld>
+      </G2>
+      {!ehNovo && (
+        <div style={{ fontSize:11, color:C.muted, marginTop:-8, marginBottom:12 }}>
+          O nome interno liga o plano aos clientes — evite alterá-lo depois de criado.
         </div>
-      ))}
-      <div style={{ display:'flex', gap:8, marginTop:10 }}>
-        <button onClick={salvar} style={{ flex:1, padding:'6px', background:'#7c3aed', border:'none', borderRadius:6, color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>Salvar</button>
-        <button onClick={()=>{setEditando(false);setForm({...plano})}} style={{ padding:'6px 10px', background:'none', border:`1px solid ${C.border}`, borderRadius:6, color:C.muted, fontSize:12, cursor:'pointer' }}>✕</button>
+      )}
+
+      <SecLbl C={C}>Tipo</SecLbl>
+      <G2>
+        <Fld label="Categoria do plano">
+          <DS value={f.tipo_plano} onChange={v=>set('tipo_plano', v)}>
+            <option value="padrao">Padrão (todos os clientes)</option>
+            <option value="personalizado">Personalizado (um cliente)</option>
+          </DS>
+        </Fld>
+        {f.tipo_plano === 'personalizado' && (
+          <Fld label="Cliente dono *">
+            <DS value={f.empresa_id} onChange={v=>set('empresa_id', v)}>
+              <option value="">Selecione…</option>
+              {empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+            </DS>
+          </Fld>
+        )}
+      </G2>
+
+      <SecLbl C={C}>Modelo de cobrança</SecLbl>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
+        {modelos.map(m => {
+          const sel = f.modelo_cobranca === m.id
+          return (
+            <button key={m.id} onClick={()=>set('modelo_cobranca', m.id)}
+              style={{ textAlign:'left', cursor:'pointer', padding:'12px 14px', borderRadius:10,
+                border:`1.5px solid ${sel ? C.purple : C.border}`, background: sel ? (tema==='dark'?'rgba(124,58,237,.14)':'rgba(124,58,237,.06)') : 'transparent' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:sel?C.violet:C.text }}>{m.titulo}</div>
+              <div style={{ fontSize:11, color:C.muted, marginTop:3 }}>{m.desc}</div>
+            </button>
+          )
+        })}
       </div>
-    </div>
+
+      {f.modelo_cobranca === 'fixo' ? (
+        <Fld label="Valor mensal (R$) *">
+          <DI value={f.valor_mensal} onChange={v=>set('valor_mensal', v)} type="number" placeholder="0 = gratuito" />
+        </Fld>
+      ) : (
+        <Fld label={f.modelo_cobranca === 'por_condominio' ? 'Preço por condomínio (R$) *' : 'Preço por unidade (R$) *'}>
+          <DI value={f.preco_unitario} onChange={v=>set('preco_unitario', v)} type="number" placeholder="ex.: 2" />
+        </Fld>
+      )}
+      <div style={{ fontSize:13, color:C.text, background:tema==='dark'?'rgba(34,197,94,.12)':'rgba(34,197,94,.08)', border:`1px solid ${C.border}`, borderRadius:8, padding:'10px 12px', marginBottom:16 }}>
+        Preço: <b style={{ color:C.green }}>{preview}</b>
+      </div>
+
+      <SecLbl C={C}>Limites (vazio = ilimitado)</SecLbl>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+        <Fld label="Máx. condomínios"><DI value={f.max_condominios} onChange={v=>set('max_condominios', v)} type="number" placeholder="∞" /></Fld>
+        <Fld label="Máx. unidades"><DI value={f.max_unidades} onChange={v=>set('max_unidades', v)} type="number" placeholder="∞" /></Fld>
+        <Fld label="Máx. usuários"><DI value={f.max_usuarios} onChange={v=>set('max_usuarios', v)} type="number" placeholder="∞" /></Fld>
+      </div>
+
+      <SecLbl C={C}>Descrição</SecLbl>
+      <Fld label="O que este plano inclui">
+        <textarea value={f.descricao} onChange={e=>set('descricao', e.target.value)} rows={3}
+          style={{ width:'100%', background:tema==='light'?'#fff':'#1c2333', border:`1px solid ${C.border}`, borderRadius:8,
+            padding:'9px 12px', color:C.text, fontSize:13, outline:'none', boxSizing:'border-box', resize:'vertical', fontFamily:'inherit' }}
+          placeholder="Ex.: até 5 condomínios, suporte prioritário, relatórios…" />
+      </Fld>
+
+      <div style={{ display:'flex', gap:10, marginTop:8, flexWrap:'wrap' }}>
+        <Btn onClick={salvar} disabled={salvando} style={{ flex:1, minWidth:160 }}>{salvando ? 'Salvando…' : 'Salvar plano'}</Btn>
+        <Btn variant="secondary" onClick={onClose}>Cancelar</Btn>
+      </div>
+
+      {!ehNovo && (
+        <div style={{ borderTop:`1px solid ${C.border}`, marginTop:20, paddingTop:16 }}>
+          {temClientes ? (
+            <>
+              <div style={{ fontSize:12.5, color:C.muted, marginBottom:10 }}>
+                {clientesNoPlano.length} cliente{clientesNoPlano.length!==1?'s':''} neste plano — não pode ser excluído.
+                {f.arquivado ? ' Está arquivado (indisponível para novos clientes).' : ' Arquive para tirá-lo de novos cadastros sem afetar os atuais.'}
+              </div>
+              {f.arquivado
+                ? <Btn variant="secondary" onClick={()=>arquivar(false)} disabled={salvando}>♻ Reativar plano</Btn>
+                : <Btn variant="secondary" onClick={()=>arquivar(true)} disabled={salvando}>📦 Arquivar plano</Btn>}
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize:12.5, color:C.muted, marginBottom:10 }}>Nenhum cliente usa este plano — pode ser excluído com segurança.</div>
+              <Btn variant="danger" onClick={excluir} disabled={salvando}>🗑 Excluir plano</Btn>
+            </>
+          )}
+        </div>
+      )}
+    </Modal>
   )
 }
 
